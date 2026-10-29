@@ -16,6 +16,7 @@ A portable design-taste layer for coding agents: a pack in the repo, an MCP serv
 ## Docs
 
 - [docs/prd.md](docs/prd.md) — PRD mirror of the one-pager
+- [docs/engineering.md](docs/engineering.md) — initial engineering architecture (draft)
 - [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) — Google Doc, source of truth
 
 Cursor and Grok Bot: read [agent.md](agent.md) before changing this repo.
