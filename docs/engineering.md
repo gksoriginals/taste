@@ -1,10 +1,10 @@
 # Engineering
 
-**Draft · Oct 29, 2026 IST**
+**Draft architecture for the product (v0) · Oct 29, 2026 IST**
 
 ## Status and scope
 
-This is the system for running Taste experiments. It is how we define an experiment, execute it, evaluate it, and modify it. It is not a product build, and it is not locked. More research and experiments still have to land before the architecture is locked.
+This is the architecture of Taste, the product we are building. Taste is a plugin for an existing coding-agent harness. The draft is not presumed final. More research may refine it. It is not a locked API.
 
 The source articles (LangChain, Anthropic, Vercel, OpenAI, Emil) stay in full as the starting base. They are proof-of-concepts. This doc re-homes them under Taste's names. The [Vercel product-design tree](https://vercel.com/blog/teaching-agents-product-design-at-vercel) is the default on-disk **Pack adapter**, not the domain model.
 
@@ -12,62 +12,286 @@ The source articles (LangChain, Anthropic, Vercel, OpenAI, Emil) stay in full as
 
 **Audience:** Gopi and Dev for engineering. North for product alignment only.
 
-**Hard goal:** from what a product has shipped, extract its taste across every design angle so any coding harness, given a PRD and the Taste Pack, first-passes UI you would merge. Experiments find the abstract set of angles. See the [PRD](prd.md).
+**Hard goal:** from what a product has shipped, extract its taste across every design angle so any coding harness, given a PRD and the Taste Pack, first-passes UI you would merge. The abstract set of angles stays open and gets clearer as Packs are built. See the [PRD](prd.md).
 
 Two mode names are first-class, from the PRD:
 
 - **Conformance** — match the judgment the product has already shipped.
 - **Expression** — invent or extend taste. Deferred. Omnipresent later.
 
-This repository stays docs-only. The schemas below are the experiment representation, written down so operators have stable inputs and outputs. They are not implemented code. No application code, package manifest, MCP server, or skill files in this repo. The Pack adapter is a layout for a **target product repo**.
+This repository stays docs-only. The schemas below are the product's domain model, written down so Pack files and harness tools have stable inputs and outputs. They are not implemented code. No application code, package manifest, MCP server, or skill files in this repo. The Pack adapter is a layout for a **target product repo**. MCP tool names and skill roles in this doc are contracts for the harness integration, not code to add here.
 
-The shape of the doc follows seven engineering principles: executable operators, data that carries the essential fields, coherent modules, business rules translated into those operators, domain names, explicit abstraction levels, and one-way dependencies so a module can be replaced on its own.
+Read [System architecture](#system-architecture) for how Taste sits on a harness, then the [Abstraction stack](#abstraction-stack) for what a builder creates at each level. Domain schemas, the harness integration table, the Vercel Pack adapter, Conformance and Expression, gates, Critique, product evals, and the improve loop follow. Dependencies run one way, so a skill, a tool, an adapter, or a dogfood binding can be replaced on its own.
 
-## Abstraction levels
+## System architecture
 
-| Level | Name | What it fixes | What may change in an experiment |
-| --- | --- | --- | --- |
-| L0 | Principles | Harness owns the loop. Shipped wins. Taste is Pack + MCP + agents. Conformance first. Rules expire. | A principle change is an architecture change, not an experiment tweak. |
-| L1 | Domain types | Schemas for the nouns. No Ally fields. No harness fields. | Schemas stay stable across an experiment. |
-| L2 | Pack on-disk adapter | Default layout: the Vercel product-design tree. Maps types to files. | A different adapter may store the same types. |
-| L3 | Operators | Sweep, Learn, Interview, Critique, Evaluate, Gate runner, Pack loader. MCP tool stubs. | Replace one operator without rewriting the others. |
-| L4 | Dogfood adapters | Conformance on HelloAlly ally-platform now. Expression priors and omnipresent later. | Ally is an edge binding. It is not in L1. |
+Taste plugs into a coding harness the user already runs. The harness owns the agent loop, the planner, the models, file and shell tools, the skill loader, the MCP client, subagents, `AGENTS.md` and rules, and linters or CI. Taste is the plugin surface those primitives load.
+
+### What Taste is
 
 ```
-L1 Pack schemas
-  ↑ read/write types only
-L3 Operators (Sweep, Learn, Interview, Critique, Evaluate, Gate runner, Pack loader)
+┌──────────────────────────────────────────────────────────┐
+│  Coding harness (Cursor / Claude Code / Codex / …)        │
+│  owns: loop, planning, models, edit/shell tools,          │
+│        skill loader, MCP client, subagents, CI hooks      │
+└────────────────────────────┬─────────────────────────────┘
+                             │ loads Pack · calls MCP ·
+                             │ spawns Critic subagent
+┌────────────────────────────▼─────────────────────────────┐
+│  Taste (plugin surface)                                   │
+│  • Pack in target product repo (skills, wiki, decisions)  │
+│  • MCP tools (load_pack, list_decisions, run_gates, …)    │
+│  • Pack-maintainer skills: Sweep · Learn · Interview      │
+│  • Critic brief → harness subagent                        │
+│  • Gates as linters/CI                                    │
+└────────────────────────────┬─────────────────────────────┘
+                             │ guides / checks
+┌────────────────────────────▼─────────────────────────────┐
+│  Target product UI work (e.g. HelloAlly ally-platform)    │
+│  PRD + Pack → first-pass mergeable UI (Conformance)       │
+└──────────────────────────────────────────────────────────┘
+```
+
+The middle box is the [L3 harness integration surface](#l3-harness-integration-surface) plus Pack files from the [L2 adapter](#l2-pack-on-disk-adapter). The bottom box is [L4](#l4-dogfood-bindings) when the target repo is a dogfood product. [L0](#l0-principles) and [L1](#l1-domain-schemas) are not boxes. L0 is the constraints. L1 is the schemas.
+
+Taste does not replace the harness loop. It does not host its own runtime. It is context, tools, checks, pack-maintainer skills, and a Critic subagent brief.
+
+### How it works
+
+Conformance has three flows: build the Pack, day-to-day UI, and Learn. Expression is a later flow. All of them run inside the host harness.
+
+**A. Build / refresh Pack (Conformance).** The user asks the harness to Sweep a product. The Sweeper skill reads shipped UI and git history, with the user granting that access. It writes proposed Decisions, Exemplars, CoverageGaps, and candidate Gates into the Pack. A human accepts. PackManifest `mode` is `conformance`.
+
+**B. Day-to-day UI generation (Conformance).** The harness starts a UI task. The repo `AGENTS.md` triggers the Taste skill. The skill loads the Angles and Decisions for that surface. The coding agent implements. The harness runs Gates through the repo linter, CI, or MCP `run_gates`. The harness spawns a Critic subagent with the Pack brief. The Critic returns CriticFindings. The agent fixes, or a human merges.
+
+**C. Learn.** A human or Critic correction lands mid-turn. The Learner records a MemoryLesson or a proposed Decision in that same turn (fast). Later it promotes the lesson into a Skill or the Wiki (slow).
+
+**D. Expression (later).** Pack mode or the task mode is `expression`. The harness runs the Interviewer skill and applies ExpressionPriors. The flow stays harness-hosted. OpenAI, Emil, and Anthropic priors apply until the design locks and Taste returns to Conformance.
+
+## Abstraction stack
+
+A builder implements Taste one level at a time. Each level states what it is, which artifacts live there, who owns them, what to edit, which harness primitive it uses, and which updates leave the neighboring levels intact.
+
+L0 is principles only. L1 is domain schemas only. L2 maps those types to files. L3 is the harness integration surface. L4 is a dogfood binding and is not part of L1.
+
+```
+L0 Principles
+  constrain every level below. They are not records.
+L1 Domain schemas
+  ↑ read and write types only
+L3 Harness integration surface
+  Sweep, Learn, Interview skills; Critic brief; Evaluate;
+  Gate runner; Pack loader; MCP tools
   ↑
-L2 is how Pack loader reads files. Gate runner is how Gates run. Critique is how review runs.
+L2 Pack on-disk adapter
+  how Pack loader reads files, where Gate text lives, where review cites
   ↑
-Harness adapter (Cursor / Claude Code / Codex / …) and L4 dogfood (Ally, later omnipresent)
+Harness (Cursor / Claude Code / Codex / …) executes L3
+L4 dogfood (Ally now, omnipresent later) is an edge binding. It is not in L1.
 ```
 
-Dependencies run one way. Pack schemas do not mention Ally or a harness. Operators depend on Pack schemas only. The harness and the dogfood sit at the edge. Replacing the Critic protocol does not rewrite Sweeper. Replacing the linter engine does not rewrite Decision records.
+Dependencies run one way. Pack schemas do not mention Ally or a harness. The harness integration depends on Pack schemas only. The harness and the dogfood sit at the edge. Replacing the Critic protocol does not rewrite the Sweeper skill. Replacing the linter engine does not rewrite Decision records.
 
-Module fences: Taste is not an agent runtime, not a component library, and not a design-system product. OpenSignal does not own design judgment. Taste does not couple to OpenSignal.
+### L0. Principles
 
-### L0 principles
+#### What it is
 
-```
-User harness (Cursor / Claude Code / Codex / …)
-  owns: loop, planning, models, tools, PR workflow
-Taste Pack (target product repo) + MCP stubs + Operators
-  supplies: Skills, Wiki, Gates, MemoryLessons, Critic brief, EvalFixtures
-Critic = harness subagent (bigger model)
-  Critique reviews generator output (generate–review)
-```
+The architecture constraints every other level has to obey.
 
-The harness is the runtime. Taste supplies context, tools, and checks. That split follows the PRD and the [Content Studio](https://www.langchain.com/blog/design-agent) lesson that taste is the designers' judgment written into skills and checks, while the harness owns the loop. Content Studio's sandbox, Slack UX, and media tooling are that product's harness. Taste does not rebuild them.
+#### What lives here
 
-Generate–review means the coding agent generates and the Critic reviews that output. Earlier notes called this GAN-inspired. That metaphor is historical only. The message protocol is still a placeholder.
+Written principles only. No schemas, no files, no skills, no MCP tools, no CI jobs.
 
-Working assumptions for experiments, not a final lock:
-
-- Judgment stays in prompts. Invariants live in code. Compensating rules expire when models improve.
-- Shipped beats a stated preference that conflicts with it. A shipped flaw is not a Decision to copy.
-- Evaluate scores rule correctness separately from similarity to shipped code.
+- The harness owns the loop: planning, models, tools, and the PR workflow.
+- Taste is a plugin on that harness: Pack files, MCP tools, skills, gates, and a Critic brief. It supplies context, tools, and checks.
+- Shipped wins over a stated preference that conflicts with it. A shipped flaw is not a Decision to copy.
 - Conformance is the dogfood mode. Expression waits.
+- Judgment stays in prompts and in Decision prose. Invariants that must always hold live in code, as Gates. Compensating rules expire when models improve. The principles stay.
+- Evaluate scores rule correctness separately from similarity to shipped code.
+- Generate–review means the coding agent generates and the Critic subagent reviews that output. Earlier notes called this GAN-inspired. That metaphor is historical only. The message protocol is still a placeholder.
+- Taste is not an agent runtime, not a component library, and not a design-system product. OpenSignal does not own design judgment. Taste does not couple to OpenSignal.
+
+That split follows the PRD and the [Content Studio](https://www.langchain.com/blog/design-agent) lesson that taste is the designers' judgment written into skills and checks, while the harness owns the loop. Content Studio's sandbox, Slack UX, and media tooling are that product's harness. Taste does not rebuild them.
+
+These are draft product assumptions. They are not a final lock.
+
+#### Who owns it
+
+The Taste product architecture, in this document. The harness does not define these principles. A dogfood product does not override them.
+
+#### How a builder works at this level
+
+Read this list before adding a schema field, a skill, an MCP tool, or a dogfood binding. Edit L0 only when the product architecture itself changes. Leave L1 field names, L2 paths, L3 tool names, and L4 repo paths alone when you are only restating a principle.
+
+#### How it hooks the harness
+
+It does not register anything. It names the primitives later levels may use — skill loader, MCP client, subagent API, linter and CI, `AGENTS.md` — and it keeps the agent loop in the harness.
+
+#### Stability
+
+A principle change is a product architecture change. It may force edits at L1–L4. A pack update or a dogfood binding leaves L0 as written.
+
+### L1. Domain schemas
+
+#### What it is
+
+The schemas for Taste's nouns, with no product and no harness baked in.
+
+#### What lives here
+
+Field tables only. The full tables, including notes, are the [Domain model](#domain-model). No file paths. No Ally fields. No Cursor, Claude Code, or Codex fields. No MCP handlers. No CI config.
+
+| Schema | Fields a builder stores |
+| --- | --- |
+| Decision | id, angle_id, mode, status (`proposed`, `accepted`, `rejected`), scope, statement, rationale, evidence_ids, exceptions, bad_example, good_example, assumptions, open_decisions |
+| Angle | id, name, mode, summary, decision_ids, skill_id, wiki_refs, coverage_gap_ids |
+| Evidence | id, kind (`pr`, `commit`, `path`, `review`, `preview`), locator, note |
+| Exemplar | id, title, decision_ids, known_flaws, evidence_ids, holdout |
+| CoverageGap | id, angle_id, missing, why_it_matters |
+| Gate | id, decision_id, engine, check, why, fix, autofix |
+| EvalFixture | id, mode, before_ref, after_ref, exemplar_id, rubric_id, holdout, requires_prod_data, requires_git_history |
+| Rubric | id, dimensions (id + question). Starting set: mergeable_first_pass, no_long_design_prompt, no_reteach_per_screen, rule_correctness, similarity_to_shipped, skill_loaded |
+| JudgeResult | fixture_id, run (`with_skill` or `without_skill`), scores, skill_loaded, notes |
+| MemoryLesson | id, loop (`fast` or `slow`), statement, evidence_ids, target, status (`captured`, `promoted`, `expired`) |
+| CriticFinding | id, severity (`P0`–`P3`), location, verification (`source`, `rendered`, `unverified`), source_id, user_consequence, smallest_fix |
+| PackManifest | product, mode, adapter, and the id lists for angles, decisions, exemplars, coverage gaps, gates, skills, wiki refs, eval fixtures, expression priors |
+| Skill | id, job, when_to_use, when_not_to_use, angle_ids, wiki_refs |
+| Router | id, rows of `{ ask, skill_id }` |
+| Wiki | id, facts, linked_from |
+| ExpressionPrior | id, source (`anthropic`, `openai`, or `emil`), statement, applies_when `expression`, subordinate to a Conformance Pack when one exists |
+
+`mode` is `conformance` or `expression` on every record that has one.
+
+#### Who owns it
+
+The Taste product. Target product repos store instances of these types. The harness does not define them.
+
+#### How a builder works at this level
+
+Add a field only when every Pack needs it, and add it on the schema in [Domain model](#domain-model). Leave file paths, linter engines, skill prose, and repo names out of the schema. Ally ids, component names, and harness vendor APIs do not belong on these records. When the work is a directory layout, that is L2. When the work is a tool or skill that reads these records, that is L3.
+
+#### How it hooks the harness
+
+It has no harness registration. L2 files and L3 tools are how a harness sees these records. The harness receives Pack files and tool results. It does not import an L1 type from this repo.
+
+#### Stability
+
+Schemas stay stable across pack updates and dogfood bindings. Adding a field is a product change, and existing records stay readable. Swapping a Critic model, a gate engine, or the Ally repo does not change these fields.
+
+### L2. Pack on-disk adapter
+
+#### What it is
+
+The mapping from L1 types to files in a target product repo.
+
+#### What lives here
+
+The default adapter id is `vercel-product-design`. It is the starting proof-of-concept, specified file for file in [Pack on-disk adapter](#pack-on-disk-adapter). Concrete artifacts in the **target product repo**:
+
+| Artifact | Path |
+| --- | --- |
+| Skill-loader trigger | Repo `AGENTS.md` |
+| Router and entry Skill | `.agents/skills/product-design/SKILL.md` |
+| Skill load order and governance | `.agents/skills/product-design/AGENTS.md` |
+| Angles, Decisions, Wiki facts | `.agents/skills/product-design/references/*.md` |
+| CoverageGap list | `.agents/skills/product-design/references/coverage-gaps.md` |
+| Exemplars | `.agents/skills/product-design/exemplars/pr-{name}.md` |
+| Gates | Rules in the target repo's existing linter. The PoC records them as Gates with `engine: eslint`. |
+| EvalFixture index | `tooling/scripts/evals/fixtures.json` |
+| Rubric checklist for those fixtures | `tooling/scripts/evals/rules-checklist.json` |
+| Fixture before / after states | `tooling/scripts/evals/<fixture>/before/` and `after/` |
+
+Also here, as adapter prose rather than L1 fields: the trigger paragraph, the adapter request modes inside `SKILL.md` (Shape, Implement, Review, Copy, Harden), the decision-authority order, and the Decision template. Adapter request modes are Vercel workflow verbs. They are not Conformance and Expression.
+
+This docs repo does not contain that tree.
+
+#### Who owns it
+
+The Taste product owns the adapter contract, written in this doc. The target product repo owns the files once they are written. The harness owns the skill loader that reads them.
+
+#### How a builder works at this level
+
+Create the tree in the target product repo, or add another adapter id that stores the same L1 records under different paths. Edit paths and trigger prose here. Leave L1 field names as they are. Do not rename a field to match a filename. Do not put Ally-only directories inside `vercel-product-design`. Do not treat Shape, Implement, Review, Copy, or Harden as the Taste mode.
+
+#### How it hooks the harness
+
+Repo `AGENTS.md` is the trigger the harness already reads on every task. The skill loader loads `.agents/skills/product-design/SKILL.md` on demand. References and exemplars are context files that skill links to. Eval fixtures are files a CI job or an agent run can read. Lint rule files sit where that repo's linter already looks. The choice of engine is the L3 gate runner. L2 only records which file holds the check.
+
+#### Stability
+
+A new adapter may store the same types. A path change is an adapter change: `PackManifest.adapter` changes, and L1 fields do not. A dogfood binding picks a repo and a surface. It does not fork this contract.
+
+### L3. Harness integration surface
+
+#### What it is
+
+The Taste pieces that plug into harness primitives.
+
+#### What lives here
+
+Skills, MCP tool contracts, a subagent brief, and CI or linter jobs. The read/write table, the business rules, and the tool stubs are in [Harness integration](#harness-integration).
+
+- Pack-maintainer skills: Sweep (Sweeper), Learn (Learner), Interview (Interviewer, Expression only).
+- Router and specialist Skills, as `SKILL.md` bodies the skill loader reads.
+- Critic brief for a harness subagent. The brief is Pack content. The subagent is the harness's.
+- MCP stubs: `load_pack`, `list_decisions`, `get_angle`, `load_skill`, `run_gates`, `record_correction`, `list_coverage_gaps`.
+- Gate runners as repo linters and CI, and as MCP `run_gates`.
+- Pack loader as the `load_pack` tool or as a skill preamble that resolves a PackManifest from L2 paths.
+- Evaluate as an offline run or a CI job: fixtures in, JudgeResult out. It is a product capability of the Pack. It is not a separate agent.
+
+The stubs in this repo are the documented contracts (name, inputs, outputs). There is no MCP server package and no `SKILL.md` tree checked in here.
+
+#### Who owns it
+
+The Taste product owns the contracts: this doc, the Pack templates in the L2 layout, and the MCP stubs. The host harness executes all of them.
+
+#### How a builder works at this level
+
+Add or replace one skill or one MCP tool without rewriting L1 schemas or the L2 on-disk adapter contract. Document what the new role reads and writes, using L1 type names. Leave Decision and Angle fields alone. Leave L2 paths alone unless the adapter itself is the change. Do not teach the gate runner to rewrite a Decision statement. Do not put Ally flow names into the skill contracts.
+
+#### How it hooks the harness
+
+- Skill loader discovers `SKILL.md` for the Router, the specialist Skills, and Sweep, Learn, and Interview.
+- MCP client registers the tools. The harness calls them. Taste does not wrap the call in its own loop.
+- Harness subagent API runs the Critic on a bigger model with the Pack brief.
+- Shell and CI run gates.
+- The `AGENTS.md` trigger is L2. L3 skills run after it has fired.
+- When a fixture sets `requires_prod_data` or `requires_git_history`, the harness asks the user. Taste does not collect that access.
+
+#### Stability
+
+Swap the Critic model or the gate implementation without changing Decision or Angle schemas. Replace the Critique message shape, the pass count, or the linter engine without a Sweeper change. Replace one skill or MCP tool without rewriting the others. A pack update changes records, not these roles.
+
+### L4. Dogfood bindings
+
+#### What it is
+
+An edge binding that points the same product at a real repo and a first surface.
+
+#### What lives here
+
+A repo path and a surface name. No new schemas. The table is repeated, with the current choice of surface, in the [dogfood appendix](#dogfood-appendix).
+
+| When | Repo and surface | Mode | What the harness runs |
+| --- | --- | --- | --- |
+| Now | HelloAlly ally-platform. First pain: flow and interaction, the first surface Sweep should look at. | Conformance | Sweeper skill, then day-to-day UI skills, Gates in that repo's linter and CI, Critic subagent, Evaluate against that Pack. |
+| Later | omnipresent | Expression | Interviewer skill and ExpressionPriors. |
+
+#### Who owns it
+
+The dogfood product owns the repo, the shipped UI, and the human who accepts or rejects Decisions. Taste does not own Ally. The harness is whichever coding harness that team already runs.
+
+#### How a builder works at this level
+
+Pass the repo path into Sweep and name the first surface. Wire that repo's `AGENTS.md`, linter, and CI to the L3 roles. Leave L1, L2, and L3 contracts untouched. Do not add Ally fields to Decision, PackManifest, or MCP tool inputs. Do not copy Ally component names into the default adapter. Leave Expression on omnipresent unwired until that product is in play.
+
+#### How it hooks the harness
+
+The same hooks as L3, aimed at that repo. `AGENTS.md` in ally-platform, the skill loader, the MCP client, the Critic subagent, and that repo's lint CI. Taste does not install a second runtime beside the dogfood harness. The same hooks apply to omnipresent when Expression starts.
+
+#### Stability
+
+Changing the dogfood repo or the first surface is a dogfood binding change. It does not change L1 schemas, the default adapter, or the skill and MCP contracts. Another product can take the Ally seat without a schema migration.
 
 ## Domain model
 
@@ -95,7 +319,7 @@ Names used from here on. Vercel filenames appear again only in the [Pack adapter
 | PackManifest | The index of a Pack: ids, mode, and which adapter stores it. |
 | ExpressionPrior | Guidance for Expression only (anti-slop, aspect rules). Subordinate to a Conformance Pack when one exists. |
 
-Schemas are the working representation for experiments. They are not a shipped API. `mode` is `conformance` or `expression` on every record that has one.
+Schemas are the product's domain model. They are not a shipped API. `mode` is `conformance` or `expression` on every record that has one.
 
 ### Decision
 
@@ -240,7 +464,7 @@ Fast: write it in the same turn the person states it. Slow: promote it later if 
 
 ### PackManifest
 
-The envelope operators read. No Ally-specific fields. No harness-specific fields.
+The envelope the harness integration reads. No Ally-specific fields. No harness-specific fields.
 
 | Field | Content |
 | --- | --- |
@@ -282,28 +506,48 @@ The envelope operators read. No Ally-specific fields. No harness-specific fields
 | Router | id, rows of `{ ask, skill_id }`. One table. Specialist craft is written once. |
 | Wiki | id, facts, linked_from. Skills link here. A font rule changes once. |
 
-## Modules and executables
+## Harness integration
 
-Two modules. The Pack is data. Operators are the executables that read and write that data.
+The harness already has an agent loop, a planner, models, file and shell tools, a skill loader, an MCP client, subagents, `AGENTS.md` and rules, and linters or CI. Taste plugs into those primitives. The pieces below are skills, subagents, MCP tools, linters, and Pack files.
+
+Two modules. The Pack is data the skill loader reads. The harness integration surface is the set of skills, tools, briefs, and checks that read and write that data. This repo documents both. It does not ship them as binaries.
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
 | Pack | L1 records and, through an adapter, the files that store them. | The model loop, the linter binary, the Critic protocol, Ally paths. |
-| Operators | Sweep, Learn, Interview, Critique, Evaluate, Gate runner, Pack loader. | Each other's internals. |
+| Harness integration | Sweep, Learn, Interview, Critique, Evaluate, the gate runner, and the Pack loader, as skills, MCP tools, a subagent brief, and linters. | Each other's internals. The harness loop. |
 
-| Operator | Who runs it | Reads | Writes |
+### What plugs in where
+
+| Taste capability | What it is in harness terms | Who runs it |
+| --- | --- | --- |
+| Pack | Repo files the skill loader reads (skills, wiki, references, exemplars, `AGENTS.md` trigger) | Harness skill and context loader |
+| Router + Skills | Agent Skills (`SKILL.md`) loaded on demand for UI work | Coding agent in the harness |
+| Wiki / Decisions / Angles | Context files and references the skills link to | Loaded by skills |
+| Gates | Deterministic checks: repo linters, CI, and/or MCP `run_gates` | Harness shell, CI, or MCP |
+| MCP server | Tools registered on the harness MCP client. Documented stubs only, in this repo. | Harness tool calls |
+| Sweeper | A skill, or a dedicated agent turn, the harness runs to extract a Pack from shipped UI | Coding agent |
+| Learner | A skill or hook that records corrections into the Pack (fast) and promotes them later (slow) | Same harness session, or a scheduled agent turn |
+| Interviewer | A skill the harness runs for Expression (greenfield) | Harness, when mode is Expression |
+| Critic | A harness subagent on a bigger model, with the Critic skill and brief from the Pack. Generate–review. | Harness subagent API |
+| Eval fixtures / Rubric / Judge | Product evals. An offline run or a CI job measures whether the Pack changed harness UI work. | Harness or CI |
+| Pack loader | Resolves a PackManifest from on-disk adapter paths | MCP `load_pack`, or a skill preamble |
+
+### What each role reads and writes
+
+| Role | Harness primitive | Reads | Writes |
 | --- | --- | --- | --- |
-| Pack loader | Executable. The only operator that knows L2 paths. | Adapter files | PackManifest and the records it indexes |
-| Sweep | Sweeper | Target repo, Evidence the harness can reach | Proposed Decisions, Evidence, Exemplars, CoverageGaps, candidate Gates |
-| Learn | Learner | Corrections, intake packets | MemoryLesson (`fast` immediately). Later: promoted Skill, Wiki, or Decision |
-| Interview | Interviewer | Greenfield intent | Expression Decisions and ExpressionPriors, status `proposed` |
-| Critique | Critic, a harness subagent | Generator output, Pack, Rubric | CriticFindings. Edits only when the request mode asks for edits |
-| Evaluate | Judge step in the harness. Not a fifth agent. | EvalFixture, Rubric, with-skill and without-skill runs | JudgeResult |
-| Gate runner | Linter adapter. The only operator that knows an engine. | Gate records, the diff | Pass, fail, or warning per Gate. Decision records stay untouched |
+| Pack loader | MCP `load_pack`, or a skill preamble. The only role that resolves L2 paths. | Adapter files | PackManifest and the records it indexes |
+| Sweep | Sweeper skill, or a dedicated agent turn | Target repo, and Evidence the harness can reach after the user approves access | Proposed Decisions, Evidence, Exemplars, CoverageGaps, candidate Gates |
+| Learn | Learner skill or hook, in the same session or on a schedule | Corrections, intake packets | MemoryLesson (`fast` immediately). Later: a promoted Skill, Wiki, or Decision |
+| Interview | Interviewer skill. Runs only when mode is `expression`. | Greenfield intent | Expression Decisions and ExpressionPriors, status `proposed` |
+| Critique | Critic brief. Harness subagent on a bigger model. | Generator output, Pack, Rubric | CriticFindings. Edits only when the request mode asks for edits |
+| Evaluate | Offline run or CI job. A judge step in the harness. | EvalFixture, Rubric, with-skill and without-skill runs | JudgeResult |
+| Gate runner | Repo linter, CI, and/or MCP `run_gates`. The only role that knows an engine. | Gate records, the diff | Pass, fail, or warning per Gate. Decision records stay untouched |
 
-Interview is the Expression operator. It stays off the Conformance dogfood path.
+Interview is the Expression skill. It stays off the Conformance dogfood path.
 
-Business rules as program logic:
+Business rules, as the behavior of these roles:
 
 - Shipped wins over a conflicting stated preference. Sweep records the shipped pattern as Evidence. A preference that contradicts it does not become an accepted Decision.
 - A universal rule needs human acceptance. Sweep and Learn write `status: proposed`.
@@ -316,7 +560,7 @@ Business rules as program logic:
 
 Documented names for L3. This repo does not implement them. The list is a starting stub, not a locked tool surface.
 
-| Tool | In | Out | Operator |
+| Tool | In | Out | Role |
 | --- | --- | --- | --- |
 | `load_pack` | adapter id, repo root | PackManifest | Pack loader |
 | `list_decisions` | angle_id?, status?, mode? | Decision[] | Pack loader |
@@ -472,9 +716,9 @@ That rule is their example of an observable Decision (`statement` plus `bad_exam
 
 ## Conformance path
 
-Conformance is the mode where Sweep fills a Pack from a shipped product and Learn keeps it current. Interview stays off this path.
+Conformance is the mode where the Sweeper skill fills a Pack from a shipped product and the Learner skill keeps it current. Interview stays off this path. This is flow A and flow C in [System architecture](#system-architecture). Day-to-day UI generation on that Pack is flow B.
 
-Sweep steps. The first-surface rule and the Decision template are in [First surface](#first-surface). The product names which surface is first. Ally's choice is in the [dogfood appendix](#dogfood-appendix), not in this algorithm.
+Sweep steps. The first-surface rule and the Decision template are in [First surface](#first-surface). The product names which surface is first. Ally's choice is in the [dogfood appendix](#dogfood-appendix), not in this procedure.
 
 1. Pack loader reads the adapter. If the Pack is empty, PackManifest `mode` is `conformance` and `adapter` is `vercel-product-design`.
 2. Pick one surface where the same review comments already repeat.
@@ -513,7 +757,7 @@ The PRD angle list is Sweep's search list: style, fonts and typography, themes a
 
 ## Expression path
 
-Expression is deferred. The operator is Interview. The dogfood surface is omnipresent, later. The lifecycle switch (Expression closed, design locked, Taste returns to Conformance) has no trigger yet. See the [PRD](prd.md).
+Expression is deferred. The harness skill is Interview. The dogfood surface is omnipresent, later. The lifecycle switch (Expression closed, design locked, Taste returns to Conformance) has no trigger yet. See the [PRD](prd.md). This is flow D. It stays off the Conformance dogfood path.
 
 Until that trigger exists, ExpressionPriors are stored on the Pack and are not applied when PackManifest `mode` is `conformance`. When a Conformance Pack exists, it wins. OpenAI's own exception:
 
@@ -537,7 +781,7 @@ Anthropic's other point is the Conformance reading: a custom Skill can encode th
 
 ## Gates and linters
 
-Use a Gate when code can identify the failure reliably. Leave the judgment on the Decision when it needs product context.
+Use a Gate when code can identify the failure reliably. Leave the judgment on the Decision when it needs product context. The gate runner is a repo linter, a CI job, or MCP `run_gates`.
 
 Vercel: "Code can count two or three static options, so a linter can recommend radio buttons. Naming the right object and consequence for a destructive action requires product context, so the skill handles it."
 
@@ -551,7 +795,7 @@ Their codebase examples illustrate that split. They are Vercel's Gates. A target
 - Theme-aware Material classes instead of raw shadows. Borders that duplicate a Material's built-in treatment.
 - Spacing that falls off the 4px grid, with a standard utility when one exists.
 
-Decision tree, from Vercel. The Gate runner implements the "yes, a linter" branch. The other branches write a Decision or a warning and no Gate.
+Decision tree, from Vercel. The gate runner implements the "yes, a linter" branch. The other branches write a Decision or a warning and no Gate.
 
 - Can code identify the failure without rendering?
   - No: agent guidance (Decision or Skill).
@@ -580,7 +824,7 @@ The brief tells the Critic to check the change against the Rubric, the Exemplars
 
 **Rendered check.** Vercel: "Source inspection establishes behavior; a rendered interface establishes visual and interaction quality. Never claim visual verification from code alone." The Pack instructs the harness to verify the rendered surface, including materially changed states. [OpenAI's Playwright / computer-use note](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) is one way a harness can do that. Taste does not ship a browser. A CriticFinding with `verification: rendered` requires that check.
 
-**Evaluate.** Adopt Vercel's guidance evals as the Evaluate operator. Their `copywriting-eval` is a narrower copy check. It is not this loop.
+**Evaluate.** Product evals, adopted from Vercel's guidance evals. They measure whether the Pack improves harness UI work. Their `copywriting-eval` is a narrower copy check. It is not this loop.
 
 1. EvalFixtures come from Exemplars documented in the Skill. Each fixture has a before state and an after state under `tooling/scripts/evals/`.
 2. An agent edits the before state.
@@ -651,25 +895,25 @@ Open decisions:
 
 The Skill's operating contract includes the nudge: when the same decision shows up and the Pack does not contain it, the agent writes this record into the narrowest file and leaves it pending. It does not silently invent a universal rule.
 
-## Experiment loop
+## Improve loop
 
-An experiment changes Pack data and re-measures. Schemas stay stable. Operators stay the same unless the experiment's question is the operator itself.
+The improve loop is how a Pack is built, used inside a harness, measured, and updated. Schemas stay stable. Harness roles stay the same unless the product change is the role itself.
 
-**Define.** Write an experiment record next to the run, in the harness notes or a doc. It is not a new product noun.
+**Define.** Write a short change note next to the run, in the harness notes or a doc. It is not a domain type and it is not a new schema.
 
 | Field | Content |
 | --- | --- |
-| id | `exp/{slug}` |
-| question | What this run is trying to learn. |
+| id | `improve/{slug}` |
+| question | What this Pack update is meant to improve. |
 | mode | `conformance` or `expression`. |
-| changed | The only records this run may edit: Decision, Gate, Skill, or Rubric. One lever. |
-| stable | `schemas`, and every operator that is not the question. |
+| changed | The only records this update may edit: Decision, Gate, Skill, or Rubric. One lever. |
+| stable | `schemas`, and every harness role that is not the thing being changed. |
 | fixture_ids | Including holdouts. |
 | baseline | `without_skill`. |
 
 ```json
 {
-  "id": "exp/example-rule-correctness",
+  "id": "improve/example-rule-correctness",
   "question": "Does this Decision raise rule_correctness on holdout fixtures?",
   "mode": "conformance",
   "changed": [{ "type": "Decision", "id": "decision/example" }],
@@ -681,29 +925,29 @@ An experiment changes Pack data and re-measures. Schemas stay stable. Operators 
 
 The example id is illustrative. It is not an Ally rule.
 
-**Execute.** Pack loader reads the adapter into a PackManifest. The harness runs the operator the question needs. Conformance questions run Sweep or Learn, then Critique, then Evaluate. Expression questions wait until that path is open, then run Interview. The harness owns the model loop. MCP stubs are how it calls L3. The user approves any prod-data or git-history request the fixture flags.
+**Run.** Pack loader reads the adapter into a PackManifest. The harness runs the skill or check this update needs. A Conformance update runs Sweep or Learn, then Critique, then Evaluate. An Expression update waits until that path is open, then runs Interview. The harness owns the model loop. MCP tools are how it calls L3. The user approves any prod-data or git-history request the fixture flags.
 
 **Eval.** Evaluate writes a JudgeResult per fixture, once `with_skill` and once `without_skill`. Read `rule_correctness` and `similarity_to_shipped` as separate numbers. Read `skill_loaded` before blaming a Decision for a miss.
 
-**Modify.** Edit only the `changed` records. Re-run Evaluate on the same fixtures.
+**Update.** Edit only the `changed` records. Re-run Evaluate on the same fixtures.
 
 | If you need to change… | Touch | Leave stable |
 | --- | --- | --- |
 | A judgment | Decision (and the adapter file that stores it) | Gate engine, Critic protocol, schemas |
 | A mechanical check | Gate | Decision statement |
 | How a job is done | Skill or Router row | L1 field names |
-| What success means | Rubric dimension | EvalFixture before/after bytes, unless the fixture itself is the question |
+| What success means | Rubric dimension | EvalFixture before/after bytes, unless the fixture itself is the change |
 | Review behavior | Critique protocol | Sweeper outputs |
 | Where files live | Pack adapter id | PackManifest's other fields |
 | A model workaround that no longer helps | MemoryLesson or Decision status `expired` | The principles on L0 |
 
-That is the loop: define the lever, execute the operator, read the JudgeResult, modify the lever, evaluate again.
+That is the loop: name the lever, run it in the harness, read the JudgeResult, update the lever, evaluate again.
 
 ## Dogfood appendix
 
 L4 bindings. They pass a repo path into Sweep. They do not appear on Pack schemas.
 
-| Track | Surface | Mode | What runs |
+| When | Surface | Mode | What the harness runs |
 | --- | --- | --- | --- |
 | Now | HelloAlly ally-platform | Conformance | First pain: flow and interaction, as the first surface Sweep should look at. Critic and Evaluate run against that Pack. |
 | Later | omnipresent | Expression | Interview. ExpressionPriors from the Expression path. |
@@ -717,11 +961,11 @@ Discovery is dual-track. Sweep followed by historical replay is one path. It is 
 Not locked, on purpose:
 
 - The final abstract set of Angles.
-- The MCP tool surface. The stub names in this doc are a starting list for experiments.
+- The MCP tool surface. The stub names in this doc are a starting list. They are not a locked tool surface.
 - The Critique protocol beyond generate–review (model, passes, message shape). The GAN metaphor is historical only.
 - The trigger that shows Expression is closed and the design is locked, so Taste switches to Conformance.
 - Whether Sweep to historical replay is the only discovery path.
-- Whether further engineering sources should still change this architecture before it is locked. This draft re-homes Vercel, OpenAI, and Emil on top of the LangChain and Anthropic baseline. The set is not closed.
+- Whether further engineering sources should still change this architecture before it is locked. This draft re-homes Vercel, OpenAI, and Emil on top of the LangChain and Anthropic baseline. The set is not closed. More research may refine it.
 - How Sweep tells a deliberate pattern from an accidental or legacy one.
 - What Evaluate proves a mergeable first pass without hand-labelling.
 - Which Conformance lessons carry over when Expression starts on omnipresent.
