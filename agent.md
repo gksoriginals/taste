@@ -18,7 +18,7 @@ Taste is a product: a plugin for an existing coding-agent harness (Cursor, Claud
 - The harness owns the loop and runtime (planning and model included). Taste supplies context, tools, checks, pack-maintainer skills, and a Critic subagent brief. Taste does not host its own runtime.
 - Taste is a Pack, MCP tools, and harness skills. It is not a design system, and it is not a component library.
 - Shipped wins over stated preferences. When they conflict, what's shipped is the source of truth.
-- Conformance on HelloAlly ally-platform first. Expression on omnipresent later.
+- Conformance on HelloAlly ally-platform and Expression on a greenfield surface (omnipresent, for example) are parallel dogfood tracks. Same Pack shape, gates, Critic, Learn sink, and product evals. The one-pager still says Expression is deferred. When a product moves between modes is an open question for North, recorded in the engineering doc. Do not invent that protocol.
 - Critic is a harness subagent: a review pass on a bigger model, with a Pack brief. Critique reviews generator output (generate–review). The GAN metaphor is historical only. The protocol may change.
 - v0 baseline is LangChain Content Studio and Anthropic frontend-skills, with Vercel, OpenAI, and Emil folded in by [docs/engineering.md](docs/engineering.md). Follow that doc. The architecture is still a draft. More research may refine it before it is locked.
 

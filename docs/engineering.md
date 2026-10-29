@@ -17,7 +17,9 @@ The source articles (LangChain, Anthropic, Vercel, OpenAI, Emil) stay in full as
 Two mode names are first-class, from the PRD:
 
 - **Conformance** — match the judgment the product has already shipped.
-- **Expression** — invent or extend taste. Deferred. Omnipresent later.
+- **Expression** — invent or extend taste where a shipped pattern is not the source.
+
+Both modes are built in parallel, on the same Pack shape and the same harness plugin. Ally is the Conformance dogfood. A greenfield surface such as omnipresent is the Expression dogfood. The [one-pager](prd.md) still says Expression is deferred and "not expression mode, yet," and it leaves the lock-back trigger open. That product framing stays with North. This file specifies the Interviewer so it can be built now. It does not decide when a product must sit on which mode. See [Mode lifecycle](#mode-lifecycle-infinity).
 
 This repository stays docs-only. The schemas below are the product's domain model, written down so Pack files and harness tools have stable inputs and outputs. They are not implemented code. No application code, package manifest, MCP server, or skill files in this repo. The Pack adapter is a layout for a **target product repo**. MCP tool names and skill roles in this doc are contracts for the harness integration, not code to add here.
 
@@ -52,7 +54,7 @@ Taste plugs into a coding harness the user already runs. The harness owns the ag
 └──────────────────────────────────────────────────────────┘
 ```
 
-The middle box is the [L3 harness integration surface](#l3-harness-integration-surface) plus Pack files from the [L2 adapter](#l2-pack-on-disk-adapter). The bottom box is [L4](#l4-dogfood-bindings) when the target repo is a dogfood product. [L0](#l0-principles) and [L1](#l1-domain-schemas) are not boxes. L0 is the constraints. L1 is the schemas.
+The middle box is the [L3 harness integration surface](#l3-harness-integration-surface) plus Pack files from the [L2 adapter](#l2-pack-on-disk-adapter). The bottom box is [L4](#l4-dogfood-bindings) when the target repo is a dogfood product. The picture shows Ally on Conformance. An Expression repo such as omnipresent uses the same plugin surface. [L0](#l0-principles) and [L1](#l1-domain-schemas) are not boxes. L0 is the constraints. L1 is the schemas.
 
 Taste does not replace the harness loop. It does not host its own runtime. It is context, tools, checks, pack-maintainer skills, and a Critic subagent brief.
 
@@ -60,7 +62,31 @@ Gates in that diagram default to the target repo's linter and CI, which is how V
 
 ### How it works
 
-Conformance has three flows: build the Pack, day-to-day UI, and Learn. Expression is a later flow. All of them run inside the host harness.
+Two tracks, one Learn sink. Conformance is seeded by Sweep. Expression is seeded by Interview. Day-to-day UI, gates, the Critic, and product evals are the same machinery. All of it runs inside the host harness.
+
+```
+        ┌── Conformance track ──┐              ┌── Expression track ──┐
+        │ Sweep / Pack load     │              │ Interview / priors   │
+        │ Generate UI (harness) │              │ Generate UI (harness)│
+        │ Gates + Critic        │              │ Gates + Critic       │
+        └──────────┬────────────┘              └──────────┬───────────┘
+                   │                                      │
+                   └──────────────┬───────────────────────┘
+                                  ▼
+                    Learn (fast → MemoryLesson; slow → Decision/Skill/Wiki)
+                                  ▲
+              ┌───────────────────┴───────────────────┐
+              │ Feedback signal sources               │
+              │ • Dev comments on first-pass PRs      │
+              │ • CriticFindings / review packets     │
+              │ • Production signals (bugs, support,  │
+              │   UX telemetry, design review of      │
+              │   shipped UI, A/B when a product      │
+              │   already has it)                     │
+              └───────────────────────────────────────┘
+```
+
+The diagram is the operating shape. It is not a second runtime. Mode changes how the Pack was seeded. It does not change whether feedback loops in.
 
 **A. Build / refresh Pack (Conformance).** The user asks the harness to Sweep a product. The Sweeper skill reads shipped UI and git history, with the user granting that access. For each angle it follows Anthropic's method: identify convergent defaults, provide concrete alternatives, structure guidance at the right altitude, and make it reusable through Skills. On a Conformance Pack the alternatives are what this product shipped. It writes proposed Decisions, Exemplars, CoverageGaps, and candidate Gates into the Pack. A human accepts. The derived Pack view records `mode: conformance`.
 
@@ -73,9 +99,17 @@ Conformance has three flows: build the Pack, day-to-day UI, and Learn. Expressio
 5. Run Vercel's verify checklist, including compact and wide viewports and every changed state. When the harness provides it, OpenAI's Playwright skill walks those viewports and flows. Taste does not ship a browser.
 6. Spawn the Critic subagent with LangChain's brief shape. It returns CriticFindings and, from Emil, a before/after table. The agent fixes, or a human merges.
 
-**C. Learn.** A human or Critic correction lands mid-turn. The Learner records a MemoryLesson in that same turn (fast), on the shared layer or the personal layer. After a job, LangChain's slow loop captures up to five evidence-backed lessons and associates them with the skill used. Future jobs read and rate those lessons. A weekly pass promotes the useful ones into a Skill or the Wiki. Vercel's intake still ends in a review packet, and a human accepts. A model upgrade does not expire a Decision.
+**C. Learn (both tracks).** The same sink serves Conformance and Expression. Two signal classes enter it.
 
-**D. Expression (later).** Pack mode or the task mode is `expression`. The harness runs the Interviewer skill, which writes proposed Expression Decisions. ExpressionPriors from OpenAI, Emil, and Anthropic apply until the design locks and Taste returns to Conformance. Interview does not write those priors. OpenAI's mood board is an input on underspecified visual work. The flow stays harness-hosted.
+Developer first-pass feedback: comments on the first-pass PR, rejected or accepted CriticFindings, and reteach notes. Vercel already gathers review comments, Slack, Figma, and previews into a review packet and keeps every candidate pending until a human accepts. LangChain's fast loop writes the correction in the same turn.
+
+Production-system feedback: bugs, support themes, UX telemetry, and design review of shipped UI. A/B results count when the product already runs them. Gopi requires this class. The articles do not name the connectors. Record a signal as Evidence the existing kinds can point at (a review, a preview, a path, a commit). Do not add a telemetry product or a new Evidence kind here. Connectors stay open.
+
+The Learner records a MemoryLesson in that same turn (fast), on the shared layer or the personal layer. After a job, LangChain's slow loop captures up to five evidence-backed lessons and associates them with the skill used. Future jobs read and rate those lessons. A weekly pass promotes the useful ones into a Skill or the Wiki. Vercel's intake still ends in a review packet, and a human accepts. A model upgrade does not expire a Decision. A thin production signal can also trigger a Sweep refresh on a Conformance Pack, or another Interview pass on an Expression Pack. That refresh uses the same skills. It is not a third mode.
+
+**D. Build Pack (Expression).** The harness runs the Interviewer. ExpressionPriors from Anthropic, OpenAI, and Emil seed the interview. Interview writes proposed Expression Decisions, Skills, and Wiki facts into the same Vercel tree Sweep uses. It does not write ExpressionPriors, and it does not invent a second Pack format. Steps are in [Expression path](#expression-path). A human accepts. The derived Pack view records `mode: expression`.
+
+**E. Day-to-day UI generation (Expression).** Same as flow B, on that Pack. Request mode, then Router. Product-decision brief and reachable states when the change is material. Repo linter and CI. Critic subagent. Product evals with and without the Pack, scored for a mergeable first pass. OpenAI's mood board is an input when the visual direction is still underspecified. Learn is flow C.
 
 ## Abstraction stack
 
@@ -96,7 +130,7 @@ L2 Pack on-disk adapter
   how Pack loader reads files, where Gate text lives, where review cites
   ↑
 Harness (Cursor / Claude Code / Codex / …) executes L3
-L4 dogfood (Ally now, omnipresent later) is an edge binding. It is not in L1.
+L4 dogfood (Ally Conformance and omnipresent Expression, in parallel) is an edge binding. It is not in L1.
 ```
 
 Dependencies run one way. Pack schemas do not mention Ally or a harness. The harness integration depends on Pack schemas only. The harness and the dogfood sit at the edge. Replacing the Critic protocol does not rewrite the Sweeper skill. Replacing the linter engine does not rewrite Decision records.
@@ -114,7 +148,7 @@ Written principles only. No schemas, no files, no skills, no MCP tools, no CI jo
 - The harness owns the loop: planning, models, tools, and the PR workflow.
 - Taste is a plugin on that harness: Pack files, MCP tools, skills, gates, and a Critic brief. It supplies context, tools, and checks.
 - Shipped wins over a stated preference that conflicts with it. A shipped flaw is not a Decision to copy.
-- Conformance is the dogfood mode. Expression waits.
+- Both modes are built and dogfooded in parallel, on one Pack shape. Ally is Conformance. A greenfield surface such as omnipresent is Expression. The one-pager's "Expression is deferred" is a product sentence for North. The lock between the two lobes is open. See [Mode lifecycle](#mode-lifecycle-infinity).
 - Judgment stays in prompts and in Decision prose. Invariants that must always hold live in code, as Gates. After a model upgrade, expire Skill prose that only compensated for the old model, and expire those MemoryLessons (LangChain's Bitter Lesson). Keep the design principles. A Decision is shipped judgment, not a model workaround, so a model upgrade does not expire it. A Decision leaves through human review.
 - Evaluate scores rule correctness separately from similarity to shipped code.
 - Generate–review means the coding agent generates and the Critic subagent reviews that output. Earlier notes called this GAN-inspired. That metaphor is historical only. The message protocol is still a placeholder.
@@ -286,7 +320,7 @@ A repo path and a surface name. No new schemas. The table is repeated, with the 
 | When | Repo and surface | Mode | What the harness runs |
 | --- | --- | --- | --- |
 | Now | HelloAlly ally-platform. First pain: flow and interaction, the first surface Sweep should look at. | Conformance | Sweeper skill, then day-to-day UI skills, Gates in that repo's linter and CI, Critic subagent, Evaluate against that Pack. |
-| Later | omnipresent | Expression | Interviewer skill and ExpressionPriors. |
+| Now, in parallel | omnipresent, or another greenfield surface | Expression | Interviewer, writing the same Vercel tree. Same gates, Critic, and product evals. |
 
 #### Who owns it
 
@@ -294,11 +328,11 @@ The dogfood product owns the repo, the shipped UI, and the human who accepts or 
 
 #### How a builder works at this level
 
-Pass the repo path into Sweep and name the first surface. Wire that repo's `AGENTS.md`, linter, and CI to the L3 roles. Leave L1, L2, and L3 contracts untouched. Do not add Ally fields to Decision, PackManifest, or MCP tool inputs. Do not copy Ally component names into the default adapter. Leave Expression on omnipresent unwired until that product is in play.
+Pass each dogfood repo path in and name its first surface. Wire that repo's `AGENTS.md`, linter, and CI to the L3 roles. Leave L1, L2, and L3 contracts untouched. Do not add Ally fields, or omnipresent fields, to Decision, PackManifest, or MCP tool inputs. Do not copy either product's component names into the default adapter. Run product evals on both Packs. That is a parallel measurement, not a separate system.
 
 #### How it hooks the harness
 
-The same hooks as L3, aimed at that repo. `AGENTS.md` in ally-platform, the skill loader, the MCP client, the Critic subagent, and that repo's lint CI. Taste does not install a second runtime beside the dogfood harness. The same hooks apply to omnipresent when Expression starts.
+The same hooks as L3, aimed at each dogfood repo. `AGENTS.md`, the skill loader, the MCP client, the Critic subagent, and that repo's lint CI. Taste does not install a second runtime beside either harness.
 
 #### Stability
 
@@ -311,7 +345,7 @@ Names used from here on. Vercel filenames appear again only in the [Pack adapter
 | Name | Meaning |
 | --- | --- |
 | Conformance | Match judgment already shipped. |
-| Expression | Invent or extend taste. Deferred. |
+| Expression | Invent or extend taste. Same Pack shape as Conformance. Seeded by Interview, not by a second format. |
 | Pack | Portable taste artifact in a target product repo. |
 | Angle | One design angle (typography, flow, interaction, copy, …). The set is open. |
 | Decision | One observable encoded judgment. |
@@ -566,7 +600,7 @@ Two modules. The Pack is data the skill loader reads. The harness integration su
 | Evaluate | A judge step the harness runs, offline or in CI. Source: Vercel, not LangChain. | EvalFixture, Rubric, with-skill and without-skill runs | JudgeResult |
 | Gate runner | Repo linter and CI. The role that knows an engine. Optional MCP `run_gates`. | Gate records, the diff | Pass, fail, or warning per Gate. Decision records stay untouched |
 
-Interview is the Expression skill. It stays off the Conformance dogfood path.
+Interview is the Expression skill. It stays off the Ally Conformance path. It runs on the Expression dogfood and writes the same Vercel tree. Learn runs on both.
 
 Business rules, as the behavior of these roles:
 
@@ -826,7 +860,7 @@ LangChain's 200-line bound is on the memory-layer `AGENTS.md` (shared and person
 
 ## Conformance path
 
-Conformance is the mode where the Sweeper skill fills a Pack from a shipped product and the Learner skill keeps it current. Interview stays off this path. This is flow A and flow C in [System architecture](#system-architecture). Day-to-day UI generation on that Pack is flow B.
+Conformance is the mode where the Sweeper skill fills a Pack from a shipped product. Interview stays off this path. Learn does not. Learn is the shared sink in [System architecture](#system-architecture), flow C, for this track and for Expression. Day-to-day UI on this Pack is flow B. Building the Pack is flow A.
 
 Sweep steps. The first-surface rule and the Decision template are in [First surface](#first-surface). The product names which surface is first. Ally's choice is in the [dogfood appendix](#dogfood-appendix), not in this procedure.
 
@@ -848,7 +882,7 @@ Anthropic's four-step method is how Sweep fills an angle: "identify convergent d
 - A shipped pattern is Evidence, with rationale if any exists, scope, exceptions, and known flaws. Exemplars document decisions worth repeating and mistakes to avoid.
 - Similarity to shipped code is not the success score. Vercel: "Shipped code can contain a flaw that the agent should improve instead of reproduce."
 
-**Learn loop.** Vercel's update loop is Learn. Cadence is not locked. Vercel's judge prompts:
+**Learn loop.** Vercel's update loop is Learn, and it is shared with Expression. Cadence is not locked. Developer comments on a first-pass PR, CriticFindings, and the review packet are the first signal class. Production signals (bugs, support, UX telemetry, design review of shipped UI) are the second. Gopi requires that second class. Connectors are not specified, so they enter as Evidence, not as a new pipeline. Vercel's judge prompts:
 
 > You are the collector. Gather messages, links, files, and nearby context. Write raw artifacts only. Do not score candidates or propose rules.
 >
@@ -874,9 +908,39 @@ The PRD angle list is Sweep's search list: style, fonts and typography, themes a
 
 ## Expression path
 
-Expression is deferred. The harness skill is Interview. Interview writes Expression Decisions with status `proposed`. It does not write ExpressionPriors. Those priors are article guidance, and `source` stays `anthropic`, `openai`, or `emil`. The dogfood surface is omnipresent, later. The lifecycle switch (Expression closed, design locked, Taste returns to Conformance) has no trigger yet. See the [PRD](prd.md). This is flow D. It stays off the Conformance dogfood path.
+Expression is a first-class track, built in parallel with Conformance. The harness skill is Interview. This is flow D, then flow E. The dogfood surface is omnipresent, or another greenfield surface, at the same time as Ally Conformance. The one-pager still says Expression is deferred as a product sentence. That does not leave the Interviewer unspecified. When a product moves between the two modes is [Mode lifecycle](#mode-lifecycle-infinity), and it is open.
 
-Until that trigger exists, ExpressionPriors are stored on the Pack and are not applied when PackManifest `mode` is `conformance`. When a Conformance Pack exists, it wins. OpenAI's own exception:
+Interview writes Expression Decisions with status `proposed`, plus the Skills and Wiki facts those Decisions need. It does not write ExpressionPriors. Those priors are article guidance, and `source` stays `anthropic`, `openai`, or `emil`. There is no `interview` source. Priors seed the interview. The Pack they fill is the Vercel tree.
+
+**Required output shape.** The same adapter as Conformance, `vercel-product-design`. Not a second format.
+
+```
+AGENTS.md
+.agents/skills/product-design/
+  SKILL.md
+  AGENTS.md
+  references/*.md
+  exemplars/pr-*.md
+tooling/scripts/evals/
+  fixtures.json
+  rules-checklist.json
+  <fixture>/before/
+  <fixture>/after/
+```
+
+`references/*.md` uses Vercel's rule reference template (`rule/{id}`, scope, rule, why, exceptions, source, bad/good examples, coverage gaps). `SKILL.md` carries the operating contract, the request modes, and the seven-step workflow. Decisions use the Decision template. Holdouts sit on EvalFixtures.
+
+**Interview steps.** A builder implements these the way Conformance implements Sweep.
+
+1. Create the tree above if the Pack is empty. Derived view: `mode: expression`, `adapter: vercel-product-design`.
+2. Load ExpressionPriors as seeds. Anthropic: identify convergent defaults, then the product's own alternatives, at the right altitude, packaged as Skills. OpenAI: underspecified prompts fall back to high-frequency patterns. Emil: one skill file per aspect, with why and a strict table or flowchart. Do not copy a prior in as an accepted Decision.
+3. Elicit the product judgment the tree needs: who acts, the job, the object, the consequence, reversibility, permissions, and every reachable state (Vercel's brief and state map). Where the surface is product UI, elicit OpenAI's Apps restraint, utility copy, and the token and type roles, filled with this product's choices rather than a generic palette. A mood board or other visual reference is an input when the direction is underspecified.
+4. Write one proposed Decision per observable judgment, in the narrowest `references/` file, with a stable `rule/{id}`. Status stays `proposed`. Map aspect guidance to specialist Skills under the Router. Resolve request modes in `SKILL.md` before the Router runs. Measurable slices become candidate Gates.
+5. Write Exemplars for decisions worth repeating and for known flaws. Write CoverageGaps for anything Interview could not lock. Write EvalFixtures, including holdouts whose expected edits stay out of the Skill text.
+6. Stop. A human accepts, rejects, or leaves each candidate pending. Emil: "Of course the more creative part of the job is still up to you."
+7. Day-to-day UI is flow E, the same gates, Critic, verify checklist, and product evals as flow B. Learn is flow C.
+
+When a Conformance Pack already exists for that product, it wins on conflict. OpenAI's own exception:
 
 > Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.
 
@@ -896,7 +960,22 @@ OpenAI notes that low or medium reasoning often produces stronger frontends on s
 
 **Aspect Skills.** [Emil Kowalski](https://emilkowal.ski/ui/agents-with-taste): "My way of getting there is to create a skill file for each aspect of the interface. If you know what great feels like, describe the rules, then give them to your agents so they can follow them." Each file says why the choice feels right, then a strict table or flowchart so the agent does not invent a rule. His easing example: "This is strict so the agent doesn't have to guess or make up its own rules." He uses Anthropic's [skill-creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) to package that.
 
-Compose aspect Skills under the Router. The Router is job-scoped. Vercel request modes are resolved before it runs. The aspect Skill is the specialist for one Angle: animation, typography, color, and the rest of the open set. Why and rules live there. Measurable slices graduate into Gates. Expression-only aspect guidance (distinctive type, anti-slop bans, hero budget) waits for greenfield or an unlocked design. Emil: "Of course the more creative part of the job is still up to you." Human acceptance stays in front of a new rule.
+Compose aspect Skills under the Router. The Router is job-scoped. Vercel request modes are resolved before it runs. The aspect Skill is the specialist for one Angle: animation, typography, color, and the rest of the open set. Why and rules live there. Measurable slices graduate into Gates. Expression-only aspect guidance (distinctive type, anti-slop bans, hero budget) is in force on an Expression Pack. On a Conformance Pack it waits. Emil: "Of course the more creative part of the job is still up to you." Human acceptance stays in front of a new rule.
+
+## Mode lifecycle (infinity)
+
+Gopi's metaphor is an infinity symbol (∞). One lobe is Conformance. One lobe is Expression. A product may start on either lobe. A feature that cannot follow existing patterns can sit in Expression for a time, then lock back into Conformance when those patterns have shipped and stabilized. Some products stay mostly on Conformance. A greenfield or strongly distinctive surface spends more time on Expression.
+
+Engineering records that the lifecycle has to exist. It does not define the protocol. Why a product should move, and who owns that call, is a product conversation with North. The one-pager already leaves the lock trigger open: "once expression is closed and the user has locked a design, Taste switches to conformance; the exact trigger is still open."
+
+Open, on purpose:
+
+- What enters Expression from Conformance. Candidates a product discussion might use, not rules: a CoverageGap, no matching Decision, a deliberate break from a shipped pattern.
+- What locks Expression back into Conformance. Candidates, not rules: shipped and accepted Decisions, an eval pass, human acceptance.
+- Whether `mode` is Pack-global, per-surface, or per-feature. Schemas today put `mode` on the Pack and on records. That field is Taste glue. It is not a decision that mode is global.
+- Who decides: a human, a harness prompt, or a Gate. Not chosen.
+
+Until those are answered, Interview and Sweep stay separate skills, Learn stays shared, and no switcher runs.
 
 Anthropic's other point is the Conformance reading: a custom Skill can encode the organization's design system and component patterns as a reusable asset, loaded on demand. That is the product Pack. The generic frontend-aesthetics skill is not a substitute for it.
 
@@ -1067,9 +1146,9 @@ L4 bindings. They pass a repo path into Sweep. They do not appear on Pack schema
 | When | Surface | Mode | What the harness runs |
 | --- | --- | --- | --- |
 | Now | HelloAlly ally-platform | Conformance | First pain: flow and interaction. Sweep starts there. Day-to-day UI uses the entry Skill's product-decision brief and reachable-state map. Critic and Evaluate run against that Pack. |
-| Later | omnipresent | Expression | Interview. ExpressionPriors from the Expression path. |
+| Now, in parallel | omnipresent, or another greenfield surface | Expression | Interview fills the same Vercel tree. Same gates, Critic, and product evals. |
 
-Ally is the dogfood surface only. Product thinking stays harness-agnostic and product-agnostic. Flow and interaction on Ally use Vercel's product-decision brief and the reachable-state map (loading, empty, error, permission, disabled, optimistic, stale, destructive, responsive, and the rest of that list). Those steps do not add Ally fields to a schema. The lifecycle switch back to Conformance has no trigger yet.
+Ally is the Conformance dogfood, not the only dogfood. Omnipresent, or another greenfield surface, is the Expression dogfood. Product thinking stays harness-agnostic and product-agnostic. Flow and interaction on Ally use Vercel's product-decision brief and the reachable-state map (loading, empty, error, permission, disabled, optimistic, stale, destructive, responsive, and the rest of that list). Those steps do not add Ally fields to a schema. Parallel product evals run on both Packs: with and without the Pack, and whether the first pass is mergeable. That measurement is not a separate system. The move between lobes is open. See [Mode lifecycle](#mode-lifecycle-infinity).
 
 Discovery is dual-track. Sweep followed by historical replay is one path. It is not locked as the only path.
 
@@ -1080,12 +1159,12 @@ Not locked, on purpose:
 - The final abstract set of Angles.
 - The MCP tool surface. The stub names in this doc are Taste glue, agent-authored starting names, not from sources. They are not a locked tool surface. The sourced rule is LangChain's: tool descriptions matter, and MCP tools sit behind search.
 - How many Critic passes run. The brief headings are LangChain's: role, relevant context, file ownership, how to validate, and model and effort. The bigger model is the one-pager's. The GAN metaphor is historical only.
-- The trigger that shows Expression is closed and the design is locked, so Taste switches to Conformance.
+- The infinity lifecycle: enter and exit triggers, whether mode is Pack-global or finer, and who decides. Listed under [Mode lifecycle](#mode-lifecycle-infinity). Product framing goes to North. This file does not set those rules. The one-pager's lock trigger is the same open question.
 - Whether Sweep to historical replay is the only discovery path.
 - Whether further engineering sources should still change this architecture before it is locked. This draft re-homes Vercel, OpenAI, and Emil on top of the LangChain and Anthropic baseline. The set is not closed. More research may refine it.
 - How Sweep tells a deliberate pattern from an accidental or legacy one.
 - What Evaluate proves a mergeable first pass without hand-labelling.
-- Which Conformance lessons carry over when Expression starts on omnipresent.
+- Which lessons carry from the Ally Conformance track to the Expression track, and back, once both are running.
 - The MemoryLesson file layout and the slow-loop cadence. The fast and slow loops are in scope, including up to five lessons, a skill association, and a later rating. The file layout is not. LangChain does not define the rating scale.
 - LangChain's 200-line bound applies to the memory-layer `AGENTS.md` that loads on every call. The one-pager asks for a bounded repo index and does not set that number. Neither number is a Taste cap.
 
@@ -1122,4 +1201,4 @@ What this architecture takes from each source. Quotes above are from these texts
 
 ### Product
 
-- [docs/prd.md](prd.md), mirroring [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) (Gopi · Draft · Oct 2026). Took the ambition bar: judgment carried across harnesses and model upgrades, and outside judges. Outside judges keep the Critic and the Evaluate judge off the generator.
+- [docs/prd.md](prd.md), mirroring [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) (Gopi · Draft · Oct 2026). Took the ambition bar: judgment carried across harnesses and model upgrades, and outside judges. Outside judges keep the Critic and the Evaluate judge off the generator. The Doc still says Expression is deferred and leaves the lock trigger open. Parallel implementation of Interview, the shared Learn sink, and the infinity metaphor are Gopi's engineering instruction for this architecture. They do not rewrite the Doc.
