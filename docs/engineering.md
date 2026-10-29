@@ -14,12 +14,15 @@ The source articles (LangChain, Anthropic, Vercel, OpenAI, Emil) stay in full as
 
 **Hard goal:** from what a product has shipped, extract its taste across every design angle so any coding harness, given a PRD and the Taste Pack, first-passes UI you would merge. The abstract set of angles stays open and gets clearer as Packs are built. See the [PRD](prd.md).
 
-Two mode names are first-class, from the PRD:
+Conformance and Expression are lifecycle states of a **part** of one Pack, from the [one-pager](prd.md). They are not two artefact sets. Gopi's locked rules:
 
-- **Conformance** — match the judgment the product has already shipped.
-- **Expression** — invent or extend taste where a shipped pattern is not the source.
+1. A project that starts from scratch is in Expression.
+2. Once a part is defined, agreed, and shipped, it moves to Conformance. Both modes use one Pack and the same artefacts.
+3. When Conformance cannot justify what to do from the artefacts, that part goes back to Expression.
+4. Otherwise Conformance keeps looping.
+5. The whole Pack never flips. Parts of the Pack update.
 
-Both modes are built in parallel, on the same Pack shape and the same harness plugin. Ally is the Conformance dogfood. A greenfield surface such as omnipresent is the Expression dogfood. The [one-pager](prd.md) still says Expression is deferred and "not expression mode, yet," and it leaves the lock-back trigger open. That product framing stays with North. This file specifies the Interviewer so it can be built now. It does not decide when a product must sit on which mode. See [Mode lifecycle](#mode-lifecycle-infinity).
+Who initiates a mode change, a human or the harness, stays open in the one-pager. This file does not invent that. See [Mode lifecycle](#mode-lifecycle-infinity).
 
 This repository stays docs-only. The schemas below are the product's domain model, written down so Pack files and harness tools have stable inputs and outputs. They are not implemented code. No application code, package manifest, MCP server, or skill files in this repo. The Pack adapter is a layout for a **target product repo**. MCP tool names and skill roles in this doc are contracts for the harness integration, not code to add here.
 
@@ -50,11 +53,12 @@ Taste plugs into a coding harness the user already runs. The harness owns the ag
                              │ guides / checks
 ┌────────────────────────────▼─────────────────────────────┐
 │  Target product UI work (e.g. HelloAlly ally-platform)    │
-│  PRD + Pack → first-pass mergeable UI (Conformance)       │
+│  PRD + one Pack → first-pass mergeable UI                 │
+│  parts in Conformance or Expression                       │
 └──────────────────────────────────────────────────────────┘
 ```
 
-The middle box is the [L3 harness integration surface](#l3-harness-integration-surface) plus Pack files from the [L2 adapter](#l2-pack-on-disk-adapter). The bottom box is [L4](#l4-dogfood-bindings) when the target repo is a dogfood product. The picture shows Ally on Conformance. An Expression repo such as omnipresent uses the same plugin surface. [L0](#l0-principles) and [L1](#l1-domain-schemas) are not boxes. L0 is the constraints. L1 is the schemas.
+The middle box is the [L3 harness integration surface](#l3-harness-integration-surface) plus Pack files from the [L2 adapter](#l2-pack-on-disk-adapter). The bottom box is [L4](#l4-dogfood-bindings) when the target repo is a dogfood product. Ally and a greenfield surface such as omnipresent use the same plugin and the same tree. Parts of each Pack sit in Conformance or Expression. [L0](#l0-principles) and [L1](#l1-domain-schemas) are not boxes. L0 is the constraints. L1 is the schemas.
 
 Taste does not replace the harness loop. It does not host its own runtime. It is context, tools, checks, pack-maintainer skills, and a Critic subagent brief.
 
@@ -62,33 +66,38 @@ Gates in that diagram default to the target repo's linter and CI, which is how V
 
 ### How it works
 
-Two tracks, one Learn sink. Conformance is seeded by Sweep. Expression is seeded by Interview. Day-to-day UI, gates, the Critic, and product evals are the same machinery. All of it runs inside the host harness.
+One Pack. The ∞ is per part, carried by a Decision. Both lobes use the same tree, the same gates, the same Critic, the same evals, and one Learn sink. All of it runs inside the host harness.
 
 ```
-        ┌── Conformance track ──┐              ┌── Expression track ──┐
-        │ Sweep / Pack load     │              │ Interview / priors   │
-        │ Generate UI (harness) │              │ Generate UI (harness)│
-        │ Gates + Critic        │              │ Gates + Critic       │
-        └──────────┬────────────┘              └──────────┬───────────┘
-                   │                                      │
-                   └──────────────┬───────────────────────┘
-                                  ▼
-                    Learn (fast → MemoryLesson; slow → Decision/Skill/Wiki)
-                                  ▲
-              ┌───────────────────┴───────────────────┐
-              │ Feedback signal sources               │
-              │ • Dev comments on first-pass PRs      │
-              │ • CriticFindings / review packets     │
-              │ • Production signals (bugs, support,  │
-              │   UX telemetry, design review of      │
-              │   shipped UI, A/B when a product      │
-              │   already has it)                     │
-              └───────────────────────────────────────┘
+                 one Pack (the Vercel tree)
+                 state derived per Decision
+     ┌──────── Expression lobe ─────────┐
+     │ Shape / Interview                │
+     │ proposed → accepted → shipped    │
+     └───────────────┬──────────────────┘
+                     │ lock-back:
+                     │ accepted + shipped Evidence
+                     ▼
+     ┌──────── Conformance lobe ────────┐
+     │ generate → gates → Critic        │
+     │ Learn keeps that part current    │
+     └───────────────┬──────────────────┘
+                     │ material decision not
+                     │ justified by rungs 3–4
+                     │ (rung 5 may still propose)
+                     └──────────► Expression
+                                  for that part only
+
+     Learn (both lobes) ▲
+       • dev comments on first-pass PRs
+       • CriticFindings / review packets
+       • production signals (bugs, support,
+         UX telemetry, design review of shipped UI)
 ```
 
-The diagram is the operating shape. It is not a second runtime. Mode changes how the Pack was seeded. It does not change whether feedback loops in.
+The lobes differ in where the concrete alternatives come from, and in whether rung-6 priors are active for that part. They do not differ in Pack shape.
 
-**A. Build / refresh Pack (Conformance).** The user asks the harness to Sweep a product. The Sweeper skill reads shipped UI and git history, with the user granting that access. For each angle it follows Anthropic's method: identify convergent defaults, provide concrete alternatives, structure guidance at the right altitude, and make it reusable through Skills. On a Conformance Pack the alternatives are what this product shipped. It writes proposed Decisions, Exemplars, CoverageGaps, and candidate Gates into the Pack. A human accepts. The derived Pack view records `mode: conformance`.
+**A. Sweep proposes from shipped UI.** The user asks the harness to Sweep a product that already shipped. The Sweeper reads shipped UI and git history, with the user granting that access. For each angle it follows Anthropic's method. The concrete alternatives are what shipped. It writes `proposed` Decisions, CoverageGaps, and candidate Gates into the same tree. A part is not Conformance because Sweep wrote it. It becomes Conformance only when the Decision is accepted and has shipped Evidence. Vercel: "Treat shipped code as evidence, not automatic precedent." An empty Pack on a shipped product takes this path. It does not default the Pack to Conformance.
 
 **B. Day-to-day UI generation (Conformance).** The harness starts a UI task. The repo `AGENTS.md` triggers the entry Skill. The steps are Vercel's workflow, in [Entry Skill](#entry-skill). Ally's first pain is flow and interaction, so the product-decision brief and the reachable-state map are not optional on that surface.
 
@@ -99,17 +108,19 @@ The diagram is the operating shape. It is not a second runtime. Mode changes how
 5. Run Vercel's verify checklist, including compact and wide viewports and every changed state. When the harness provides it, OpenAI's Playwright skill walks those viewports and flows. Taste does not ship a browser.
 6. Spawn the Critic subagent with LangChain's brief shape. It returns CriticFindings and, from Emil, a before/after table. The agent fixes, or a human merges.
 
-**C. Learn (both tracks).** The same sink serves Conformance and Expression. Two signal classes enter it.
+**C. Learn (both lobes).** The same sink serves every part, whether that part is in Conformance or Expression. Two signal classes enter it.
 
 Developer first-pass feedback: comments on the first-pass PR, rejected or accepted CriticFindings, and reteach notes. Vercel already gathers review comments, Slack, Figma, and previews into a review packet and keeps every candidate pending until a human accepts. LangChain's fast loop writes the correction in the same turn.
 
 Production-system feedback: bugs, support themes, UX telemetry, and design review of shipped UI. A/B results count when the product already runs them. Gopi requires this class. The articles do not name the connectors. Record a signal as Evidence the existing kinds can point at (a review, a preview, a path, a commit). Do not add a telemetry product or a new Evidence kind here. Connectors stay open.
 
-The Learner records a MemoryLesson in that same turn (fast), on the shared layer or the personal layer. After a job, LangChain's slow loop captures up to five evidence-backed lessons and associates them with the skill used. Future jobs read and rate those lessons. A weekly pass promotes the useful ones into a Skill or the Wiki. Vercel's intake still ends in a review packet, and a human accepts. A model upgrade does not expire a Decision. A thin production signal can also trigger a Sweep refresh on a Conformance Pack, or another Interview pass on an Expression Pack. That refresh uses the same skills. It is not a third mode.
+The Learner records a MemoryLesson in that same turn (fast), on the shared layer or the personal layer. After a job, LangChain's slow loop captures up to five evidence-backed lessons and associates them with the skill used. Future jobs read and rate those lessons. A weekly pass promotes the useful ones into a Skill or the Wiki. Vercel's intake still ends in a review packet, and a human accepts. A model upgrade does not expire a Decision.
 
-**D. Build Pack (Expression).** The harness runs the Interviewer. ExpressionPriors from Anthropic, OpenAI, and Emil seed the interview. Interview writes proposed Expression Decisions, Skills, and Wiki facts into the same Vercel tree Sweep uses. It does not write ExpressionPriors, and it does not invent a second Pack format. Steps are in [Expression path](#expression-path). A human accepts. The derived Pack view records `mode: expression`.
+Route the signal per part. If the part's accepted, shipped Decision still justifies the change, stay in the Conformance loop: Learn, review packet, update that Decision, Gate, or Exemplar. If a material decision cannot be justified from the artefacts, that part follows rule 3: CoverageGap, a `proposed` Decision, and Shape. Other parts of the Pack stay where they are.
 
-**E. Day-to-day UI generation (Expression).** Same as flow B, on that Pack. Request mode, then Router. Product-decision brief and reachable states when the change is material. Repo linter and CI. Critic subagent. Product evals with and without the Pack, scored for a mergeable first pass. OpenAI's mood board is an input when the visual direction is still underspecified. Learn is flow C.
+**D. Interview proposes from intent.** The harness runs the Interviewer for a from-scratch project, or for a part that rule 3 sent back to Expression. ExpressionPriors seed the interview as rung-6 context. They are not Pack records. Interview writes `proposed` Decisions, Skills, and Wiki facts into the same Vercel tree. Steps are in [Expression path](#expression-path). A human accepts. Acceptance alone is not Conformance. The part locks when the Decision is accepted and shipped Evidence is attached.
+
+**E. Day-to-day UI on an Expression part.** Same machinery as flow B, scoped to that part. Request mode, then Router. Product-decision brief and reachable states when the change is material. Repo linter and CI. Critic subagent. Product evals with and without the Pack. OpenAI's mood board is an input when the visual direction is still underspecified. Learn is flow C. Neighboring parts that are already Conformance stay on flow B.
 
 ## Abstraction stack
 
@@ -130,7 +141,7 @@ L2 Pack on-disk adapter
   how Pack loader reads files, where Gate text lives, where review cites
   ↑
 Harness (Cursor / Claude Code / Codex / …) executes L3
-L4 dogfood (Ally Conformance and omnipresent Expression, in parallel) is an edge binding. It is not in L1.
+L4 dogfood (Ally and a greenfield surface such as omnipresent, in parallel) is an edge binding. It is not in L1. Each product has one Pack. Parts of that Pack sit in Conformance or Expression.
 ```
 
 Dependencies run one way. Pack schemas do not mention Ally or a harness. The harness integration depends on Pack schemas only. The harness and the dogfood sit at the edge. Replacing the Critic protocol does not rewrite the Sweeper skill. Replacing the linter engine does not rewrite Decision records.
@@ -148,7 +159,7 @@ Written principles only. No schemas, no files, no skills, no MCP tools, no CI jo
 - The harness owns the loop: planning, models, tools, and the PR workflow.
 - Taste is a plugin on that harness: Pack files, MCP tools, skills, gates, and a Critic brief. It supplies context, tools, and checks.
 - Shipped wins over a stated preference that conflicts with it. A shipped flaw is not a Decision to copy.
-- Both modes are built and dogfooded in parallel, on one Pack shape. Ally is Conformance. A greenfield surface such as omnipresent is Expression. The one-pager's "Expression is deferred" is a product sentence for North. The lock between the two lobes is open. See [Mode lifecycle](#mode-lifecycle-infinity).
+- Both lobes are dogfooded in parallel, on one Pack. A from-scratch surface starts in Expression. A part that is defined, agreed, and shipped is Conformance. The five rules in [Status and scope](#status-and-scope) are locked. Who initiates a mode change stays open. See [Mode lifecycle](#mode-lifecycle-infinity).
 - Judgment stays in prompts and in Decision prose. Invariants that must always hold live in code, as Gates. After a model upgrade, expire Skill prose that only compensated for the old model, and expire those MemoryLessons (LangChain's Bitter Lesson). Keep the design principles. A Decision is shipped judgment, not a model workaround, so a model upgrade does not expire it. A Decision leaves through human review.
 - Evaluate scores rule correctness separately from similarity to shipped code.
 - Generate–review means the coding agent generates and the Critic subagent reviews that output. Earlier notes called this GAN-inspired. That metaphor is historical only. The message protocol is still a placeholder.
@@ -188,13 +199,13 @@ Field tables only. The full tables, including notes, are the [Domain model](#dom
 
 | Schema | Fields a builder stores |
 | --- | --- |
-| Decision | id, angle_id, mode, status (`proposed`, `accepted`, `rejected`, `superseded`), scope, statement, rationale, evidence_ids, exceptions, bad_example, good_example, assumptions, open_decisions. Vercel's template is the first three statuses. `superseded` is Taste glue for a human retiring a Decision. |
-| Angle | id, name, mode, summary, decision_ids, skill_id, wiki_refs, coverage_gap_ids |
+| Decision | id, angle_id, status (`proposed`, `accepted`, `rejected`, `superseded`), scope, statement, rationale, evidence_ids, exceptions, bad_example, good_example, assumptions, open_decisions. Vercel's template is the first three statuses. `superseded` is Taste glue for a human retiring a Decision. No `mode` field. Part state is [derived](#derived-part-state). |
+| Angle | id, name, summary, decision_ids, skill_id, wiki_refs, coverage_gap_ids |
 | Evidence | id, kind (`pr`, `commit`, `path`, `review`, `preview`), locator, note |
 | Exemplar | id, title, decision_ids, known_flaws, evidence_ids. No `holdout` field. Holdouts live on EvalFixture. |
 | CoverageGap | id, angle_id, missing, why_it_matters |
 | Gate | id, decision_id, engine, check, why, fix, autofix |
-| EvalFixture | id, mode, before_ref, after_ref, exemplar_id, rubric_id, holdout, requires_prod_data, requires_git_history |
+| EvalFixture | id, before_ref, after_ref, exemplar_id, rubric_id, holdout, requires_prod_data, requires_git_history. No `mode` field. |
 | Rubric | id, dimensions (id + question). Starting set: mergeable_first_pass, no_long_design_prompt, no_reteach_per_screen, rule_correctness, similarity_to_shipped, skill_loaded |
 | JudgeResult | fixture_id, run (`with_skill` or `without_skill`), scores, skill_loaded, notes |
 | MemoryLesson | id, loop (`fast` or `slow`), statement, evidence_ids, skill_id, scope (`shared` or `personal`), rating, target, status (`captured`, `promoted`, `expired`). `skill_id`, `scope`, and a later job's rating are LangChain. The status names and `target` are Taste glue. |
@@ -203,9 +214,7 @@ Field tables only. The full tables, including notes, are the [Domain model](#dom
 | Skill | id, job, when_to_use, when_not_to_use, angle_ids, wiki_refs |
 | Router | id, rows of `{ ask, skill_id }` |
 | Wiki | id, facts, linked_from |
-| ExpressionPrior | id, source (`anthropic`, `openai`, or `emil` only), statement, applies_when `expression`, subordinate to a Conformance Pack when one exists. Interview does not write these. |
-
-`mode` is `conformance` or `expression` on every record that has one.
+| ExpressionPrior | id, source (`anthropic`, `openai`, or `emil` only), statement. Rung-6 heuristics, outside the Pack. Active for a part in Expression. Subordinate per part where an accepted shipped Decision exists. Interview does not write these. |
 
 #### Who owns it
 
@@ -256,7 +265,7 @@ The Taste product owns the adapter contract, written in this doc. The target pro
 
 #### How a builder works at this level
 
-Create the tree in the target product repo, or add another adapter id that stores the same L1 records under different paths. Edit paths and trigger prose here. Leave L1 field names as they are. Do not rename a field to match a filename. Do not put Ally-only directories inside `vercel-product-design`. Do not treat Shape, Implement, Review, Copy, or Harden as the Taste mode.
+Create the tree in the target product repo, or add another adapter id that stores the same L1 records under different paths. Edit paths and trigger prose here. Leave L1 field names as they are. Do not rename a field to match a filename. Do not put Ally-only directories inside `vercel-product-design`. Do not treat Shape, Implement, Review, Copy, or Harden as Conformance or Expression.
 
 #### How it hooks the harness
 
@@ -317,10 +326,10 @@ An edge binding that points the same product at a real repo and a first surface.
 
 A repo path and a surface name. No new schemas. The table is repeated, with the current choice of surface, in the [dogfood appendix](#dogfood-appendix).
 
-| When | Repo and surface | Mode | What the harness runs |
+| When | Repo and surface | Where its parts start | What the harness runs |
 | --- | --- | --- | --- |
-| Now | HelloAlly ally-platform. First pain: flow and interaction, the first surface Sweep should look at. | Conformance | Sweeper skill, then day-to-day UI skills, Gates in that repo's linter and CI, Critic subagent, Evaluate against that Pack. |
-| Now, in parallel | omnipresent, or another greenfield surface | Expression | Interviewer, writing the same Vercel tree. Same gates, Critic, and product evals. |
+| Now | HelloAlly ally-platform. First pain: flow and interaction, the first surface Sweep should look at. | Mostly Conformance after Sweep Decisions are accepted and have shipped Evidence. Unjustified parts stay in Expression (rule 3). | Sweeper proposes. Day-to-day skills, Gates, Critic, and Evaluate on the parts that have locked. Interview on parts in Expression. |
+| Now, in parallel | omnipresent, or another greenfield surface | Starts in Expression (rule 1). Parts lock to Conformance as they ship. | Interviewer proposes into the same Vercel tree. Same gates, Critic, and product evals. |
 
 #### Who owns it
 
@@ -328,7 +337,7 @@ The dogfood product owns the repo, the shipped UI, and the human who accepts or 
 
 #### How a builder works at this level
 
-Pass each dogfood repo path in and name its first surface. Wire that repo's `AGENTS.md`, linter, and CI to the L3 roles. Leave L1, L2, and L3 contracts untouched. Do not add Ally fields, or omnipresent fields, to Decision, PackManifest, or MCP tool inputs. Do not copy either product's component names into the default adapter. Run product evals on both Packs. That is a parallel measurement, not a separate system.
+Pass each dogfood repo path in and name its first surface. Wire that repo's `AGENTS.md`, linter, and CI to the L3 roles. Leave L1, L2, and L3 contracts untouched. Do not add Ally fields, or omnipresent fields, to Decision, PackManifest, or MCP tool inputs. Do not copy either product's component names into the default adapter. Run product evals on each dogfood Pack. That is a parallel measurement, not a separate system.
 
 #### How it hooks the harness
 
@@ -344,8 +353,8 @@ Names used from here on. Vercel filenames appear again only in the [Pack adapter
 
 | Name | Meaning |
 | --- | --- |
-| Conformance | Match judgment already shipped. |
-| Expression | Invent or extend taste. Same Pack shape as Conformance. Seeded by Interview, not by a second format. |
+| Conformance | Lifecycle state of a part, derived. Not a record type. The Decision is `accepted` and has shipped Evidence. |
+| Expression | Lifecycle state of a part, derived. Not a record type. Open CoverageGap or open decisions, status `proposed`, or `accepted` with no shipped Evidence yet. |
 | Pack | Portable taste artifact in a target product repo. |
 | Angle | One design angle (typography, flow, interaction, copy, …). The set is open. |
 | Decision | One observable encoded judgment. |
@@ -361,14 +370,32 @@ Names used from here on. Vercel filenames appear again only in the [Pack adapter
 | Rubric | The dimensions a judge scores. |
 | JudgeResult | The outcome of Evaluate on one fixture run. |
 | CriticFinding | One review finding from Critique. |
-| PackManifest | The index of a Pack: ids, mode, and which adapter stores it. |
-| ExpressionPrior | Guidance for Expression only (anti-slop, aspect rules). Subordinate to a Conformance Pack when one exists. |
+| PackManifest | Optional derived index: ids and which adapter stores the Pack. No global mode. |
+| ExpressionPrior | Rung-6 heuristics (Anthropic, OpenAI, Emil). Outside the Pack. Active for a part in Expression. Subordinate, per part, where an accepted shipped Decision exists. |
 
-Schemas are the product's domain model. They are not a shipped API. `mode` is `conformance` or `expression` on every record that has one. Putting `mode` on every record is Taste glue. The two mode names themselves are the PRD's.
+Schemas are the product's domain model. They are not a shipped API. Conformance and Expression are not fields. See [Derived part state](#derived-part-state). The two names are the PRD's.
 
 **What a source actually names.** Decision matches Vercel's decision template. CriticFinding matches Vercel's review output. Router matches LangChain's ask-to-skill table. EvalFixture, Rubric, and JudgeResult match Vercel evals plus the PRD success signals. MemoryLesson's fast loop, slow loop, shared-versus-personal scope, skill association, and later rating match LangChain. Holdouts match Vercel eval fixtures only.
 
-**Taste glue.** Agent-authored starting names, not from the articles or the one-pager: PackManifest, the MCP tool names, Evidence `note`, Angle `summary`, `skill_id`, `wiki_refs`, and `coverage_gap_ids`, Wiki `facts` and `linked_from`, MemoryLesson `status` names and `target`, Decision `mode`, `angle_id`, and `superseded`. Useful for a builder. Not a proven technique.
+**Taste glue.** Agent-authored starting names, not from the articles or the one-pager: PackManifest, the optional derived roll-up, the MCP tool names, Evidence `note`, Angle `summary`, `skill_id`, `wiki_refs`, and `coverage_gap_ids`, Wiki `facts` and `linked_from`, MemoryLesson `status` names and `target`, Decision `angle_id`, and `superseded`. Useful for a builder. Not a proven technique. `mode` is not glue. It is not a field.
+
+### Derived part state
+
+Mode is computed per Decision from Vercel fields. It is not authored on the Pack, on a Decision, on an Angle, on an EvalFixture, or on PackManifest. Roll a surface or an Angle up by reading its Decisions. Mixed surfaces are normal. The Pack never flips.
+
+A part is in **Expression** when any of these hold:
+
+- an open CoverageGap, or `open_decisions`, on that part
+- the Decision status is `proposed`
+- the Decision is `accepted` and has no shipped Evidence yet (`pr`, `commit`, or `path`). The decision log reports that as "agreed, awaiting ship." Do not add a status for it.
+
+A part is in **Conformance** when the Decision is `accepted` and it has shipped Evidence (`pr`, `commit`, or `path`).
+
+`rejected` and `superseded` are retired records. They are not a mode.
+
+The predicate uses only Vercel fields: Decision status, Evidence, CoverageGap, open decisions, and the [authority ladder](#entry-skill). ExpressionPriors are rung 6. They sit outside the Pack. They are active for a part in Expression, and subordinate for a part that already has an accepted shipped Decision.
+
+**Engineering readings, not product locks.** Rung 5 (verified adjacent shipped patterns) stays on the Conformance side as a propose-through-Learn path: justify the change and write a `proposed` Decision. A human still accepts. A `proposed` Decision's candidate Gate is a warning at most. Gates enforce only accepted Decisions.
 
 ### Decision
 
@@ -376,8 +403,7 @@ Schemas are the product's domain model. They are not a shipped API. `mode` is `c
 | --- | --- |
 | id | Stable id. Adapter example: `decision/destructive-names-action`. |
 | angle_id | Angle it belongs to. |
-| mode | `conformance` or `expression`. |
-| status | `proposed`, `accepted`, `rejected`, or `superseded`. Stays `proposed` until a human accepts it. Vercel's template is `proposed`, `accepted`, or `rejected`. `superseded` is Taste glue for Vercel's "removing those that stop helping." `expired` is not a Decision status. |
+| status | `proposed`, `accepted`, `rejected`, or `superseded`. Stays `proposed` until a human accepts it. Vercel's template is `proposed`, `accepted`, or `rejected`. `superseded` is Taste glue for Vercel's "removing those that stop helping." `expired` is not a Decision status. Whether the part is in Expression or Conformance is [derived](#derived-part-state) from this status plus shipped Evidence. |
 | scope | Where it applies. |
 | statement | The observable rule. Adjectives do not qualify. |
 | rationale | Why. |
@@ -396,8 +422,7 @@ The on-disk serialization in the default adapter is the Vercel decision record i
 | --- | --- |
 | id | `angle/{name}`. |
 | name | Search list from the PRD, not a closed set: style, fonts and typography, themes and tokens, UX, interaction, flow, copy, and more. |
-| mode | Which mode this angle file is being filled for. |
-| summary | What this angle means in this product. |
+| summary | What this angle means in this product. An Angle is not a mode. It holds Decisions in either lifecycle state. |
 | decision_ids | Decisions on this angle. |
 | skill_id | Specialist Skill, when one exists (Emil: one file per aspect). |
 | wiki_refs | Shared facts this angle links to. |
@@ -450,8 +475,7 @@ Holdouts are not an Exemplar field. Vercel builds "holdouts from interfaces whos
 | Field | Content |
 | --- | --- |
 | id | |
-| mode | `conformance` or `expression`. |
-| before_ref | Before state. |
+| before_ref | Before state. The fixture does not store a mode. A holdout whose expected edit comes from intent belongs with a part in Expression. A fixture taken from a shipped Exemplar belongs with a part in Conformance. The link is the Decision and its Evidence. |
 | after_ref | Shipped or expected after state. Hidden from the Skill when `holdout` is true. |
 | exemplar_id | |
 | rubric_id | |
@@ -524,7 +548,6 @@ Taste glue. An optional derived view of what Vercel already indexes in the repo 
 | Field | Content |
 | --- | --- |
 | product | Display name of the target product. Free text. |
-| mode | `conformance` or `expression`. |
 | adapter | Default: `vercel-product-design`. |
 | angle_ids | |
 | decision_ids | |
@@ -534,12 +557,11 @@ Taste glue. An optional derived view of what Vercel already indexes in the repo 
 | skill_ids | Includes the Router. |
 | wiki_refs | |
 | eval_fixture_ids | |
-| expression_prior_ids | Empty on a Conformance Pack. |
+| derived_roll_up | Optional glue. Computed, never authored. Per surface: how many Decisions are Conformance, how many are Expression, how many CoverageGaps are open. ExpressionPriors are not indexed here. They are rung 6, outside the Pack. |
 
 ```json
 {
   "product": "",
-  "mode": "conformance",
   "adapter": "vercel-product-design",
   "angle_ids": [],
   "decision_ids": [],
@@ -549,7 +571,10 @@ Taste glue. An optional derived view of what Vercel already indexes in the repo 
   "skill_ids": [],
   "wiki_refs": [],
   "eval_fixture_ids": [],
-  "expression_prior_ids": []
+  "derived_roll_up": {
+    "note": "optional glue; computed, not authored",
+    "by_surface": []
+  }
 }
 ```
 
@@ -583,7 +608,7 @@ Two modules. The Pack is data the skill loader reads. The harness integration su
 | MCP server | Tools registered on the harness MCP client. The one-pager names the server. The tool names in this doc are Taste glue. LangChain: write tool descriptions with the same care as skill descriptions, and put MCP tools behind search so schemas load on demand. | Harness tool calls |
 | Sweeper | A skill, or a dedicated agent turn, the harness runs to extract a Pack from shipped UI | Coding agent |
 | Learner | A skill or hook that records corrections into the Pack (fast) and promotes them later (slow) | Same harness session, or a scheduled agent turn |
-| Interviewer | A skill the harness runs for Expression (greenfield) | Harness, when mode is Expression |
+| Interviewer | A skill the harness runs for any part in Expression (rule 1 or rule 3), on any product, including Ally | Harness, when that part is in Expression |
 | Critic | A harness subagent on a bigger model, with the Critic skill and brief from the Pack. Generate–review. | Harness subagent API |
 | Eval fixtures / Rubric / Judge | Product evals. An offline run or a CI job measures whether the Pack changed harness UI work. | Harness or CI |
 | Pack loader | Resolves a PackManifest from on-disk adapter paths | MCP `load_pack`, or a skill preamble |
@@ -595,17 +620,19 @@ Two modules. The Pack is data the skill loader reads. The harness integration su
 | Pack loader | MCP `load_pack`, or a skill preamble. The role that resolves L2 paths. | Adapter files | PackManifest and the records it indexes |
 | Sweep | Sweeper skill, or a dedicated agent turn | Target repo, and Evidence the harness can reach after the user approves access | Proposed Decisions, Evidence, Exemplars, CoverageGaps, candidate Gates |
 | Learn | Learner skill or hook, in the same session or on a schedule | Corrections, intake packets | MemoryLesson (`fast` immediately). Later: a promoted Skill, Wiki, or Decision |
-| Interview | Interviewer skill. Runs when mode is `expression`. | Greenfield intent | Expression Decisions, status `proposed`. Not ExpressionPriors. |
+| Interview | Interviewer skill. Runs for any part in Expression (from scratch, or rule 3), on any product. | Intent for that part. Rung-6 priors are context, not records. | `proposed` Decisions in the same tree. Not ExpressionPriors. |
 | Critique | Critic brief. Harness subagent on a bigger model (one-pager). Brief shape from LangChain. | Generator output, Pack, Rubric | CriticFindings, plus Emil's before/after table. Edits only when the request mode asks for edits |
 | Evaluate | A judge step the harness runs, offline or in CI. Source: Vercel, not LangChain. | EvalFixture, Rubric, with-skill and without-skill runs | JudgeResult |
 | Gate runner | Repo linter and CI. The role that knows an engine. Optional MCP `run_gates`. | Gate records, the diff | Pass, fail, or warning per Gate. Decision records stay untouched |
 
-Interview is the Expression skill. It stays off the Ally Conformance path. It runs on the Expression dogfood and writes the same Vercel tree. Learn runs on both.
+Interview proposes for any part in Expression, including a pocket on Ally. It writes the same Vercel tree. Learn runs for every part.
 
 Business rules, as the behavior of these roles:
 
 - Shipped wins over a conflicting stated preference. Sweep records the shipped pattern as Evidence. A preference that contradicts it does not become an accepted Decision.
-- A universal rule needs human acceptance. Sweep and Learn write `status: proposed`.
+- A universal rule needs human acceptance. Sweep and Interview both write `status: proposed`, then stop. Learn does the same when it proposes a Decision.
+- A material decision with no rung 3–4 justification becomes a CoverageGap, a `proposed` Decision, and a Shape or Interview pass for that part. A human accepts. Vercel: new standards stay with people. A candidate stays pending until a human approver accepts.
+- Gates enforce accepted Decisions. A `proposed` Decision's candidate Gate is a warning at most. That sentence is an engineering reading, not a product lock.
 - One screenshot, one shipped file, or one reviewer comment does not become a Decision by itself.
 - Measurable invariants become Gates. Judgment stays on the Decision and in the Skill prose.
 - After a model upgrade, delete Skill prose that only compensated for the old model, and mark those MemoryLessons `expired`. Keep the principles. Do not mark a Decision `expired`. A Decision leaves when a human sets `rejected` or `superseded`.
@@ -622,14 +649,14 @@ LangChain, on tools: "Descriptions matter for tools just as much as for skills."
 | Tool | When to call | When not to | In | Out | Role |
 | --- | --- | --- | --- | --- | --- |
 | `load_pack` | A UI task needs the Pack index | The skill files are already loaded | adapter id, repo root | PackManifest | Pack loader |
-| `list_decisions` | The task needs Decisions for an angle or status | A single known Decision is already in context | angle_id?, status?, mode? | Decision[] | Pack loader |
+| `list_decisions` | The task needs Decisions for an angle, a status, or shipped Evidence | A single known Decision is already in context | angle_id?, status?, shipped? | Decision[] | Pack loader |
 | `get_angle` | The task is scoped to one angle | The angle's references are already loaded | angle_id | Angle plus its Decision ids | Pack loader |
 | `load_skill` | The Router has picked a specialist Skill | The entry Skill is enough | skill_id, or a Router ask | Skill body | Pack loader |
 | `run_gates` | Optional. The repo linter is not already in the loop | The default path, which is the repo linter and CI | paths or diff | Gate results | Gate runner |
 | `record_correction` | Someone states a rule or a correction this turn (LangChain fast loop) | Promoting a lesson into a Skill or the Wiki. That is the slow loop | MemoryLesson fields (`loop: fast`) | MemoryLesson id, status `captured` | Learn |
 | `list_coverage_gaps` | Sweep or Learn is looking for missing standards | The task is ordinary UI implementation | angle_id? | CoverageGap[] | Pack loader |
 
-The harness calls these. Taste does not own the loop around them.
+The harness calls these. Taste does not own the loop around them. `shipped?` on `list_decisions` is a derived filter: the Decision is `accepted` and has Evidence of kind `pr`, `commit`, or `path`. It is not a stored mode. The parameter name is still Taste glue.
 
 ## Pack on-disk adapter
 
@@ -732,7 +759,7 @@ A material decision, in Vercel's words, "changes the user's task, default, scope
 3. **Model the product decision.** For Shape, Implement, Harden, a full Review, or any material product or flow change, write a compact internal brief: user, job, current behavior, desired outcome, success signal, non-goals, object, scope, action, consequence, reversibility, permissions, and open decisions.
 4. **Map the surface and states.** Inventory entry points, visible regions, overlays, transitions, exits, and return paths. Map only reachable states: loading, empty, sparse, populated, validation, error, permission, disabled, optimistic, stale, destructive, and responsive variants.
 5. **Load the routed references.** Material product, flow, or component decisions load product-judgment. Implementation, a material visual change, or a full review loads interface-quality. Copy loads its reference. Overflow, localization, extreme data, and network or error resilience load the resilience reference.
-6. **Decide, then implement.** For each non-mechanical change, answer: what user problem this solves, why this component is appropriate, what consequence the interface must communicate, which evidence supports it, and what the smallest coherent change is.
+6. **Decide, then implement.** For each non-mechanical change, answer: what user problem this solves, why this component is appropriate, what consequence the interface must communicate, which evidence supports it, and what the smallest coherent change is. **Justification check.** For each material decision, cite authority rung 3 or 4, or rung 5 as a `proposed` Decision. Rung 5 is an engineering reading: an adjacent shipped pattern stays on the Conformance propose path and goes through Learn. It is not a product lock. If none of those rungs justify the decision, that part enters Expression. Write a CoverageGap and a `proposed` Decision in the narrowest file, run Shape or Interview with rung-6 priors, and surface it to a human. Vercel: a new standard stays with people. A candidate stays pending until a human approver accepts.
 7. **Verify.**
    1. Confirm the primary job and the acceptance criteria.
    2. Run repository lint checks.
@@ -774,7 +801,7 @@ Good:
 
 The Decision template in [First surface](#first-surface) is the decision record. This template is the reference file that holds one or more of those rules.
 
-**Adapter request modes.** These are Vercel's workflow verbs inside `SKILL.md`. They are not Conformance and Expression. Taste mode is `conformance` or `expression` on the Pack and on each Decision. The adapter mode only decides whether this turn may edit.
+**Adapter request modes.** These are Vercel's workflow verbs inside `SKILL.md`. They are not Conformance and Expression. Those two are [derived per part](#derived-part-state). They are not fields on the Pack or on a Decision. The adapter verb only decides whether this turn may edit.
 
 `SKILL.md` resolves the adapter mode before acting, so an audit does not become an edit and a copy pass does not become a redesign.
 
@@ -797,11 +824,13 @@ When the verb is ambiguous, use the narrowest mode. A URL, screenshot, route, or
 3. Repository-canonical guidance: `AGENTS.md`, component APIs, the product's design-system docs, routed Skills.
 4. Accepted Decisions and Exemplars with stable Evidence.
 5. Verified adjacent shipped patterns in the same product area.
-6. General interface heuristics.
+6. General interface heuristics. This rung is ExpressionPriors (Anthropic, OpenAI, Emil). They sit outside the Pack. They are active for a part in Expression.
 
 The PRD rule sits on rungs 2 and 5: when a stated preference conflicts with what shipped, shipped wins. The user's goal for the current task still comes first. Shipped code is Evidence of what exists. It becomes an accepted Decision only through the record in [First surface](#first-surface).
 
-**Governance.** From Vercel's skill integrity. These are Learn and Sweep rules.
+Rung 5, an engineering reading and not a product lock: a verified adjacent shipped pattern can justify the change and become a `proposed` Decision through Learn. The part stays on the Conformance propose path. It does not enter Expression only because the match is adjacent rather than canonical. A human still accepts.
+
+**Governance.** From Vercel's skill integrity. These are Learn, Sweep, and Interview rules.
 
 - Add or change a rule only after current-source verification and human acceptance.
 - Record scope, rationale, evidence, exceptions, and a bad/good example.
@@ -818,7 +847,7 @@ Rule:   Destructive CTAs follow Verb + Noun.
         Never use Confirm, OK, or a bare verb.
 ```
 
-That rule is their example of an observable Decision (`statement` plus `bad_example`). A target product's Decisions come from Sweep.
+That rule is their example of an observable Decision (`statement` plus `bad_example`). A target product's Decisions come from Sweep or from Interview. Both write `proposed` and stop for a human. The alternatives differ: shipped Evidence, or elicited intent.
 
 ## Knowledge layers
 
@@ -839,14 +868,14 @@ Anthropic's frontend prompt was about 400 tokens, compact enough to load as a sk
 
 LangChain's guidance stack, which belongs in the Wiki and the Skills that link to it: start with brand tokens, font weights, spacing, and alignment; add design principles (their example is one focal point per frame); add guardrails against common AI design patterns; and keep the reasoning behind each piece of feedback. That reasoning is what Learn writes into a Skill.
 
-**Conformance Wiki, from OpenAI, not only Expression.** Product UI still needs named tokens and type roles. OpenAI: define `background`, `surface`, `primary text`, `muted text`, and `accent`, and type roles `display`, `headline`, `body`, and `caption`, early in the build. On a Conformance Pack those names are whatever the product shipped. They are Wiki facts a Gate may check. They are not a license to invent a new palette.
+**Product UI Wiki, from OpenAI.** Product UI still needs named tokens and type roles. OpenAI: define `background`, `surface`, `primary text`, `muted text`, and `accent`, and type roles `display`, `headline`, `body`, and `caption`, early in the build. For a part in Conformance those names are whatever the product shipped. They are Wiki facts a Gate may check. They are not a license to invent a new palette.
 
-The same article's product-UI rules belong in the Wiki for an app surface such as Ally, not under Expression:
+The same article's product-UI rules belong in the Wiki for an app surface such as Ally. They apply to parts in Conformance:
 
 - **Apps.** Default to Linear-style restraint: calm surface hierarchy, strong typography and spacing, few colors, dense but readable information, minimal chrome, cards only when the card is the interaction. Avoid dashboard-card mosaics, thick borders on every region, decorative gradients behind routine product UI, and competing accent colors.
 - **Utility copy.** For a dashboard, app surface, admin tool, or operational workspace, prefer utility copy over marketing copy. Prioritize orientation, status, and action. Section headings say what the area is or what the user can do. If a sentence could appear in a homepage hero, rewrite it until it sounds like product UI.
 
-Hero budget, cardless landing pages, and atmosphere stay ExpressionPriors. They are for a page that has no shipped system yet. See [Expression path](#expression-path).
+Hero budget, cardless landing pages, and atmosphere stay ExpressionPriors. They are active for a part in Expression, including a page that has no accepted shipped Decision yet. See [Expression path](#expression-path).
 
 **Judgment in prompts, invariants in code.** Content Studio: "The order that must always hold lives in code, and the judgment stays in the prompt." They had described a required review order in instructions, and the agent skipped it. The order moved into code. Creative calls stayed in the prompt. Taste uses the same split. A Gate can count options, reject a nested modal, or flag a token that is off the product scale. Choosing the right object and consequence for a destructive action stays on the Decision, with its Evidence.
 
@@ -860,13 +889,13 @@ LangChain's 200-line bound is on the memory-layer `AGENTS.md` (shared and person
 
 ## Conformance path
 
-Conformance is the mode where the Sweeper skill fills a Pack from a shipped product. Interview stays off this path. Learn does not. Learn is the shared sink in [System architecture](#system-architecture), flow C, for this track and for Expression. Day-to-day UI on this Pack is flow B. Building the Pack is flow A.
+Conformance is the lifecycle state of a part whose Decision is `accepted` and has shipped Evidence. Sweep proposes Decisions from a shipped product. Writing them does not put the part in Conformance. Interview runs for any part of this same Pack that is in Expression, including on Ally. Learn is the shared sink in [System architecture](#system-architecture), flow C. Day-to-day UI on a Conformance part is flow B. Proposing from shipped UI is flow A.
 
 Sweep steps. The first-surface rule and the Decision template are in [First surface](#first-surface). The product names which surface is first. Ally's choice is in the [dogfood appendix](#dogfood-appendix), not in this procedure.
 
-Anthropic's four-step method is how Sweep fills an angle: "identify convergent defaults, provide concrete alternatives, structure guidance at the right altitude, and make it reusable through Skills." On a Conformance Pack the concrete alternatives are the product's shipped ones. A ban list that merely swaps one generic default for another is the failure Anthropic names, their Space Grotesk example.
+Anthropic's four-step method is how Sweep fills an angle: "identify convergent defaults, provide concrete alternatives, structure guidance at the right altitude, and make it reusable through Skills." When Sweeping, the concrete alternatives are the product's shipped ones. A ban list that merely swaps one generic default for another is the failure Anthropic names, their Space Grotesk example.
 
-1. Pack loader reads the adapter. If the Pack is empty, PackManifest `mode` is `conformance` and `adapter` is `vercel-product-design`.
+1. Pack loader reads the adapter. The adapter id is `vercel-product-design`. If the Pack is empty and the product has already shipped, Sweep proposes. The Pack does not default to Conformance. If the project is from scratch, Interview proposes. See [Expression path](#expression-path).
 2. Pick one surface where the same review comments already repeat.
 3. Collect shipped examples and reviews as Evidence (`pr`, `commit`, `path`, `review`, `preview`).
 4. Write one Decision per observable judgment. Status `proposed`. Map it to the narrowest `references/` file. Add an Angle file only when no current reference is the right home.
@@ -908,11 +937,11 @@ The PRD angle list is Sweep's search list: style, fonts and typography, themes a
 
 ## Expression path
 
-Expression is a first-class track, built in parallel with Conformance. The harness skill is Interview. This is flow D, then flow E. The dogfood surface is omnipresent, or another greenfield surface, at the same time as Ally Conformance. The one-pager still says Expression is deferred as a product sentence. That does not leave the Interviewer unspecified. When a product moves between the two modes is [Mode lifecycle](#mode-lifecycle-infinity), and it is open.
+Expression is a lifecycle state of a part, on the same Pack as Conformance. The harness skill is Interview. This is flow D, then flow E. It runs for a from-scratch project (rule 1) and for any part that rule 3 sent back, including on Ally. The [PRD](prd.md) states the same loop.
 
-Interview writes Expression Decisions with status `proposed`, plus the Skills and Wiki facts those Decisions need. It does not write ExpressionPriors. Those priors are article guidance, and `source` stays `anthropic`, `openai`, or `emil`. There is no `interview` source. Priors seed the interview. The Pack they fill is the Vercel tree.
+Interview writes Decisions with status `proposed`, plus the Skills and Wiki facts those Decisions need. It does not write ExpressionPriors. Those priors are rung-6 article guidance, outside the Pack. `source` stays `anthropic`, `openai`, or `emil`. There is no `interview` source. Priors seed the interview. The Pack they inform is the one Vercel tree.
 
-**Required output shape.** The same adapter as Conformance, `vercel-product-design`. Not a second format.
+**Required output shape.** The same adapter, `vercel-product-design`. Not a second tree.
 
 ```
 AGENTS.md
@@ -930,52 +959,92 @@ tooling/scripts/evals/
 
 `references/*.md` uses Vercel's rule reference template (`rule/{id}`, scope, rule, why, exceptions, source, bad/good examples, coverage gaps). `SKILL.md` carries the operating contract, the request modes, and the seven-step workflow. Decisions use the Decision template. Holdouts sit on EvalFixtures.
 
-**Interview steps.** A builder implements these the way Conformance implements Sweep.
+**Interview steps.** A builder implements these the same way Sweep proposes: write `proposed` Decisions, then stop.
 
-1. Create the tree above if the Pack is empty. Derived view: `mode: expression`, `adapter: vercel-product-design`.
-2. Load ExpressionPriors as seeds. Anthropic: identify convergent defaults, then the product's own alternatives, at the right altitude, packaged as Skills. OpenAI: underspecified prompts fall back to high-frequency patterns. Emil: one skill file per aspect, with why and a strict table or flowchart. Do not copy a prior in as an accepted Decision.
+1. Create the tree above if the Pack is empty. Adapter id: `vercel-product-design`. Do not set a Pack mode. An empty Pack on a from-scratch project takes this path. An empty Pack on a shipped product takes [Conformance path](#conformance-path) step 1 instead, and Sweep proposes.
+2. Load ExpressionPriors as rung-6 context for parts in Expression. They are not Pack records. Anthropic: identify convergent defaults, then the product's own alternatives, at the right altitude, packaged as Skills. OpenAI: underspecified prompts fall back to high-frequency patterns. Emil: one skill file per aspect, with why and a strict table or flowchart. Do not copy a prior in as an accepted Decision.
 3. Elicit the product judgment the tree needs: who acts, the job, the object, the consequence, reversibility, permissions, and every reachable state (Vercel's brief and state map). Where the surface is product UI, elicit OpenAI's Apps restraint, utility copy, and the token and type roles, filled with this product's choices rather than a generic palette. A mood board or other visual reference is an input when the direction is underspecified.
 4. Write one proposed Decision per observable judgment, in the narrowest `references/` file, with a stable `rule/{id}`. Status stays `proposed`. Map aspect guidance to specialist Skills under the Router. Resolve request modes in `SKILL.md` before the Router runs. Measurable slices become candidate Gates.
 5. Write Exemplars for decisions worth repeating and for known flaws. Write CoverageGaps for anything Interview could not lock. Write EvalFixtures, including holdouts whose expected edits stay out of the Skill text.
-6. Stop. A human accepts, rejects, or leaves each candidate pending. Emil: "Of course the more creative part of the job is still up to you."
-7. Day-to-day UI is flow E, the same gates, Critic, verify checklist, and product evals as flow B. Learn is flow C.
+6. Stop. A human accepts, rejects, or leaves each candidate pending. Emil: "Of course the more creative part of the job is still up to you." Acceptance alone is not Conformance.
+7. Day-to-day UI is flow E, the same gates, Critic, verify checklist, and product evals as flow B. Learn is flow C. Neighboring parts that are already Conformance stay on flow B.
+8. **Lock back.** When a human has accepted the Decision and the change has shipped, attach the PR, commit, or path as Evidence. Write an Exemplar. Add a decision-log entry: the part locked to Conformance, with the rule id, the PR, the approver, and the eval re-run. That part is now Conformance. OpenAI's exception applies to it. Neighboring parts that are still Expression stay there. LangChain: "Once we pick a direction, the approved storyboard becomes the spec the rest of the film is built against."
 
-When a Conformance Pack already exists for that product, it wins on conflict. OpenAI's own exception:
+When an accepted Decision on that part already has shipped Evidence, that part wins on conflict. OpenAI's own exception:
 
 > Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.
 
-If the product shipped Inter, or a purple brand, Conformance keeps it. An ExpressionPrior rejects a default the product did not choose.
+If the product shipped Inter, or a purple brand, that part stays Conformance. An ExpressionPrior does not override it. A part with no such Decision may still use the prior.
 
-ExpressionPrior fields: `id`, `source` (`anthropic`, `openai`, or `emil`), `statement`, `applies_when: expression`, `subordinate_to: conformance pack when one exists`. There is no `interview` source. Greenfield intent from Interview is an Expression Decision.
+ExpressionPrior fields: `id`, `source` (`anthropic`, `openai`, or `emil`), `statement`. They are rung 6, outside the Pack. They are active for a part in Expression. They are subordinate, per part, wherever an accepted shipped Decision exists. There is no `interview` source. There is no mode field on the prior. Greenfield intent from Interview is a Decision.
 
 Generic UI is what the model emits when the Pack is silent. Anthropic and OpenAI are the starting ExpressionPriors for that failure. Emil is the starting shape for aspect Skills.
 
 Anthropic, on an unguided landing page: models "almost always conform to Inter fonts, purple gradients on white backgrounds, and minimal animations." They name the cause [distributional convergence](https://en.wikipedia.org/wiki/Convergence_of_random_variables): sampling sits on the high-probability center of the training data. Their axes for steering are typography, color and theme, motion, and backgrounds. They also warn that a ban list can create a new local maximum (their example is Space Grotesk). Name the product's own alternatives. Do not swap one generic default for another.
 
-OpenAI, on underspecified prompts: "models often fall back to high-frequency patterns from the training data." Landing-page hard rules are ExpressionPriors: one composition in the first viewport, a hero budget, cardless by default, brand-first, expressive type, atmosphere instead of a flat field. The portable pack pattern is their [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill). Those priors are subordinate to Conformance once a product Pack exists.
+OpenAI, on underspecified prompts: "models often fall back to high-frequency patterns from the training data." Landing-page hard rules are ExpressionPriors: one composition in the first viewport, a hero budget, cardless by default, brand-first, expressive type, atmosphere instead of a flat field. The portable pack pattern is their [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill). Those priors are subordinate, per part, once an accepted shipped Decision exists. OpenAI: "Great design balances restraint with invention—drawing from patterns that have stood the test of time while introducing something new."
 
-The same skill's **Apps** and **Utility Copy For Product UI** sections are Conformance guidance for a product surface. They live in the Wiki. See [Knowledge layers](#knowledge-layers). So do the named tokens and type roles, filled with what the product shipped. OpenAI also asks for real copy and product context instead of placeholders, and for a mood board or visual references before final assets when the visual direction is underspecified. A mood board is an Expression input. On Conformance, the user-supplied product context and the PRD are the ground.
+The same skill's **Apps** and **Utility Copy For Product UI** sections are Wiki guidance for a product surface. They live in the Wiki. See [Knowledge layers](#knowledge-layers). So do the named tokens and type roles. For a part in Conformance they are filled with what shipped. OpenAI also asks for real copy and product context instead of placeholders, and for a mood board or visual references before final assets when the visual direction is underspecified. A mood board is an input for a part in Expression. For a part in Conformance, the user-supplied product context and the PRD are the ground.
 
 OpenAI notes that low or medium reasoning often produces stronger frontends on simpler pages, with room to turn reasoning up for ambitious work. That is a generator setting in the harness. It does not move the one-pager's Critic off a bigger model.
 
 **Aspect Skills.** [Emil Kowalski](https://emilkowal.ski/ui/agents-with-taste): "My way of getting there is to create a skill file for each aspect of the interface. If you know what great feels like, describe the rules, then give them to your agents so they can follow them." Each file says why the choice feels right, then a strict table or flowchart so the agent does not invent a rule. His easing example: "This is strict so the agent doesn't have to guess or make up its own rules." He uses Anthropic's [skill-creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) to package that.
 
-Compose aspect Skills under the Router. The Router is job-scoped. Vercel request modes are resolved before it runs. The aspect Skill is the specialist for one Angle: animation, typography, color, and the rest of the open set. Why and rules live there. Measurable slices graduate into Gates. Expression-only aspect guidance (distinctive type, anti-slop bans, hero budget) is in force on an Expression Pack. On a Conformance Pack it waits. Emil: "Of course the more creative part of the job is still up to you." Human acceptance stays in front of a new rule.
+Compose aspect Skills under the Router. The Router is job-scoped. Vercel request modes are resolved before it runs. The aspect Skill is the specialist for one Angle: animation, typography, color, and the rest of the open set. Why and rules live there. Measurable slices graduate into Gates. Expression-only aspect guidance (distinctive type, anti-slop bans, hero budget) is in force for a part in Expression. For a part in Conformance it waits. Emil: "Of course the more creative part of the job is still up to you." Human acceptance stays in front of a new rule.
 
 ## Mode lifecycle (infinity)
 
-Gopi's metaphor is an infinity symbol (∞). One lobe is Conformance. One lobe is Expression. A product may start on either lobe. A feature that cannot follow existing patterns can sit in Expression for a time, then lock back into Conformance when those patterns have shipped and stabilized. Some products stay mostly on Conformance. A greenfield or strongly distinctive surface spends more time on Expression.
+Gopi's five rules are locked. The [PRD](prd.md) states them.
 
-Engineering records that the lifecycle has to exist. It does not define the protocol. Why a product should move, and who owns that call, is a product conversation with North. The one-pager already leaves the lock trigger open: "once expression is closed and the user has locked a design, Taste switches to conformance; the exact trigger is still open."
+1. From scratch, the work is Expression.
+2. Once a part is defined, agreed, and shipped, it is Conformance. One Pack, the same artefacts. There is no separate Expression tree and no separate Conformance tree.
+3. When Conformance cannot justify the next step from the artefacts, that part enters Expression again.
+4. Otherwise Conformance keeps looping.
+5. The whole Pack never flips. Parts update.
 
-Open, on purpose:
+**How the techniques carry the state.**
 
-- What enters Expression from Conformance. Candidates a product discussion might use, not rules: a CoverageGap, no matching Decision, a deliberate break from a shipped pattern.
-- What locks Expression back into Conformance. Candidates, not rules: shipped and accepted Decisions, an eval pass, human acceptance.
-- Whether `mode` is Pack-global, per-surface, or per-feature. Schemas today put `mode` on the Pack and on records. That field is Taste glue. It is not a decision that mode is global.
-- Who decides: a human, a harness prompt, or a Gate. Not chosen.
+- Vercel: Decision status, shipped Evidence, CoverageGap, open decisions, and the authority ladder are the per-part state. The decision log records the move.
+- OpenAI: "Great design balances restraint with invention—drawing from patterns that have stood the test of time while introducing something new." The exception: an existing design system wins for that part once an accepted, shipped Decision exists.
+- LangChain: "Once we pick a direction, the approved storyboard becomes the spec the rest of the film is built against." That is the lock-back. An accepted, shipped Decision is the spec for that part.
+- Anthropic's four steps stay the same. The source of the concrete alternatives switches. Shipped Evidence on a Conformance part. Elicited intent on an Expression part.
 
-Until those are answered, Interview and Sweep stay separate skills, Learn stays shared, and no switcher runs.
+**Granularity.** State is carried per Decision and rolled up per surface or Angle. A surface can mix Conformance parts and Expression parts. The Pack does not flip.
+
+**No switcher.** There is no process that flips a mode field. The move is the existing review packet, a human acceptance, and shipped Evidence. Vercel: new standards, policy choices, and unresolved product decisions stay with people. A candidate stays pending until a human approver accepts. Who initiates the proposal, a human or the harness, stays open in the one-pager. This file does not invent that.
+
+### What both lobes share
+
+One system. The lobes differ only in where the concrete alternatives come from, and in whether rung-6 priors are active for that part.
+
+| Shared piece | What it is |
+| --- | --- |
+| Vercel tree | `AGENTS.md`, `SKILL.md`, references, exemplars, coverage gaps, evals. One tree for both lobes. |
+| Decision lifecycle | `proposed`, then `accepted`, then shipped Evidence, or `rejected` / `superseded`. This is the state carrier. |
+| Derived part state | Computed from those Vercel fields. Not an authored `mode`. |
+| Authority ladder | The resolver. Rungs 3–4 justify staying in Conformance. Rung 5 may still propose on that path (engineering reading). Rung 6 is ExpressionPriors, outside the Pack. |
+| Propose contract | Sweep (alternatives = shipped) and Interview (alternatives = elicited) both write `proposed` Decisions, CoverageGaps, and candidate Gates, then stop for a human. |
+| Entry Skill | Operating contract, request modes, the seven-step workflow, the product-decision brief, the reachable-state map, the verify checklist. |
+| Router, aspect Skills, Wiki | LangChain, Emil, Anthropic. Loaded for either lobe. |
+| Learn | One sink. Fast and slow loops. Collector, judge, review packet, human. Dev first-pass comments and production signals, recorded as Evidence. |
+| Critic brief | Role, context, file ownership, how to validate, model and effort. Findings are P0–P3, plus Emil's before/after table. |
+| Gates | Repo linter and CI. They enforce accepted Decisions. A proposed Decision's candidate Gate is a warning at most (engineering reading, not a product lock). |
+| Evaluate | With and without the Skill, holdouts, `rule_correctness` separate from similarity. |
+| Decision log | What changed, why, source, approver. An ∞ move is an entry. |
+| Rules-expire hygiene | A model upgrade removes workaround prose and matching MemoryLessons. It does not expire a Decision. |
+
+### Still with North
+
+These are product questions. This file does not answer them.
+
+- What "shipped" means: merged, released, or stable for some period.
+- Who the approver is per product, and how the user is told that a part entered Expression.
+- Whether an Expression part may be implemented before its Decision is accepted.
+- Whether `known_flaws`, or a deliberate wish to break a shipped pattern, can send a part to Expression, and how that sits with "shipped wins."
+- The user-facing unit of the ∞: surface, feature, or PR. Engineering stores state per Decision either way.
+- The threshold for "from scratch" when a little UI has already shipped.
+
+The one-pager already asks who initiates a mode change, and how sharp "artefacts can't justify" must be. Detection in this file is the entry Skill's justification check: which evidence supports the decision. Acceptance is human. This file does not add a who-flips rule beyond Vercel's "new standards stay with people."
 
 Anthropic's other point is the Conformance reading: a custom Skill can encode the organization's design system and component patterns as a reusable asset, loaded on demand. That is the product Pack. The generic frontend-aesthetics skill is not a substitute for it.
 
@@ -1010,6 +1079,8 @@ Decision tree, from Vercel. The gate runner implements the "yes, a linter" branc
 - If a rule stays reliable only with many exceptions, move it back to agent guidance. Drop the Gate. Keep the Decision.
 
 Each Gate says why the pattern is a problem and suggests a concrete fix. Some may autofix a safe migration. The explanation of why, and any judgment call, stay in the Decision prose.
+
+**Engineering reading, not a product lock.** Gates enforce accepted Decisions. A `proposed` Decision's candidate Gate is a warning at most. It does not block the build.
 
 ## Critique and Evaluate
 
@@ -1105,9 +1176,9 @@ Open decisions:
 | Assumptions | assumptions |
 | Open decisions | open_decisions |
 
-`mode` and `angle_id` are Taste glue the template does not have. So is `superseded`. The Pack loader can set `mode` and `angle_id` from the derived Pack view and the reference file the record lives in. Vercel's template statuses stay `proposed`, `accepted`, and `rejected`.
+`angle_id` and `superseded` are Taste glue the template does not have. There is no `mode` field. Part state is [derived](#derived-part-state) from status and shipped Evidence. The Pack loader sets `angle_id` from the reference file the record lives in. It does not set a mode. Vercel's template statuses stay `proposed`, `accepted`, and `rejected`.
 
-The reference file around this record uses the [rule reference template](#entry-skill). When the same decision shows up and the Pack does not contain it, the agent writes this record into the narrowest file and leaves it pending. It does not silently invent a universal rule.
+The reference file around this record uses the [rule reference template](#entry-skill). When the same decision shows up and the Pack does not contain it, the agent writes this record into the narrowest file and leaves it pending. It does not silently invent a universal rule. When that missing decision is material and rungs 3–4 do not justify it, the write is the rule-3 path: CoverageGap, `proposed` Decision, Shape or Interview.
 
 ## Decision log
 
@@ -1123,6 +1194,11 @@ A log entry is that record. It is not a domain type.
 | Approver | Vercel's human review: "Require stable evidence, explicit scope and exceptions, and an approver." |
 | Eval re-run | Vercel evals. When fixtures exist, run them with the Skill and without it, and keep both JudgeResults. Read `rule_correctness` and `similarity_to_shipped` as separate numbers. Read `skill_loaded` before blaming a Decision for a miss. |
 
+**Infinity entries.** Two moves are log entries. They are not a new type.
+
+- Part entered Expression. Record the CoverageGap id and why the artefacts did not justify the decision.
+- Part locked to Conformance. Record the rule id, the shipping PR (or commit or path), the approver, and that Evaluate was re-run.
+
 LangChain sits next to that log, not inside it. After a job, up to five evidence-backed lessons are stored against the skill used. "Future jobs read and rate those lessons." A weekly pass promotes the useful ones into a Skill or the Wiki. Rating a lesson is not the Vercel judge.
 
 Removing a rule that stops helping is a human edit. Set the Decision to `rejected` or `superseded`. Do not mark it `expired` because a model got better. Expiry is for Skill-prose workarounds and MemoryLessons.
@@ -1137,18 +1213,19 @@ Removing a rule that stops helping is a human edit. Set the Decision to `rejecte
 | What success means | Rubric dimension | EvalFixture before/after bytes, unless the fixture itself is the change |
 | Review behavior | Critique brief | Sweeper outputs |
 | Where files live | Pack adapter id | The other PackManifest fields, if a derived view is in use |
+| A part's lifecycle state | That part's Decision status, its Evidence, or its CoverageGap | Every other part. There is no Pack-level mode to flip. |
 | A model workaround that no longer helps | The Skill prose, or MemoryLesson status `expired` | Decisions, and the principles on L0 |
 
 ## Dogfood appendix
 
 L4 bindings. They pass a repo path into Sweep. They do not appear on Pack schemas.
 
-| When | Surface | Mode | What the harness runs |
+| When | Surface | Where its parts start | What the harness runs |
 | --- | --- | --- | --- |
-| Now | HelloAlly ally-platform | Conformance | First pain: flow and interaction. Sweep starts there. Day-to-day UI uses the entry Skill's product-decision brief and reachable-state map. Critic and Evaluate run against that Pack. |
-| Now, in parallel | omnipresent, or another greenfield surface | Expression | Interview fills the same Vercel tree. Same gates, Critic, and product evals. |
+| Now | HelloAlly ally-platform | Mostly Conformance once Sweep Decisions are accepted and have shipped Evidence. A net-new part the artefacts cannot justify goes through Expression (rule 3). | First pain: flow and interaction. Sweep proposes. Day-to-day UI on a Conformance part uses the entry Skill. Interview runs for parts in Expression. Critic and Evaluate run against this Pack. |
+| Now, in parallel | omnipresent, or another greenfield surface | Expression (rule 1). Parts lock to Conformance as they ship. | Interview proposes into the same Vercel tree. Same gates, Critic, and product evals. |
 
-Ally is the Conformance dogfood, not the only dogfood. Omnipresent, or another greenfield surface, is the Expression dogfood. Product thinking stays harness-agnostic and product-agnostic. Flow and interaction on Ally use Vercel's product-decision brief and the reachable-state map (loading, empty, error, permission, disabled, optimistic, stale, destructive, responsive, and the rest of that list). Those steps do not add Ally fields to a schema. Parallel product evals run on both Packs: with and without the Pack, and whether the first pass is mergeable. That measurement is not a separate system. The move between lobes is open. See [Mode lifecycle](#mode-lifecycle-infinity).
+Ally is one dogfood Pack, not a mode flag for the product. Omnipresent, or another greenfield surface, is a second dogfood Pack that starts from scratch. Product thinking stays harness-agnostic and product-agnostic. Flow and interaction on Ally use Vercel's product-decision brief and the reachable-state map (loading, empty, error, permission, disabled, optimistic, stale, destructive, responsive, and the rest of that list). Those steps do not add Ally fields to a schema. Parallel product evals run on each dogfood Pack: with and without the Pack, and whether the first pass is mergeable. That measurement is not a separate system. See [Mode lifecycle](#mode-lifecycle-infinity).
 
 Discovery is dual-track. Sweep followed by historical replay is one path. It is not locked as the only path.
 
@@ -1159,12 +1236,12 @@ Not locked, on purpose:
 - The final abstract set of Angles.
 - The MCP tool surface. The stub names in this doc are Taste glue, agent-authored starting names, not from sources. They are not a locked tool surface. The sourced rule is LangChain's: tool descriptions matter, and MCP tools sit behind search.
 - How many Critic passes run. The brief headings are LangChain's: role, relevant context, file ownership, how to validate, and model and effort. The bigger model is the one-pager's. The GAN metaphor is historical only.
-- The infinity lifecycle: enter and exit triggers, whether mode is Pack-global or finer, and who decides. Listed under [Mode lifecycle](#mode-lifecycle-infinity). Product framing goes to North. This file does not set those rules. The one-pager's lock trigger is the same open question.
+- What "shipped" means, who the approver is, whether an Expression part may be built before acceptance, whether a known flaw or a deliberate break can enter Expression, the user-facing unit of the ∞, and the threshold for "from scratch" when a little UI already shipped. Listed under [Still with North](#still-with-north). The [PRD](prd.md) already leaves who initiates a mode change open, and how sharp "artefacts can't justify" must be. This file does not answer those.
 - Whether Sweep to historical replay is the only discovery path.
 - Whether further engineering sources should still change this architecture before it is locked. This draft re-homes Vercel, OpenAI, and Emil on top of the LangChain and Anthropic baseline. The set is not closed. More research may refine it.
 - How Sweep tells a deliberate pattern from an accidental or legacy one.
 - What Evaluate proves a mergeable first pass without hand-labelling.
-- Which lessons carry from the Ally Conformance track to the Expression track, and back, once both are running.
+- Lessons live in one Learn sink on the Pack. They are not split into an Ally track and an Expression track.
 - The MemoryLesson file layout and the slow-loop cadence. The fast and slow loops are in scope, including up to five lessons, a skill association, and a later rating. The file layout is not. LangChain does not define the rating scale.
 - LangChain's 200-line bound applies to the memory-layer `AGENTS.md` that loads on every call. The one-pager asks for a bounded repo index and does not set that number. Neither number is a Taste cap.
 
@@ -1176,7 +1253,7 @@ What this architecture takes from each source. Quotes above are from these texts
 
 - Article: [Building a design agent](https://www.langchain.com/blog/design-agent)
 - Open source: [langchain-ai/design-agent](https://github.com/langchain-ai/design-agent)
-- Took: job-scoped Skills behind a Router; a Wiki that Skills link to; Gates in code for measurable checks; fast memory in the same turn and a slow loop (up to five lessons, associated with the skill, future jobs read and rate them, weekly promotion); two memory layers, shared and personal; judgment in prompts and invariants in code; the guidance stack of tokens, principles, anti-slop guardrails, and the reasoning behind feedback; subagent briefs (role, relevant context, file ownership, how to validate, model and effort); tool descriptions, with MCP tools behind search; storyboard then animatic then production; workaround rules expire after model upgrades ([Bitter Lesson](http://www.incompleteideas.net/IncIdeas/BitterLesson.html)); the 200-line bound on the memory-layer `AGENTS.md`; harness_v1's 115-component design system, which became repetitive. The harness owns the loop. Taste does not adopt Content Studio's media computer or Slack product. LangChain is not the source of the eval judge.
+- Took: job-scoped Skills behind a Router; a Wiki that Skills link to; Gates in code for measurable checks; fast memory in the same turn and a slow loop (up to five lessons, associated with the skill, future jobs read and rate them, weekly promotion); two memory layers, shared and personal; judgment in prompts and invariants in code; the guidance stack of tokens, principles, anti-slop guardrails, and the reasoning behind feedback; subagent briefs (role, relevant context, file ownership, how to validate, model and effort); tool descriptions, with MCP tools behind search; storyboard then animatic then production, and "Once we pick a direction, the approved storyboard becomes the spec the rest of the film is built against" as the lock-back precedent; workaround rules expire after model upgrades ([Bitter Lesson](http://www.incompleteideas.net/IncIdeas/BitterLesson.html)); the 200-line bound on the memory-layer `AGENTS.md`; harness_v1's 115-component design system, which became repetitive. The harness owns the loop. Taste does not adopt Content Studio's media computer or Slack product. LangChain is not the source of the eval judge.
 
 ### Anthropic — frontend skills
 
@@ -1186,13 +1263,13 @@ What this architecture takes from each source. Quotes above are from these texts
 ### Vercel — product-design
 
 - Article: [Teaching agents product design at Vercel](https://vercel.com/blog/teaching-agents-product-design-at-vercel)
-- Took: the default Pack adapter (skill plus linters plus a human review loop); the entry Skill's operating contract and seven-step workflow, including the product-decision brief, the reachable-state map, and the verify checklist; request modes resolved before routing; the rule reference template; references, Exemplars, and CoverageGaps; Gates for deterministic rules and prose for judgment; sandbox validation with builds, tests, and linters before a suggestion; Evaluate (before state, judge, Rubric, shipped examples, holdouts on fixtures, with/without-skill baseline, correctness scored separately from similarity); the first-surface quote and the Decision template; Learn as collector, judge, review packet, and human acceptance into the narrowest destination; the decision log (what changed, why, which source, approver).
+- Took: the default Pack adapter (skill plus linters plus a human review loop); the entry Skill's operating contract and seven-step workflow, including the product-decision brief, the reachable-state map, and the verify checklist; request modes resolved before routing; the rule reference template; references, Exemplars, and CoverageGaps; Gates for deterministic rules and prose for judgment; sandbox validation with builds, tests, and linters before a suggestion; Evaluate (before state, judge, Rubric, shipped examples, holdouts on fixtures, with/without-skill baseline, correctness scored separately from similarity); the first-surface quote and the Decision template; Learn as collector, judge, review packet, and human acceptance into the narrowest destination; the decision log (what changed, why, which source, approver); Decision status, shipped Evidence, CoverageGap, and the authority ladder as the per-part ∞ state.
 
 ### OpenAI — delightful frontends
 
 - Article: [Designing delightful frontends with GPT-5.4](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4)
 - Pack pattern: [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill)
-- Took: underspecified prompts fall back to high-frequency patterns; landing-page hard rules (hero budget, cardless default, brand-first, expressive type, atmosphere) as ExpressionPriors; Apps (Linear-style restraint) and Utility Copy for product UI as Conformance Wiki guidance; named tokens (`background`, `surface`, `primary text`, `muted text`, `accent`) and type roles (`display`, `headline`, `body`, `caption`); the exception that an existing design system wins; ground the work in real copy; visual references and a mood board; rendered verification with Playwright across viewports and flows; low or medium reasoning as an optional generator setting. The article does not describe a component library for agents.
+- Took: underspecified prompts fall back to high-frequency patterns; "Great design balances restraint with invention—drawing from patterns that have stood the test of time while introducing something new"; landing-page hard rules (hero budget, cardless default, brand-first, expressive type, atmosphere) as ExpressionPriors; Apps (Linear-style restraint) and Utility Copy for product UI as Wiki guidance for a part in Conformance; named tokens (`background`, `surface`, `primary text`, `muted text`, `accent`) and type roles (`display`, `headline`, `body`, `caption`); the exception that an existing design system wins, applied per part; ground the work in real copy; visual references and a mood board; rendered verification with Playwright across viewports and flows; low or medium reasoning as an optional generator setting. The article does not describe a component library for agents.
 
 ### Emil Kowalski — agents with taste
 
@@ -1201,4 +1278,4 @@ What this architecture takes from each source. Quotes above are from these texts
 
 ### Product
 
-- [docs/prd.md](prd.md), mirroring [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) (Gopi · Draft · Oct 2026). Took the ambition bar: judgment carried across harnesses and model upgrades, and outside judges. Outside judges keep the Critic and the Evaluate judge off the generator. The Doc still says Expression is deferred and leaves the lock trigger open. Parallel implementation of Interview, the shared Learn sink, and the infinity metaphor are Gopi's engineering instruction for this architecture. They do not rewrite the Doc.
+- [docs/prd.md](prd.md), mirroring [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) (Gopi · Draft · Oct 2026). Took the ambition bar: judgment carried across harnesses and model upgrades, and outside judges. Outside judges keep the Critic and the Evaluate judge off the generator. The Doc now states the five ∞ rules: from scratch is Expression; defined, agreed, and shipped is Conformance on one Pack; Conformance returns to Expression when the artefacts cannot justify the next step; otherwise Conformance keeps looping; the Pack never flips, parts do. Who initiates a mode change stays open there. This file follows those rules and does not invent the initiator.

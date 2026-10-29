@@ -34,9 +34,13 @@ LangChain (Content Studio) and Anthropic's frontend-skills article are the v0 ba
 - Rules expire: delete compensating rules after model upgrades.
 - AGENTS.md as a bounded index; growth goes into skills and the wiki.
 
-## Conformance and expression
+## Conformance ↔ Expression (∞)
 
-Conformance first: match the judgment the product has already shipped, across every design angle. Expression is deferred. Lifecycle: once expression is closed and the user has locked a design, Taste switches to conformance; the exact trigger is still open. HelloAlly ally-platform is the dogfood surface only, where flow and interaction are the first pain; product thinking stays harness- and product-agnostic.
+Conformance and Expression are two modes of one Taste pack lifecycle (∞), not a one-way deferral. One Pack, same artefacts for both modes — never separate Expression vs Conformance artefact sets. The whole Pack does not flip; parts of the Pack update per-surface / per-feature.
+
+Locked loop: (1) Project from scratch → Expression. (2) Once defined, agreed, and shipped → Conformance. (3) When Conformance can't justify what to do from the artefacts → Expression again. (4) Otherwise Conformance keeps looping.
+
+HelloAlly ally-platform remains the conformance dogfood surface (flow and interaction first pain). Omnipresent stays a greenfield Expression surface. Product thinking stays harness- and product-agnostic. Who initiates a mode change (human vs harness) is still open — do not invent it yet.
 
 ## How taste gets in and is checked
 
@@ -50,7 +54,7 @@ Shipped is the source of truth: when stated preferences conflict with what's shi
 ## First experiments
 
 - Conformance on HelloAlly ally-platform now.
-- Expression on omnipresent later.
+- Expression on omnipresent (greenfield start); Expression pockets anywhere artefacts can't justify.
 - Dual-track discovery: Sweep to historical replay is not locked as the only path.
 
 Success signals:
@@ -65,13 +69,13 @@ Success signals:
 - Not an agent runtime.
 - Not a component library or design system product.
 - Not OpenSignal: OpenSignal doesn't own design judgment.
-- Not expression mode, yet.
+- Not separate Expression vs Conformance artefact sets — one Pack for both modes.
 
 ## Open questions
 
 - Suggested: How does a sweep tell deliberate design patterns from accidental or legacy ones?
 - Suggested: What eval proves a mergeable first pass without hand-labelling?
-- Suggested: Which conformance learnings carry over once expression starts on omnipresent?
-- What signal shows expression is closed and the design is locked, so Taste switches to conformance?
+- Suggested: How do we detect "artefacts can't justify" sharply enough to enter Expression without thrashing?
+- Who initiates enter-Expression / lock-back-to-Conformance (human vs harness)? Still open — do not invent.
 - Which abstract set of design angles holds across products?
 - Which other engineering sources should shape the architecture before we lock it?

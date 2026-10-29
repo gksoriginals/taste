@@ -16,7 +16,7 @@ A plugin for an existing coding-agent harness (Cursor, Claude Code, Codex, and o
 ## Docs
 
 - [docs/prd.md](docs/prd.md) — PRD mirror of the one-pager
-- [docs/engineering.md](docs/engineering.md) — product architecture (draft): harness plugin, Conformance and Expression in parallel, L0–L4 stack, domain model
+- [docs/engineering.md](docs/engineering.md) — product architecture (draft): harness plugin, one Pack, Conformance and Expression derived per part, L0–L4 stack, domain model
 - [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) — Google Doc, source of truth
 
 Cursor and Grok Bot: read [agent.md](agent.md) before changing this repo.
