@@ -40,7 +40,7 @@ Conformance and Expression are two modes of one Taste pack lifecycle (∞), not 
 
 Locked loop: (1) Project from scratch → Expression. (2) Once defined, agreed, and shipped → Conformance. (3) When Conformance can't justify what to do from the artefacts → Expression again. (4) Otherwise Conformance keeps looping.
 
-HelloAlly ally-platform remains the conformance dogfood surface (flow and interaction first pain). Omnipresent stays a greenfield Expression surface. Product thinking stays harness- and product-agnostic. Who initiates a mode change (human vs harness) is still open — do not invent it yet.
+HelloAlly ally-platform remains the conformance dogfood surface (flow and interaction first pain). Omnipresent stays a greenfield Expression surface. Product thinking stays harness- and product-agnostic. Engineering derives per-part mode from Decision status, shipped Evidence, and CoverageGap (no authored mode field; one Pack). Who initiates a mode change (human vs harness) is still open — do not invent it yet.
 
 ## How taste gets in and is checked
 
@@ -78,4 +78,10 @@ Success signals:
 - Suggested: How do we detect "artefacts can't justify" sharply enough to enter Expression without thrashing?
 - Who initiates enter-Expression / lock-back-to-Conformance (human vs harness)? Still open — do not invent.
 - Which abstract set of design angles holds across products?
+- What does "shipped" mean for lock-back (merged, released, or stable for a period)?
+- Who is the approver per product, and how is the user told a part entered Expression?
+- May an Expression part be implemented before its Decision is accepted?
+- Can known_flaws or a deliberate break of a shipped pattern send a part to Expression, and how does that sit with "shipped wins"?
+- User-facing unit of the ∞: surface, feature, or PR? (Eng stores state per Decision either way.)
+- Threshold for "from scratch" when a little UI has already shipped?
 - Which other engineering sources should shape the architecture before we lock it?

@@ -1044,7 +1044,7 @@ These are product questions. This file does not answer them.
 - The user-facing unit of the ∞: surface, feature, or PR. Engineering stores state per Decision either way.
 - The threshold for "from scratch" when a little UI has already shipped.
 
-The one-pager already asks who initiates a mode change, and how sharp "artefacts can't justify" must be. Detection in this file is the entry Skill's justification check: which evidence supports the decision. Acceptance is human. This file does not add a who-flips rule beyond Vercel's "new standards stay with people."
+The [PRD](prd.md) open questions now include this list, plus who initiates a mode change and how sharp "artefacts can't justify" must be. Detection in this file is the entry Skill's justification check: which evidence supports the decision. Acceptance is human. This file does not add a who-flips rule beyond Vercel's "new standards stay with people."
 
 Anthropic's other point is the Conformance reading: a custom Skill can encode the organization's design system and component patterns as a reusable asset, loaded on demand. That is the product Pack. The generic frontend-aesthetics skill is not a substitute for it.
 
@@ -1236,7 +1236,7 @@ Not locked, on purpose:
 - The final abstract set of Angles.
 - The MCP tool surface. The stub names in this doc are Taste glue, agent-authored starting names, not from sources. They are not a locked tool surface. The sourced rule is LangChain's: tool descriptions matter, and MCP tools sit behind search.
 - How many Critic passes run. The brief headings are LangChain's: role, relevant context, file ownership, how to validate, and model and effort. The bigger model is the one-pager's. The GAN metaphor is historical only.
-- What "shipped" means, who the approver is, whether an Expression part may be built before acceptance, whether a known flaw or a deliberate break can enter Expression, the user-facing unit of the ∞, and the threshold for "from scratch" when a little UI already shipped. Listed under [Still with North](#still-with-north). The [PRD](prd.md) already leaves who initiates a mode change open, and how sharp "artefacts can't justify" must be. This file does not answer those.
+- What "shipped" means, who the approver is, whether an Expression part may be built before acceptance, whether a known flaw or a deliberate break can enter Expression, the user-facing unit of the ∞, and the threshold for "from scratch" when a little UI already shipped. Listed under [Still with North](#still-with-north) and in the [PRD](prd.md) open questions. This file does not answer those.
 - Whether Sweep to historical replay is the only discovery path.
 - Whether further engineering sources should still change this architecture before it is locked. This draft re-homes Vercel, OpenAI, and Emil on top of the LangChain and Anthropic baseline. The set is not closed. More research may refine it.
 - How Sweep tells a deliberate pattern from an accidental or legacy one.
