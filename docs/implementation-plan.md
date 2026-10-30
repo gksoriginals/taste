@@ -35,6 +35,14 @@ This plan describes a usable first version of Taste as a plugin for an existing 
 - Verify supported harnesses where installed; distinguish schema/protocol validation from a live IDE acceptance test.
 - Acceptance: repeatable code and protocol checks cover plugin manifests, MCP loading, Pack initialization/upkeep, both modes, paired fixture packets, and Judge handoff. The synthetic smoke evaluation confirmed the separate-context workflow and produced actionable rubric feedback. Harness-specific installation UI checks remain limited to the installed tools described in `docs/plugin-development.md`.
 
+### 6. Setup, sweep, interviews, and mode routing — complete for v1
+
+- Make a live browser/computer product sweep a required part of Conformance knowledge discovery; capture page, flow, screenshot/rendered state, date, and viewport evidence, plus source/history corroboration.
+- Ask Expression questions through the existing coding harness, summarize user intent, and require confirmation before recording an accepted direction.
+- Define named workflows and their manual/automatic triggers across harnesses.
+- Resolve the coding agent's structured intent signal through deterministic mode-transition logic. Do not classify raw language in Taste code.
+- Acceptance: setup creates both mode routes; the sweep Skill requires screenshots and marks missing access/evidence incomplete; Expression questions go through the harness and need confirmation before recording accepted direction; ambiguous intent returns a focused harness question; the deterministic resolver maps LLM-selected structured signals without classifying raw language.
+
 ## First-version boundaries
 
 Taste does not implement an agent runtime, provider-specific subagent protocol, automatic access to production data/Git history, a universal eval runner, or an evaluation database. Skills instruct the harness coding agent; the MCP tools provide deterministic Pack and fixture operations; the harness delegates to its own higher-capacity model and stores transient run records in its own working memory. A host lacking the required delegation must report that limitation rather than silently substitute same-context judging.
@@ -42,8 +50,8 @@ Taste does not implement an agent runtime, provider-specific subagent protocol, 
 ## Delivered v1 capabilities
 
 - Root Agent Plugins package, Codex repo marketplace catalog, and Claude Code native compatibility metadata.
-- Three plugin Skills: apply product direction, discover/maintain Pack knowledge, and run paired evaluations.
-- Eight MCP tools: initialize, inspect, read, write, validate, list fixtures, retrieve generator input, and retrieve one-output Judge packet.
+- Seven plugin Skills: UI task routing, Pack upkeep, setup, visual sweep, Conformance, Expression, and evaluation.
+- Nine MCP tools: mode resolution; Pack initialize, inspect, read, write, validate; fixture listing; generator input; and one-output Judge packet.
 - Starter and synthetic example Packs with shared, Conformance, and Expression references, authority notes, Rubric, and fixtures for each mode.
 - Path and symlink confinement, non-overwriting initialization, bounded reads/writes and fixture states, manifest validation, tests, and local development instructions.
 

@@ -22,6 +22,7 @@ For local development, the Codex repo marketplace is declared under `.agents/plu
 - [docs/engineering.md](docs/engineering.md) — system design
 - [docs/implementation-plan.md](docs/implementation-plan.md) — v1 milestones, scope, and acceptance status
 - [docs/plugin-development.md](docs/plugin-development.md) — local plugin setup and test workflow
+- [docs/plugin-workflows.md](docs/plugin-workflows.md) — named Taste workflows and activation triggers
 - [docs/validation-results.md](docs/validation-results.md) — synthetic end-to-end evaluation smoke run and its limits
 - [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) — product source of truth
 

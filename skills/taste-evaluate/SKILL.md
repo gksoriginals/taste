@@ -1,6 +1,6 @@
 ---
 name: taste-evaluate
-description: Use when measuring whether Taste guidance improves UI work, creating evaluation fixtures from shipped examples, or comparing agent outputs with and without a product Skill.
+description: Use when the user explicitly requests an evaluation or when deliberately calibrating product Skills; compare with/without-Skill outputs using a separate higher-capacity Judge.
 ---
 
 # Evaluate Taste guidance

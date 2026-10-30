@@ -36653,6 +36653,47 @@ var StdioServerTransport = class {
   }
 };
 
+// src/core/mode.ts
+function resolveTasteMode(input2) {
+  const rationale = input2.rationale.trim();
+  const ask = (question) => ({
+    status: "needs_user",
+    mode: null,
+    transition: null,
+    rationale,
+    question
+  });
+  if (!rationale) {
+    return ask("Ask the user to clarify the intended mode and record the reason for the choice.");
+  }
+  let mode2;
+  switch (input2.trigger) {
+    case "explicit_mode":
+      if (!input2.explicitMode) return ask("The user requested an explicit mode, but the requested mode was not provided.");
+      mode2 = input2.explicitMode;
+      break;
+    case "established_direction":
+      mode2 = "conformance";
+      break;
+    case "new_direction":
+      mode2 = "expression";
+      break;
+    case "direction_accepted":
+      if (input2.userConfirmed !== true) {
+        return ask("Ask through the harness whether the proposed direction is accepted as product guidance before switching to Conformance.");
+      }
+      mode2 = "conformance";
+      break;
+    case "unclear":
+      return ask("Ask one focused question through the harness to determine whether the user wants established product direction or a new direction.");
+  }
+  if (input2.currentMode === "expression" && mode2 === "conformance" && input2.trigger !== "explicit_mode" && input2.trigger !== "direction_accepted") {
+    return ask("Confirm through the harness that the user accepts the proposed Expression direction as product guidance before switching to Conformance.");
+  }
+  const transition = input2.currentMode === void 0 ? "start" : input2.currentMode === mode2 ? "stay" : "switch";
+  return { status: "selected", mode: mode2, transition, rationale };
+}
+
 // src/core/pack.ts
 import { lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -36679,16 +36720,25 @@ description: Apply ${productName}'s product-specific design judgment when creati
 
 This is the entry point for the product's Taste Pack. Keep its mode-selection cues specific to this product and update them as product intent becomes clearer.
 
-## Select a Taste mode
+## Choose and record a task mode
 
-- **Conformance:** Use when the task asks you to follow an established product direction, and shipped work plus accepted references provide evidence for the decision.
-- **Expression:** Use when the user intentionally asks to establish, explore, or extend the product's design direction.
-- If the request mixes the two or the choice would materially change the result, ask the user through the harness before proceeding. Follow an explicit mode request unless it conflicts with higher-priority product direction; surface that conflict.
-- A user accepting a new direction may signal a return to Conformance. Use the user's intent and product evidence to determine when that applies; do not infer a universal automatic transition.
+Use the user's explicit mode request when present. Otherwise interpret the task using this product's triggers:
+
+- **Conformance:** the requested change follows an accepted direction documented in the Pack, grounded in visual evidence from the running product and supporting sources. Shipped work is evidence, not automatic policy.
+- **Expression:** the user asks to explore, establish, or intentionally change product direction. Ask the user focused questions through the harness conversation.
+- **Unclear or unsupported:** if intent is mixed, or an important decision lacks evidence, ask one focused question through the harness instead of guessing.
+
+Use the \`taste_mode_resolve\` tool with your interpreted signal (\`explicit_mode\`, \`established_direction\`, \`new_direction\`, \`direction_accepted\`, or \`unclear\`). The tool maps the signal deterministically; it does not classify raw language. A proposed Expression direction moves to Conformance only after the user confirms it as product guidance. Keep mode task-local and tell the user which mode was selected and why.
 
 ## Apply this Pack
 
-Read \`references/shared/product-facts.md\` when relevant. For Conformance, load the applicable reference under \`references/conformance/\`; for Expression, load relevant intent and direction under \`references/expression/\`. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
+Read \`references/shared/product-facts.md\` when relevant. For Conformance, load the applicable reference under \`references/conformance/\`; for Expression, load the relevant intent and direction under \`references/expression/\`. These routes exist for both modes from setup; an unestablished direction must be labeled as such. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
+
+Visual taste was gathered from the running product, not source code alone. For a discovery refresh, follow the Taste \`taste-sweep\` workflow and capture screenshots. When implementing or reviewing visible UI, use the harness's available browser/computer/rendered-preview tools when needed and report what you actually inspected.
+
+## Expression questions
+
+Ask the product owner through the harness conversation. Ask only questions needed to resolve user need, desired outcome, constraints, tradeoffs, or relevant references. Summarize the proposed direction and obtain confirmation before storing it as accepted guidance.
 
 Product-specific guidance is incomplete until its references contain reviewed evidence. Ask the product owner when the task needs a decision the Pack does not support.
 `;
@@ -36727,14 +36777,14 @@ Record only reviewed product facts that apply in both Conformance and Expression
       path: "skills/product-design/references/conformance/README.md",
       content: `# Conformance references
 
-Capture decisions supported by shipped product work and accepted review evidence. Put each decision, rationale, scope, exceptions, examples, and known flaws beside the relevant surface or craft guidance.
+Capture decisions supported by evidence from the running product and accepted review evidence. A visual sweep should record relevant URLs/pages, user-flow steps, screenshots or rendered captures, date and viewport, and important interaction states. Correlate those observations with code, Git history, reviews, and product-owned sources where available. Put each decision, rationale, scope, exceptions, examples, evidence gaps, and known flaws beside the relevant surface or craft guidance.
 `
     },
     {
       path: "skills/product-design/references/expression/README.md",
       content: `# Expression references
 
-Capture user intent, alternatives considered, and the direction the user chooses when intentionally creating or extending product taste. Keep open questions visible.
+The coding agent interviews the product owner through the harness when they want to establish or extend direction. Capture user intent, alternatives considered, constraints, and the direction the user explicitly confirms. Label proposed and accepted guidance distinctly; do not invent a direction to populate this file. Keep open questions visible.
 `
     },
     {
@@ -37152,6 +37202,22 @@ async function toolResult(operation) {
 }
 function createTasteServer() {
   const server2 = new McpServer({ name: "taste", version: "0.1.0" });
+  server2.registerTool(
+    "taste_mode_resolve",
+    {
+      title: "Resolve the selected Taste mode",
+      description: "Resolve a product Skill's LLM-interpreted intent signal into a task-local Conformance or Expression mode. Taste does not classify raw user language. Ambiguous intent, missing explicit mode, or an unconfirmed Expression-to-Conformance transition returns a question for the coding agent to ask through its harness.",
+      inputSchema: {
+        currentMode: mode.optional().describe("Current task-local mode, if one has already been selected."),
+        trigger: external_exports.enum(["explicit_mode", "established_direction", "new_direction", "direction_accepted", "unclear"]),
+        explicitMode: mode.optional().describe("Required when trigger is explicit_mode."),
+        userConfirmed: external_exports.boolean().optional().describe("Whether the user explicitly accepted the proposed direction as product guidance."),
+        rationale: external_exports.string().max(2e3).describe("The coding agent's short rationale, based on the product Skill and conversation context.")
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async (input2) => success2(resolveTasteMode(input2))
+  );
   server2.registerTool(
     "taste_pack_initialize",
     {

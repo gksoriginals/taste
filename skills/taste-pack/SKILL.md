@@ -1,6 +1,6 @@
 ---
 name: taste-pack
-description: Use when discovering product design decisions from shipped work, initializing a product's Taste Pack, or reviewing and updating product-specific Taste guidance.
+description: Use when maintaining a product Taste Pack or reviewing candidate guidance. For first-time setup use taste-setup; for a visual product discovery pass use taste-sweep.
 ---
 
 # Build and maintain a product Pack
@@ -9,9 +9,9 @@ The existing harness coding agent performs the analysis. Use Taste tools for Pac
 
 ## Discover guidance
 
-1. Choose a first product surface where repeated decisions or review corrections are visible. Use the user's product direction to bound the surface.
-2. Ask the harness to obtain access to Git history, reviews, design files, or production data when that evidence is needed. Do not assume access or invent evidence.
-3. Collect links and examples before drafting rules. Separate observed product facts, inferred decisions, known flaws, counterexamples, and evidence gaps.
+1. For first-time setup or a product discovery pass, follow `taste-setup` or `taste-sweep`; source-only inspection does not complete a visual sweep.
+2. Ask the harness to obtain access to the running product, browser/computer tools, Git history, reviews, design files, or production data when needed. Do not assume access or invent evidence.
+3. Collect rendered screens, screenshots or equivalent records, links, and implementation examples before drafting rules. Separate observed product facts, inferred decisions, known flaws, counterexamples, and evidence gaps.
 4. Ask: “What repeated decision is currently in someone's head that an agent needs to find?” Capture the reasoning, scope, exceptions, and examples with each candidate.
 5. Place accepted product knowledge in shared, Conformance, or Expression references according to its meaning. Keep examples and known flaws beside related guidance. Keep transient/private corrections in harness or plugin working memory until reviewed.
 

@@ -36,7 +36,8 @@ Shipped work is evidence of what a product does. It is not automatically a rule 
 ```mermaid
 flowchart TB
   subgraph ProductEvidence[Product evidence]
-    Repo[Target repository and shipped UI]
+    Repo[Running product pages and shipped UI]
+    Visual[Browser/computer screenshots and flow states]
     History[Commits, PRs, reviews, previews]
     Corrections[User corrections and product rationale]
   end
@@ -74,9 +75,11 @@ flowchart TB
     MainAgent <--> Tools
     MainAgent <--> MCP
     MainAgent <--> PluginSkills
+    MainAgent <--> Human
   end
 
   ProductEvidence --> Sweep[Sweep role in host coding agent]
+  Visual --> Sweep
   Sweep --> Candidate[Candidate guidance with evidence and uncertainty]
   Candidate --> Human
   Human -->|accepted guidance| Skills
@@ -123,7 +126,7 @@ This uses LangChain's Skills, Wiki, and Gates as Pack knowledge roles, with Verc
 
 The Pack needs a discoverable entry point in the target repo so a coding agent knows when product-design guidance applies. A root `AGENTS.md` can provide a thin trigger for harnesses that read it; it is not Taste itself and is not a universal installation mechanism. Harnesses that do not read `AGENTS.md` need their own adapter or setup. Vercel's example uses repository instructions to trigger an in-repo product-design Skill; its Skill then resolves the task mode and routes to focused references. LangChain's Router is also a Skill with a table mapping job types to specialist Skills. Anthropic describes Skills that the model can autonomously identify and load when the task calls for them.
 
-For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load deeper guidance as the task requires. A small deterministic resolver may load a named file or route among explicit choices, but semantic task classification should remain with the coding agent where interpretation is needed.
+For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load deeper guidance as the task requires. The coding agent interprets the request using the product's mode triggers, then passes a structured signal to a small deterministic resolver. The resolver maps explicit signals to Conformance, Expression, or a question; it does not classify raw language or invent product meaning.
 
 ### Shared Pack structure for both modes
 
@@ -189,6 +192,23 @@ The repository-level trigger tells the coding agent when the UI Skill applies an
 
 For the first surface, Sweep and the coding agent should gather shipped examples and review evidence, identify repeated decisions, then draft guidance in the narrowest relevant reference. Each candidate should make the decision observable and include why it matters, scope, evidence, exceptions, and useful good/bad examples. Keep candidate decisions pending human review. Put known defects next to the example or rule they qualify so the agent learns the intended pattern without reproducing the defect.
 
+A Sweep is not complete from source code alone. The coding agent should use the harness's available browser or computer-use tools to open the running product, traverse the chosen flow, inspect visible and interactive states, and capture screenshots. Record the page or URL, flow step, state, date, viewport, screenshot path, and what the evidence supports. Correlate this with code, Git history, reviews, and product-owned sources. If access or visual tools are unavailable, ask the harness/user for access or captures and mark the evidence incomplete.
+
+### Workflow Skills and commands
+
+Taste defines explicit, user-invokable workflow Skills and one automatically relevant UI entry Skill. In the portable package, Skills are the shared command definitions; harnesses expose them through their own skill picker/invocation syntax. Do not duplicate the workflow body into provider-specific command files unless a harness adapter specifically requires an alias.
+
+| Skill | Trigger | Outcome |
+| --- | --- | --- |
+| `taste-setup` | User explicitly asks to set up Taste for a product | Select a first surface, create/continue the Pack, arrange the initial evidence sweep, establish both mode routes, and report readiness/gaps. |
+| `taste-sweep` | User asks to learn, sweep, or refresh product taste | Inspect the live product with browser/computer tools and capture evidence; correlate with source/history; draft reviewed candidates. |
+| `taste-design` | UI/UX task in a repository with a Taste Pack | Follow product triggers, select a task-local mode, load focused guidance, and implement/review. |
+| `taste-conformance` | User explicitly requests Conformance or product Skill resolves an established direction | Apply accepted evidence-backed product guidance. |
+| `taste-expression` | User asks to explore, establish, or deliberately change direction | Interview the user through the harness, propose alternatives, and record only a confirmed direction as accepted guidance. |
+| `taste-evaluate` | User asks to evaluate guidance or an intentional calibration run is due | Compare controlled with/without-Skill generation and ask the harness to delegate independent higher-capacity judging. |
+
+The Pack should contain both mode routes before routine UI work begins. Setup can leave Expression unestablished if the user has not chosen a new direction; it must label that state rather than fabricate product taste.
+
 This creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. Add a specialized Skill for a craft (such as copy or animation) when routing by job benefits from it; do not create a separate Skill for every topic by default.
 
 ### Runtime path for a UI task
@@ -201,16 +221,20 @@ sequenceDiagram
   participant Harness as User's coding harness
   participant Agent as Coding agent
   participant Pack as Taste Pack
-  participant Tools as Repo / Git / browser tools
+  participant Tools as Repo / Git / browser / computer tools
+  participant Mode as Deterministic mode resolver
   participant Gate as Deterministic Gates
 
   User->>Harness: UI task and constraints
   Harness->>Agent: Start task in existing agent loop
   Agent->>Pack: Read entry guidance and relevant route
   Pack-->>Agent: Skill, linked context, examples, applicable checks
+  Agent->>Agent: Interpret user intent using product-specific mode triggers
+  Agent->>Mode: Send structured signal and rationale
+  Mode-->>Agent: Resolved task mode or question to ask through harness
   Agent->>Tools: Inspect product behavior and source evidence
-  Tools-->>Agent: Code, states, product references
-  Agent->>Agent: Interpret context and make design decisions
+  Tools-->>Agent: Screenshots, rendered states, code, and product references
+  Agent->>Agent: Apply selected mode and make design decisions
   Agent->>Tools: Implement scoped product change
   opt Relevant reliable Gate exists
     Agent->>Gate: Check changed code
@@ -289,13 +313,13 @@ LangChain's Content Studio also treats some rules as model-version workarounds: 
 
 ### MCP interface
 
-The PRD includes an MCP server as a Taste component. Its architectural role is to expose Pack and check capabilities to external harnesses—for example, loading focused guidance, running a relevant Gate, or recording a correction. The MCP server does not own planning, model selection, generation, Critique orchestration, or the task loop. The specific tool names, capability boundaries, and which operations may instead use ordinary repository files are still open.
+The PRD includes an MCP server as a Taste component. Its architectural role is to expose Pack and check capabilities to external harnesses—for example, loading focused guidance, resolving an LLM-interpreted mode signal, running a relevant Gate, or recording a correction. The MCP server does not own planning, model selection, generation, Critique orchestration, or the task loop.
 
 ### Agent judgment and deterministic logic
 
 Use the coding agent's intelligence for work that needs meaning or product context: interpreting evidence, noticing patterns, deciding which guidance applies, weighing exceptions and tradeoffs, proposing UI, and reviewing whether the result fits the product. Taste should give the agent evidence and reasons so it can exercise that judgment; it should not try to encode the full design decision tree as application logic.
 
-Keep deterministic code for narrow operations whose inputs and outcomes are explicit and reliably checkable: locating or loading a known reference, simple routing among named guidance, and mechanical checks with low false-positive risk. Routing does not have to be deterministic: in the cited LangChain and Vercel examples, a model-facing Router Skill or entry Skill describes the routes. A rules engine should not decide product meaning merely because an operation can be expressed in code.
+Keep deterministic code for narrow operations whose inputs and outcomes are explicit and reliably checkable: locating/loading a known reference, routing a selected mode to named guidance, validating a structured mode transition, and mechanical checks with low false-positive risk. The product Skill supplies product-specific triggers; the coding agent interprets user intent and sends a structured signal to `taste_mode_resolve`. That function deterministically maps `established_direction` to Conformance, `new_direction` to Expression, and `unclear` to a harness question. It honors an explicit mode request and permits an Expression-to-Conformance transition only after user confirmation. It keeps mode task-local and has no global product state. It is not a keyword classifier. A rules engine should not decide product meaning merely because an operation can be expressed in code.
 
 This is the intended split, not a claim that every implementation needs a Router or a linter. When a check requires judgment, depends on product context, or produces unreliable flags, keep it in agent guidance and review.
 
@@ -377,14 +401,14 @@ The system could support this high-level loop:
 2. Use agent judgment to identify recurring product decisions, known flaws, and gaps in understanding.
 3. Preserve supported findings as candidate Pack guidance with their scope and evidence; a person reviews proposed product-wide standards.
 4. For a coding task, load the relevant Conformance guidance and let the harness produce the change.
-5. Use deterministic checks for reliable mechanical rules and agent Critique for product-context review. Inspect the rendered result when visual or interaction quality matters.
+5. Use deterministic checks for reliable mechanical rules and agent Critique for product-context review. Inspect rendered product pages and interactions; use the harness browser/computer tools and capture screenshots for visible or interaction changes.
 6. Capture corrections and use evaluation or review evidence to improve, revise, or retire guidance.
 
 Shipped work is evidence, not an instruction to copy every pattern. A correction that conflicts with shipped behavior is evidence to investigate, not an automatic conformance rule. Similarity to shipped code does not outweigh known flaws.
 
 ### Expression loop
 
-An Expression loop uses the selected Expression guidance to elicit intent, alternatives, and reasons for a new or evolving direction. The agent uses that context to propose and develop the design; the user judges whether the direction expresses the intended taste. Useful decisions and examples can then be captured as candidate Expression guidance. The precise interview script, approval protocol, and stored schema remain open.
+An Expression loop uses the selected Expression guidance to elicit intent, alternatives, and reasons for a new or evolving direction. The coding agent asks focused questions directly through the user's harness conversation, based on the choices that materially affect the task. It proposes a small number of distinct options when useful, summarizes the intended direction and rationale, and asks the user to confirm before treating it as accepted product guidance. The harness remains the interview surface; Taste supplies the Skill and Pack tools. The user's confirmed direction becomes task guidance immediately and can become Conformance guidance for later work within its stated scope.
 
 For work on an existing product, settled Conformance guidance remains context when Expression intentionally extends that product; it does not prevent a user-directed change in direction. The PRD's Expression dogfood is on omnipresent, after the current HelloAlly Conformance work, while both modes remain supported by the shared architecture.
 
@@ -392,19 +416,22 @@ The [OpenAI frontend article](https://developers.openai.com/blog/designing-delig
 
 ### Combined lifecycle
 
-The modes share the Pack and harness connection while keeping guidance associated with its mode. A product Skill defines the evidence that indicates an intentional move into Expression and the signal that a direction is settled enough to apply through Conformance. That signal is evaluated with agent judgment and can be explicitly set by the user; the exact product-level transition criteria are left for each Pack to define.
+The modes share the Pack and harness connection while keeping guidance associated with its mode. A product Skill defines product-specific evidence and task examples for entering Expression and settling a direction. The LLM interprets those signals from conversation and product context; deterministic code applies the resulting structured transition, asks for clarification when needed, and requires confirmation before an accepted Expression direction becomes Conformance guidance. Explicit user mode requests override defaults. Mode selection remains task-local and does not silently rewrite product-wide state.
 
 ```mermaid
 flowchart LR
   Skill[Product entry Skill<br/>interprets task and product intent]
+  Signal[LLM-selected structured signal<br/>and rationale]
+  Resolver[Deterministic signal-to-mode resolver]
   Conformance[Conformance guidance<br/>Learn from shipped work<br/>Guide implementation and review]
   Expression[Expression guidance<br/>Elicit intent and alternatives<br/>Agent develops options; user judges<br/>Capture the chosen direction]
   Ask[Ask user through harness<br/>when mode is ambiguous]
-  Skill -->|request aligns with settled shipped direction| Conformance
-  Skill -->|request establishes or explores direction| Expression
-  Skill -->|unclear or mixed intent| Ask
+  Skill --> Signal --> Resolver
+  Resolver -->|established_direction / explicit Conformance| Conformance
+  Resolver -->|new_direction / explicit Expression| Expression
+  Resolver -->|unclear or unsupported| Ask
   Ask -->|user clarifies| Skill
-  Expression -->|user accepts direction; product Skill defines transition signal| Conformance
+  Expression -->|user confirms accepted direction| Resolver
 ```
 
 These loops describe system behavior, not a fixed sequence of agents, APIs, or mandatory steps. The coding harness owns task execution and follows the selected mode; the product Skill carries the mode criteria that let the coding agent select and switch. Keep that decision visible to the user rather than hiding it in deterministic application logic.

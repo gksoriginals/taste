@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { resolveTasteMode } from "./core/mode.js";
 import {
   getEvaluationGeneratorCase,
   getEvaluationJudgePacket,
@@ -39,6 +40,23 @@ async function toolResult<T extends object>(operation: () => Promise<T>) {
 
 export function createTasteServer(): McpServer {
   const server = new McpServer({ name: "taste", version: "0.1.0" });
+
+  server.registerTool(
+    "taste_mode_resolve",
+    {
+      title: "Resolve the selected Taste mode",
+      description: "Resolve a product Skill's LLM-interpreted intent signal into a task-local Conformance or Expression mode. Taste does not classify raw user language. Ambiguous intent, missing explicit mode, or an unconfirmed Expression-to-Conformance transition returns a question for the coding agent to ask through its harness.",
+      inputSchema: {
+        currentMode: mode.optional().describe("Current task-local mode, if one has already been selected."),
+        trigger: z.enum(["explicit_mode", "established_direction", "new_direction", "direction_accepted", "unclear"]),
+        explicitMode: mode.optional().describe("Required when trigger is explicit_mode."),
+        userConfirmed: z.boolean().optional().describe("Whether the user explicitly accepted the proposed direction as product guidance."),
+        rationale: z.string().max(2000).describe("The coding agent's short rationale, based on the product Skill and conversation context."),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (input) => success(resolveTasteMode(input)),
+  );
 
   server.registerTool(
     "taste_pack_initialize",

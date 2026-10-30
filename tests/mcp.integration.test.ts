@@ -30,6 +30,7 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
         "taste_pack_read",
         "taste_pack_validate",
         "taste_pack_write",
+        "taste_mode_resolve",
       ].sort(),
     );
 
@@ -49,6 +50,13 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     const skill = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
     assert.match(skill, /Conformance/);
     assert.match(skill, /Expression/);
+
+    const mode = await client.callTool({
+      name: "taste_mode_resolve",
+      arguments: { currentMode: "expression", trigger: "direction_accepted", userConfirmed: true, rationale: "The user accepted this direction for the product." },
+    });
+    assert.equal(mode.isError, undefined);
+    assert.match(JSON.stringify(mode.structuredContent), /conformance/);
 
     const written = await client.callTool({
       name: "taste_pack_write",

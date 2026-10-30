@@ -41,6 +41,8 @@ npm run validate:package
 
 `npm test` bundles the server and exercises Pack safety, the two-mode Pack, generator/Judge context separation, manifest schemas, and a real MCP stdio client/server exchange. `claude plugin validate .` checks Claude's native package metadata. Package validation is static and does not prove that every installed harness version can load the plugin.
 
+Use the named portable workflow Skills when explicitly invoking setup, sweep, Conformance, Expression, or evaluation. `taste-design` is the auto-relevant entry for UI/UX work when a Pack exists. See [plugin-workflows.md](plugin-workflows.md) for exact triggers and outcomes. Skills are the portable workflow definitions; Cursor-specific command files are not duplicated in this package.
+
 Evaluation tools deliberately return different packets. The generator gets task instructions and the before state; the Judge packet gets the task, rubric, and expected after state. The host harness is responsible for running a higher-capacity Judge in a separate context. This separation limits answer leakage in the workflow; it is not a security boundary against a harness that ignores instructions.
 
 ## Official references
