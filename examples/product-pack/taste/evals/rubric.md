@@ -1,0 +1,3 @@
+# Example evaluation rubric
+
+The harness runs a higher-capacity Eval Judge in a fresh context from the generator. Score each output from 1–5 on user-facing quality, task completion, product-rule correctness, and alignment with accepted work. A 1 fails or conflicts with supported direction; 3 partly meets the task with material gaps; 5 meets it strongly without material gaps. Cite concrete output evidence for every score. Similarity must not reward copying a known flaw. Call out behavior that cannot be verified from the supplied files. Human review calibrates this rubric; scores do not automatically edit the Pack.

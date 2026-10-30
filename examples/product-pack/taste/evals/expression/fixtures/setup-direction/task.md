@@ -1,0 +1,1 @@
+Explore a more reassuring account setup experience for people who are unsure why personal details are needed. Offer two distinct directions and ask the product owner to choose before treating either as established product guidance.

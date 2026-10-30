@@ -1,22 +1,28 @@
 # Taste
 
-From what's shipped, extract a product's taste so any coding harness, given a PRD and the Taste pack, first-passes UI you'd merge.
+Taste is a portable product-design plugin for existing coding harnesses. It provides Skills, a local MCP server, and TypeScript tools that help the host coding agent learn and apply product-specific design guidance stored in a target repository's `taste/` Pack.
 
-**Status:** Draft · Oct 2026
+Taste does not configure or host the coding agent. Codex and Cursor use the portable [Agent Plugins](https://agent-plugins.org/) package at this repository root. Claude Code uses the same Skills and server through its native plugin compatibility files.
 
-## What it is
+## Quick start
 
-A portable design-taste layer for coding agents: a pack in the repo, an MCP server, and agents that build and maintain the pack. For now, Gopi is dogfooding it; it is built for software-product UI projects generally.
+Requirements: Node.js 20 or later.
 
-## What it isn't
+```sh
+npm install
+npm run build
+npm test
+```
 
-- Not an agent runtime. The harness owns the loop, planning, and the model; Taste supplies context, tools, and checks.
-- Not a component library, and it won't become a design system product.
+For local development, the Codex repo marketplace is declared under `.agents/plugins/marketplace.json`; Cursor loads the portable root Agent Plugin; Claude Code can load it with `claude --plugin-dir .` from the repository root. See [docs/plugin-development.md](docs/plugin-development.md) for harness setup and smoke checks.
 
 ## Docs
 
-- [docs/prd.md](docs/prd.md) — PRD mirror of the one-pager
-- [docs/engineering.md](docs/engineering.md) — initial engineering architecture (draft)
-- [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) — Google Doc, source of truth
+- [docs/prd.md](docs/prd.md) — PRD mirror of the product one-pager
+- [docs/engineering.md](docs/engineering.md) — system design
+- [docs/implementation-plan.md](docs/implementation-plan.md) — v1 milestones, scope, and acceptance status
+- [docs/plugin-development.md](docs/plugin-development.md) — local plugin setup and test workflow
+- [docs/validation-results.md](docs/validation-results.md) — synthetic end-to-end evaluation smoke run and its limits
+- [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) — product source of truth
 
-Cursor and Grok Bot: read [agent.md](agent.md) before changing this repo.
+Read [agent.md](agent.md) before changing project conventions.

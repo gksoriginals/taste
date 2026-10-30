@@ -1,0 +1,6 @@
+{
+  "name": "taste",
+  "version": "0.1.0",
+  "description": "Product-specific design Skills and tools for coding agents",
+  "mcpServers": "./.mcp.json"
+}

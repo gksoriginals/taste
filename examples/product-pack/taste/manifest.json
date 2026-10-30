@@ -1,0 +1,6 @@
+{
+  "name": "Example Product",
+  "version": "0.1.0",
+  "supportedModes": ["conformance", "expression"],
+  "surfaces": ["account setup"]
+}

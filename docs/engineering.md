@@ -1,764 +1,459 @@
 # Engineering
 
-**Draft · Oct 29, 2026 IST**
+**Draft · Oct 30, 2026 IST**
 
-## Status and scope
+## Purpose and status
 
-This is the system for running Taste experiments. It is how we define an experiment, execute it, evaluate it, and modify it. It is not a product build, and it is not locked. More research and experiments still have to land before the architecture is locked.
+This document describes a possible system design for Taste: its responsibility, major components, and how they might work together. It is not an implementation plan or a locked architecture. Keep the product direction clear while allowing the system shape to change as Taste is used.
 
-The source articles (LangChain, Anthropic, Vercel, OpenAI, Emil) stay in full as the starting base. They are proof-of-concepts. This doc re-homes them under Taste's names. The [Vercel product-design tree](https://vercel.com/blog/teaching-agents-product-design-at-vercel) is the default on-disk **Pack adapter**, not the domain model.
+Taste's ambition remains the one in the [PRD](prd.md): extract the taste in a shipped product so a coding harness, given a PRD and the Taste Pack, can produce a first pass the user would merge. The ambition is the destination, not a requirement to settle every architectural question now.
 
-**Product source of truth:** the [Google Doc one-pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit), mirrored in [docs/prd.md](prd.md). If this file and the Doc disagree about the product, the Doc wins.
+The [Google Doc one-pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is the product source of truth; [docs/prd.md](prd.md) mirrors it. If this document and the Doc disagree about the product, the Doc wins.
 
-**Audience:** Gopi and Dev for engineering. North for product alignment only.
+This repository contains the Taste plugin implementation and documentation. Example product Packs live under `examples/`; real Packs live in their target repositories.
 
-**Hard goal:** from what a product has shipped, extract its taste across every design angle so any coding harness, given a PRD and the Taste Pack, first-passes UI you would merge. Experiments find the abstract set of angles. See the [PRD](prd.md).
+## Product boundaries and direction
 
-Two mode names are first-class, from the PRD:
+Taste is a plugin for existing coding harnesses that supplies a portable, product-specific design-taste layer. Its proposed system includes:
 
-- **Conformance** — match the judgment the product has already shipped.
-- **Expression** — invent or extend taste. Deferred. Omnipresent later.
+- A **Pack** that carries product-specific design knowledge into a target product repository.
+- **Capabilities** that help discover, capture, deliver, and check that knowledge.
+- A connection to the user's **coding harness**, which owns the agent loop, planning, models, tools, and PR workflow.
 
-This repository stays docs-only. The schemas below are the experiment representation, written down so operators have stable inputs and outputs. They are not implemented code. No application code, package manifest, MCP server, or skill files in this repo. The Pack adapter is a layout for a **target product repo**.
+Taste supplies Skills, tools, and checks that the harness's existing coding agent can use. Taste does not configure or run an agent; the harness owns the agent, model, loop, and any delegation. Taste is not a component library or design-system product. Product-specific design judgment belongs to the product, not OpenSignal.
 
-The shape of the doc follows seven engineering principles: executable operators, data that carries the essential fields, coherent modules, business rules translated into those operators, domain names, explicit abstraction levels, and one-way dependencies so a module can be replaced on its own.
+Conformance comes first:
 
-## Abstraction levels
+- **Conformance** means matching the judgment a product has already shipped across design angles such as style, typography, themes and tokens, UX, interaction, flow, and copy. The angle set stays open.
+- **Expression** means inventing or extending taste. Its dogfood sequence is later, on omnipresent, but the shared Pack and harness architecture should support it from the outset.
 
-| Level | Name | What it fixes | What may change in an experiment |
-| --- | --- | --- | --- |
-| L0 | Principles | Harness owns the loop. Shipped wins. Taste is Pack + MCP + agents. Conformance first. Rules expire. | A principle change is an architecture change, not an experiment tweak. |
-| L1 | Domain types | Schemas for the nouns. No Ally fields. No harness fields. | Schemas stay stable across an experiment. |
-| L2 | Pack on-disk adapter | Default layout: the Vercel product-design tree. Maps types to files. | A different adapter may store the same types. |
-| L3 | Operators | Sweep, Learn, Interview, Critique, Evaluate, Gate runner, Pack loader. MCP tool stubs. | Replace one operator without rewriting the others. |
-| L4 | Dogfood adapters | Conformance on HelloAlly ally-platform now. Expression priors and omnipresent later. | Ally is an edge binding. It is not in L1. |
+For now, HelloAlly's ally-platform is the conformance dogfood surface, with flow and interaction as the first pain to address. This is sequencing for dogfooding, not a product-specific architecture. Product thinking remains harness- and product-agnostic.
 
+Shipped work is evidence of what a product does. It is not automatically a rule worth repeating: known flaws should be recorded so similarity to shipped code is not mistaken for quality. A stated preference that conflicts with the shipped product does not become an accepted conformance rule. The user's explicit goal for the current task remains the immediate authority.
+
+## System at a glance
+
+```mermaid
+flowchart TB
+  subgraph ProductEvidence[Product evidence]
+    Repo[Target repository and shipped UI]
+    History[Commits, PRs, reviews, previews]
+    Corrections[User corrections and product rationale]
+  end
+
+  subgraph Pack[Versioned Taste Pack under target repository /taste]
+    Entry[Bounded repo entry / trigger]
+    Router[Product Skill: task and mode selection]
+    Skills[Shared and mode-specific guidance]
+    Wiki[Wiki and canonical product references]
+    Examples[Examples and known flaws beside related guidance]
+    Gates[Deterministic Gates for reliable rules]
+    EvalData[Eval examples, holdouts, Rubrics]
+    Entry --> Router --> Skills
+    Skills --> Wiki
+    Skills --> Examples
+  end
+
+  subgraph TasteTools[Installable Taste plugin]
+    InstallSource[Canonical plugin source and version]
+    Adapter[Harness-specific plugin registration]
+    PluginSkills[Pack and evaluation workflow Skills]
+    MCP[Taste tools exposed through MCP]
+    InstallSource --> Adapter
+    Adapter --> PluginSkills
+    Adapter --> MCP
+  end
+
+  subgraph Harness[User's coding harness owns the loop]
+    MainAgent[Coding agent uses product judgment]
+    Tools[Repo, Git, rendered UI, and connected tools]
+    Critic[Critique role in host coding agent]
+    EvalJudge[Higher-capacity Eval Judge subagent<br/>managed by host harness]
+    Human[User reviews product-wide guidance and results]
+    WorkingMemory[Harness/plugin-local working memory]
+    MainAgent <--> Tools
+    MainAgent <--> MCP
+    MainAgent <--> PluginSkills
+  end
+
+  ProductEvidence --> Sweep[Sweep role in host coding agent]
+  Sweep --> Candidate[Candidate guidance with evidence and uncertainty]
+  Candidate --> Human
+  Human -->|accepted guidance| Skills
+  Human -->|accepted mechanical rule| Gates
+  Human -->|retained example or gap| Examples
+  Corrections --> WorkingMemory --> Candidate
+  Entry -. points to setup instructions .-> InstallSource
+  Adapter --> MainAgent
+  Router -. selects relevant guidance .-> MainAgent
+  MCP -. reads .-> Skills
+  MCP -. invokes .-> Gates
+  MCP -. records .-> WorkingMemory
+  MainAgent --> Change[Product change]
+  Change --> Gates --> MainAgent
+  Change --> Critic --> MainAgent
+  Change --> Rendered[Rendered interface]
+  EvalData --> EvalJudge
+  Change --> EvalJudge
+  EvalJudge --> Human
+  Human --> WorkingMemory
 ```
-L1 Pack schemas
-  ↑ read/write types only
-L3 Operators (Sweep, Learn, Interview, Critique, Evaluate, Gate runner, Pack loader)
-  ↑
-L2 is how Pack loader reads files. Gate runner is how Gates run. Critique is how review runs.
-  ↑
-Harness adapter (Cursor / Claude Code / Codex / …) and L4 dogfood (Ally, later omnipresent)
-```
 
-Dependencies run one way. Pack schemas do not mention Ally or a harness. Operators depend on Pack schemas only. The harness and the dogfood sit at the edge. Replacing the Critic protocol does not rewrite Sweeper. Replacing the linter engine does not rewrite Decision records.
+This is the high-level architecture proposed from the linked proof-of-concepts, not a deployment diagram. [LangChain's Content Studio](https://www.langchain.com/blog/design-agent) provides the knowledge-layer starting point—Skills, Wiki, Gates, and Memory—and [Anthropic's article](https://claude.com/resources/articles/improving-frontend-design-through-skills) supports loading focused Skills on demand. [Vercel's product-design system](https://vercel.com/blog/teaching-agents-product-design-at-vercel) grounds the target-repository Pack, conformance guidance, Gates, evidence review, and evaluation. Taste adapts these ideas as a plugin for existing harnesses; it does not adopt LangChain's Slack agent, sandbox, media tools, or runtime.
 
-Module fences: Taste is not an agent runtime, not a component library, and not a design-system product. OpenSignal does not own design judgment. Taste does not couple to OpenSignal.
+The architecture separates knowledge and work by responsibility, not necessarily by process or service. The PRD includes an MCP server as part of Taste; MCP exposes Pack and check capabilities to the harness but does not orchestrate work. Its precise tool surface and deployment remain open. The existing harness coding agent performs evidence interpretation, Pack maintenance, implementation, and critique using Taste Skills and tools. Taste does not configure or host those agent roles. Deterministic code is reserved for locating/loading known content and mechanical rules that are reliable without product judgment.
 
-### L0 principles
+The diagram makes an important distinction: Sweep, implementation, and Critique use the coding agent's judgment; the Eval Judge uses the harness's higher-capacity subagent for the evaluation pass; Gates execute mechanical checks; the Pack carries the context they need. The harness owns any delegation; Taste provides the instructions, data, and tools.
 
-```
-User harness (Cursor / Claude Code / Codex / …)
-  owns: loop, planning, models, tools, PR workflow
-Taste Pack (target product repo) + MCP stubs + Operators
-  supplies: Skills, Wiki, Gates, MemoryLessons, Critic brief, EvalFixtures
-Critic = harness subagent (bigger model)
-  Critique reviews generator output (generate–review)
-```
+## Pack knowledge layers
 
-The harness is the runtime. Taste supplies context, tools, and checks. That split follows the PRD and the [Content Studio](https://www.langchain.com/blog/design-agent) lesson that taste is the designers' judgment written into skills and checks, while the harness owns the loop. Content Studio's sandbox, Slack UX, and media tooling are that product's harness. Taste does not rebuild them.
+The Pack is product-specific knowledge versioned with the target repository under `taste/`. A configured harness loads it from there instead of rebuilding product taste after each clone. LangChain and Anthropic inform the knowledge layers; Vercel's `product-design` work informs the starter content and authoring workflow. Use the useful roles from those sources without copying every folder they used.
 
-Generate–review means the coding agent generates and the Critic reviews that output. Earlier notes called this GAN-inspired. That metaphor is historical only. The message protocol is still a placeholder.
-
-Working assumptions for experiments, not a final lock:
-
-- Judgment stays in prompts. Invariants live in code. Compensating rules expire when models improve.
-- Shipped beats a stated preference that conflicts with it. A shipped flaw is not a Decision to copy.
-- Evaluate scores rule correctness separately from similarity to shipped code.
-- Conformance is the dogfood mode. Expression waits.
-
-## Domain model
-
-Names used from here on. Vercel filenames appear again only in the [Pack adapter](#pack-on-disk-adapter).
-
-| Name | Meaning |
-| --- | --- |
-| Conformance | Match judgment already shipped. |
-| Expression | Invent or extend taste. Deferred. |
-| Pack | Portable taste artifact in a target product repo. |
-| Angle | One design angle (typography, flow, interaction, copy, …). The set is open. |
-| Decision | One observable encoded judgment. |
-| Evidence | Pointer to shipped proof: PR, commit, path, review, or preview. |
-| Exemplar | Shipped example, including decisions worth repeating and known flaws. |
-| CoverageGap | A missing standard. |
-| Gate | A deterministic check (linter or other code). |
-| Skill | How to do a job. Job-scoped. Loaded on demand. |
-| Router | The Skill whose body is mostly a table from an ask to a specialist Skill. |
-| Wiki | Shared craft and product facts. Skills link to it. They do not copy it. |
-| MemoryLesson | A captured correction. Fast: same turn. Slow: promoted later into a Skill, Wiki, or Decision. |
-| EvalFixture | A before state, an after state, and the Rubric that judges an edit. |
-| Rubric | The dimensions a judge scores. |
-| JudgeResult | The outcome of Evaluate on one fixture run. |
-| CriticFinding | One review finding from Critique. |
-| PackManifest | The index of a Pack: ids, mode, and which adapter stores it. |
-| ExpressionPrior | Guidance for Expression only (anti-slop, aspect rules). Subordinate to a Conformance Pack when one exists. |
-
-Schemas are the working representation for experiments. They are not a shipped API. `mode` is `conformance` or `expression` on every record that has one.
-
-### Decision
-
-| Field | Content |
-| --- | --- |
-| id | Stable id. Adapter example: `decision/destructive-names-action`. |
-| angle_id | Angle it belongs to. |
-| mode | `conformance` or `expression`. |
-| status | `proposed`, `accepted`, or `rejected`. Stays `proposed` until a human accepts it. |
-| scope | Where it applies. |
-| statement | The observable rule. Adjectives do not qualify. |
-| rationale | Why. |
-| evidence_ids | Evidence pointers. |
-| exceptions | When it does not apply. |
-| bad_example | |
-| good_example | |
-| assumptions | |
-| open_decisions | |
-
-The on-disk serialization in the default adapter is the Vercel decision record in [First surface](#first-surface).
-
-### Angle
-
-| Field | Content |
-| --- | --- |
-| id | `angle/{name}`. |
-| name | Search list from the PRD, not a closed set: style, fonts and typography, themes and tokens, UX, interaction, flow, copy, and more. |
-| mode | Which mode this angle file is being filled for. |
-| summary | What this angle means in this product. |
-| decision_ids | Decisions on this angle. |
-| skill_id | Specialist Skill, when one exists (Emil: one file per aspect). |
-| wiki_refs | Shared facts this angle links to. |
-| coverage_gap_ids | What is still missing. |
-
-### Evidence
-
-| Field | Content |
-| --- | --- |
-| id | |
-| kind | `pr`, `commit`, `path`, `review`, or `preview`. Vercel intake also preserves Slack and Figma links; store those as `review` or `preview` with the URL in `locator`. |
-| locator | URL, sha, or path. |
-| note | What this pointer is evidence of. |
-
-### Exemplar
-
-| Field | Content |
-| --- | --- |
-| id | Adapter file: `exemplars/pr-{name}.md`. |
-| title | |
-| decision_ids | Decisions worth repeating. |
-| known_flaws | What the shipped code gets wrong. Similarity to this file is not success. |
-| evidence_ids | |
-| holdout | When true, expected edits stay out of the Skill text. |
-
-### CoverageGap
-
-| Field | Content |
-| --- | --- |
-| id | |
-| angle_id | |
-| missing | The decision or evidence that is absent. |
-| why_it_matters | |
-
-### Gate
-
-| Field | Content |
-| --- | --- |
-| id | |
-| decision_id | The Decision this check enforces. The Decision does not name a linter engine. |
-| engine | Replaceable. The Vercel PoC uses ESLint. |
-| check | What code identifies. |
-| why | Why the pattern is a problem. |
-| fix | Concrete fix. Empty when the right output is a warning. |
-| autofix | Whether a safe migration may rewrite the code. |
-
-### EvalFixture
-
-| Field | Content |
-| --- | --- |
-| id | |
-| mode | `conformance` or `expression`. |
-| before_ref | Before state. |
-| after_ref | Shipped or expected after state. Hidden from the Skill when `holdout` is true. |
-| exemplar_id | |
-| rubric_id | |
-| holdout | |
-| requires_prod_data | The harness may ask the user. Taste does not collect it. |
-| requires_git_history | Same. |
-
-### Rubric
-
-PRD success signals are dimensions. Vercel's two scores stay separate dimensions. Gate pass rate is an optional measure, not a required dimension.
-
-| Field | Content |
-| --- | --- |
-| id | |
-| dimensions | Each dimension has an id and a question. Starting set below. |
-
-| Dimension id | Question | Source |
+| Layer | What it carries | How it is used |
 | --- | --- | --- |
-| mergeable_first_pass | Is the first pass UI you would merge? | PRD |
-| no_long_design_prompt | Did the run need a long design prompt? | PRD |
-| no_reteach_per_screen | Did the run need re-teaching on this screen? | PRD |
-| rule_correctness | Did the edit follow the Decisions and Gates? | Vercel |
-| similarity_to_shipped | How close is it to the shipped result? Scored separately. A high score is not success when `known_flaws` says to improve the shipped code. | Vercel |
-| skill_loaded | Did the agent load the Skill? Separate from whether it followed a rule. | Vercel trigger eval |
+| Router and Skills | A bounded entry point routes by task/surface to focused, job-scoped Skills. Skills explain what to do and why, including product judgment, exceptions, and when they apply. | The coding agent uses the relevant Skill as reasoning context. Routing may be expressed in a Skill for the model to follow; it is not assumed to be a deterministic rules engine. |
+| Wiki and references | Canonical product facts and shared context, linked from Skills rather than duplicated. | The agent reads only relevant context for its current task. Product-owned sources remain canonical where they exist. |
+| Examples and open gaps | Shipped examples, known flaws, and missing or weak evidence. Keep them beside the relevant rule or surface while the collection is small. | The agent and reviewer ground judgments in concrete product work and see where evidence is thin. |
+| Gates | Code checks for narrow, measurable rules that can be enforced reliably. | Deterministic feedback handles mechanical failures; product-context decisions stay with the agent and review. |
+| Evaluation material | Before/after examples, unseen holdouts, and rubrics that describe what a good result means. | The agent's application of guidance can be judged separately from whether guidance was loaded or whether output resembles shipped work. |
 
-### JudgeResult
+This uses LangChain's Skills, Wiki, and Gates as Pack knowledge roles, with Vercel's examples, evidence review, and eval method for conformance. LangChain's Memory function informs how corrections are captured, but transient memory belongs in the configured harness/plugin store, not in the portable Pack. These are useful responsibilities, not a requirement to give each one a separate directory.
 
-| Field | Content |
-| --- | --- |
-| fixture_id | |
-| run | `with_skill` or `without_skill`. |
-| scores | One value per Rubric dimension. |
-| skill_loaded | |
-| notes | |
+### Pack entry and routing
 
-### MemoryLesson
+The Pack needs a discoverable entry point in the target repo so a coding agent knows when product-design guidance applies. A root `AGENTS.md` can provide a thin trigger for harnesses that read it; it is not Taste itself and is not a universal installation mechanism. Harnesses that do not read `AGENTS.md` need their own adapter or setup. Vercel's example uses repository instructions to trigger an in-repo product-design Skill; its Skill then resolves the task mode and routes to focused references. LangChain's Router is also a Skill with a table mapping job types to specialist Skills. Anthropic describes Skills that the model can autonomously identify and load when the task calls for them.
 
-| Field | Content |
-| --- | --- |
-| id | |
-| loop | `fast` or `slow`. |
-| statement | The correction or preference. |
-| evidence_ids | |
-| target | Skill, Wiki, or Decision id to promote into. Empty while pending. |
-| status | `captured`, `promoted`, or `expired`. |
+For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load deeper guidance as the task requires. A small deterministic resolver may load a named file or route among explicit choices, but semantic task classification should remain with the coding agent where interpretation is needed.
 
-Fast: write it in the same turn the person states it. Slow: promote it later if it holds. Content Studio runs promotion on a weekly pass. The cadence is not locked. Shared standards take precedence over a personal preference.
+### Shared Pack structure for both modes
 
-### CriticFinding
+Use Vercel's `product-design` work as the content and workflow baseline: a bounded trigger, an entry Skill that selects task and mode and routes to focused guidance, product references, examples, mechanical Gates, and evals. The Pack structure supports Conformance and Expression from the start, even if dogfooding or particular experiments begin with one mode. They share the repository Pack, entry Skill, product facts, harness integration, and relevant capabilities; each mode has its own evidence, guidance, and evaluation cases where needed. Store the portable Pack in a dedicated `taste/` directory at the target repository root so it is versioned with the product and can be found after a clone. Do not reproduce every Vercel folder just because it appears in their example tree.
 
-| Field | Content |
-| --- | --- |
-| id | |
-| severity | `P0`, `P1`, `P2`, or `P3` (Vercel labels, starting scale). |
-| location | File, line, or rendered location. |
-| verification | `source`, `rendered`, or `unverified`. |
-| source_id | Decision, Skill, or Wiki the finding cites. |
-| user_consequence | |
-| smallest_fix | |
-
-### PackManifest
-
-The envelope operators read. No Ally-specific fields. No harness-specific fields.
-
-| Field | Content |
-| --- | --- |
-| product | Display name of the target product. Free text. |
-| mode | `conformance` or `expression`. |
-| adapter | Default: `vercel-product-design`. |
-| angle_ids | |
-| decision_ids | |
-| exemplar_ids | |
-| coverage_gap_ids | |
-| gate_ids | |
-| skill_ids | Includes the Router. |
-| wiki_refs | |
-| eval_fixture_ids | |
-| expression_prior_ids | Empty on a Conformance Pack. |
-
-```json
-{
-  "product": "",
-  "mode": "conformance",
-  "adapter": "vercel-product-design",
-  "angle_ids": [],
-  "decision_ids": [],
-  "exemplar_ids": [],
-  "coverage_gap_ids": [],
-  "gate_ids": [],
-  "skill_ids": [],
-  "wiki_refs": [],
-  "eval_fixture_ids": [],
-  "expression_prior_ids": []
-}
+```text
+target-product-repository/
+├── AGENTS.md                         # optional thin setup and UI trigger
+└── taste/
+    ├── README.md                     # Pack contents, canonical setup source, and how a harness loads it
+    ├── manifest.json                # product, supported modes, Pack revision, and ownership
+    ├── skills/
+    │   └── product-design/
+    │       ├── SKILL.md              # shared entry, mode-selection policy, task routing
+    │       └── references/
+    │           ├── shared/
+    │           │   └── product-facts.md
+    │           ├── conformance/
+    │           │   └── surface-{surface}.md
+    │           └── expression/
+    │               └── direction-{topic}.md
+    ├── metadata/
+    │   ├── authority.md              # canonical product sources and precedence
+    │   └── sources.md                # evidence index, if useful at this scale
+    └── evals/
+        ├── rubric.md                 # shared Judge dimensions and scoring guidance
+        ├── conformance/
+        │   └── fixtures/{fixture}/{before,after}
+        └── expression/
+            └── fixtures/{fixture}/{before,after}
 ```
 
-### Skill, Router, Wiki
+This is a small starting shape, not a required set of folders. Shared guidance holds facts that apply in both modes. Conformance references capture decisions inferred from shipped work, with examples and known flaws; Expression references capture intended new direction, rationale, alternatives, and the user's choices. An item may be shared or mode-specific according to its meaning. Put an example, rationale, and any known flaw beside the relevant guidance. Keep missing-evidence notes beside the affected reference too. Add a shared sources or coverage index only when inline notes become difficult to navigate; create a separate Exemplar collection only when the number or reuse of examples warrants it. Keep copy, resilience, terminology, and interface-quality guidance in the surface reference until a distinct Skill or shared reference makes routing clearer.
 
-| Type | Essential fields |
-| --- | --- |
-| Skill | id, job, when_to_use, when_not_to_use, angle_ids, wiki_refs. Description reads like a routing rule, including when not to use it. |
-| Router | id, rows of `{ ask, skill_id }`. One table. Specialist craft is written once. |
-| Wiki | id, facts, linked_from. Skills link here. A font rule changes once. |
+The `manifest.json` and metadata docs describe the Pack, supported modes, and source authority; they do not duplicate the actual product guidance. Keep the root `AGENTS.md` small. Where the harness reads it, it can tell the coding agent to use Taste for relevant work and, if Taste is not available, to ask the harness to install or configure it using the canonical source recorded in `taste/README.md`. It may also link to the entry Skill. This file is only a discovery hint: actual installation and tool/Skill registration belong to the harness or its Taste adapter.
 
-## Modules and executables
+The portable Agent Plugins package is the canonical distribution for clients that support that format. Claude Code uses its native `.claude-plugin/plugin.json` and `.mcp.json` compatibility files while sharing the same Skills and server. The repository is the initial install source; a public marketplace URL and release policy can be selected later. After setup, the plugin reads the repository's existing `taste/` Pack, so a clone reuses product knowledge instead of creating a new Pack. Harness-specific plugin loaders point at that same Pack without copying it into provider-specific skill directories.
 
-Two modules. The Pack is data. Operators are the executables that read and write that data.
+The eventual repository hint can be as small as:
 
-| Module | Owns | Does not own |
-| --- | --- | --- |
-| Pack | L1 records and, through an adapter, the files that store them. | The model loop, the linter binary, the Critic protocol, Ally paths. |
-| Operators | Sweep, Learn, Interview, Critique, Evaluate, Gate runner, Pack loader. | Each other's internals. |
-
-| Operator | Who runs it | Reads | Writes |
-| --- | --- | --- | --- |
-| Pack loader | Executable. The only operator that knows L2 paths. | Adapter files | PackManifest and the records it indexes |
-| Sweep | Sweeper | Target repo, Evidence the harness can reach | Proposed Decisions, Evidence, Exemplars, CoverageGaps, candidate Gates |
-| Learn | Learner | Corrections, intake packets | MemoryLesson (`fast` immediately). Later: promoted Skill, Wiki, or Decision |
-| Interview | Interviewer | Greenfield intent | Expression Decisions and ExpressionPriors, status `proposed` |
-| Critique | Critic, a harness subagent | Generator output, Pack, Rubric | CriticFindings. Edits only when the request mode asks for edits |
-| Evaluate | Judge step in the harness. Not a fifth agent. | EvalFixture, Rubric, with-skill and without-skill runs | JudgeResult |
-| Gate runner | Linter adapter. The only operator that knows an engine. | Gate records, the diff | Pass, fail, or warning per Gate. Decision records stay untouched |
-
-Interview is the Expression operator. It stays off the Conformance dogfood path.
-
-Business rules as program logic:
-
-- Shipped wins over a conflicting stated preference. Sweep records the shipped pattern as Evidence. A preference that contradicts it does not become an accepted Decision.
-- A universal rule needs human acceptance. Sweep and Learn write `status: proposed`.
-- One screenshot, one shipped file, or one reviewer comment does not become a Decision by itself.
-- Measurable invariants become Gates. Judgment stays on the Decision and in the Skill prose.
-- After a model upgrade, delete compensating rules. Mark those MemoryLessons or Decisions `expired`. Keep the principles.
-- Critique's protocol can change without a Sweeper change. The Gate engine can change without a Decision change.
-
-### MCP tool stubs
-
-Documented names for L3. This repo does not implement them. The list is a starting stub, not a locked tool surface.
-
-| Tool | In | Out | Operator |
-| --- | --- | --- | --- |
-| `load_pack` | adapter id, repo root | PackManifest | Pack loader |
-| `list_decisions` | angle_id?, status?, mode? | Decision[] | Pack loader |
-| `get_angle` | angle_id | Angle plus its Decision ids | Pack loader |
-| `load_skill` | skill_id, or a Router ask | Skill body | Pack loader |
-| `run_gates` | paths or diff | Gate results | Gate runner |
-| `record_correction` | MemoryLesson fields (`loop: fast`) | MemoryLesson id, status `captured` | Learn |
-| `list_coverage_gaps` | angle_id? | CoverageGap[] | Pack loader |
-
-The harness calls these. Taste does not own the loop around them.
-
-## Pack on-disk adapter
-
-Default adapter id: `vercel-product-design`. Starting PoC, from [Teaching agents product design at Vercel](https://vercel.com/blog/teaching-agents-product-design-at-vercel). Three parts, as Vercel defines them: an agent skill, linters for clear rules, and a review loop that prepares guideline updates for a human.
-
-This tree is how the Pack loader finds files. It is not the domain model. Another adapter may store the same L1 records under different paths.
-
-Layout in the **target product repo**:
-
-```
-repository/
-├── AGENTS.md
-├── .agents/
-│   └── skills/
-│       └── product-design/
-│           ├── AGENTS.md
-│           ├── SKILL.md
-│           ├── references/
-│           │   ├── product-judgment.md
-│           │   ├── interface-quality.md
-│           │   ├── resilience.md
-│           │   ├── surfaces.md
-│           │   ├── surfaces-{surface}.md
-│           │   ├── copy.md
-│           │   ├── rules.md
-│           │   ├── glossary.md
-│           │   ├── patterns.md
-│           │   └── coverage-gaps.md
-│           └── exemplars/
-│               └── pr-{name}.md
-└── tooling/
-    └── scripts/
-        └── evals/
-            ├── fixtures.json
-            ├── rules-checklist.json
-            └── <fixture>/
-                ├── before/
-                └── after/
+```markdown
+For product UI work, use the Taste plugin with this repository's `taste/` Pack.
+If Taste is not installed in your harness, ask it to install this repository's
+Agent Plugins package (or its supported Claude Code compatibility package), then
+load the existing Pack.
+Read the product-design entry Skill and follow its instructions to choose Conformance,
+Expression, or ask me to clarify the intended mode.
 ```
 
-Lint rules live in the target repo's existing linter (Vercel uses ESLint). They are Gate records with `engine: eslint`. This repo does not add a linter package. The directory name `product-design` is Vercel's. Keep it for this adapter so the published tree matches file for file.
+This is illustrative guidance, not a universal `AGENTS.md` contract. Each harness needs a supported way to install/register Taste and expose its Skills or tools; the adapter should use that harness's mechanism.
 
-| Path | L1 type |
-| --- | --- |
-| Repo `AGENTS.md` | Pack loader trigger. Not a domain type. Firm boundary: user-visible UI. |
-| Skill-local `AGENTS.md` | Load order, validation, governance for the Router and Skills. |
-| `SKILL.md` | Router plus the entry Skill. Adapter request modes live here. |
-| `references/*.md` | Angle prose and Decision prose. Wiki facts live here too until an adapter splits them. Skills link to these files. They do not copy them. |
-| `references/coverage-gaps.md` | CoverageGap list. |
-| `exemplars/pr-{name}.md` | Exemplar. |
-| Lint rules in the product linter | Gate. |
-| `tooling/scripts/evals/fixtures.json` | EvalFixture index. |
-| `rules-checklist.json` | Rubric checklist for those fixtures. |
-| `<fixture>/before/`, `<fixture>/after/` | EvalFixture `before_ref` and `after_ref`. |
+The target repository's existing linter owns Gate implementation; `taste/` explains which product rule a Gate supports. Do not create a Taste-specific component library or replace the target's design system.
 
-**Trigger.** Persistent repo instructions tell the coding agent when to load the Skill, what it covers, and what it skips. Vercel saw agents fail to invoke an available skill in 56% of cases in [separate Next.js evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals). Test the trigger separately from the guidance (`skill_loaded` on the Rubric).
+The `SKILL.md` entry can follow Vercel's request modes—Shape, Implement, Review, Copy, and Harden—so the coding agent respects task intent and scope. These task modes are separate from Taste's Conformance and Expression modes. The product Skill defines how the coding agent recognizes each Taste mode and routes to its task-specific and mode-specific guidance. These are starting modes and names, not a requirement that each task follow a rigid workflow.
 
-Adapted from Vercel's trigger:
+- **Shape:** use agent reasoning to frame the user, job, flow, states, alternatives, and acceptance signals before implementation.
+- **Implement:** apply the requested direction with the smallest coherent product change; resolve meaningful product questions with the user or source evidence.
+- **Review:** inspect source and rendered evidence, report findings, and do not edit unless asked.
+- **Copy:** improve product language and only the UI structure required to support it; route broader design concerns separately.
+- **Harden:** preserve the settled design while finding state, accessibility, responsive, resilience, and recovery issues.
 
-```
-When shaping, editing, or reviewing user-facing UI,
-load .agents/skills/product-design/SKILL.md.
+The repository-level trigger tells the coding agent when the UI Skill applies and what it excludes. The Skill entry provides scope, modes, and routing; focused references carry the actual product decisions. This prevents the trigger and every unrelated task from loading the whole knowledge base.
 
-Applies to:
-- user-facing pages and components
-- copy, interaction, accessibility, responsive behavior, and states
+For the first surface, Sweep and the coding agent should gather shipped examples and review evidence, identify repeated decisions, then draft guidance in the narrowest relevant reference. Each candidate should make the decision observable and include why it matters, scope, evidence, exceptions, and useful good/bad examples. Keep candidate decisions pending human review. Put known defects next to the example or rule they qualify so the agent learns the intended pattern without reproducing the defect.
 
-Skip:
-- backend-only work with no user-visible effect
-- telemetry, generated files, documentation, and marketing
-```
+This creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. Add a specialized Skill for a craft (such as copy or animation) when routing by job benefits from it; do not create a separate Skill for every topic by default.
 
-Also skip console-only errors and tests with no shipped UI impact. The agent reports which surfaces and references it loaded. CriticFindings cite those sources.
+### Runtime path for a UI task
 
-**Adapter request modes.** These are Vercel's workflow verbs inside `SKILL.md`. They are not Conformance and Expression. Taste mode is `conformance` or `expression` on the Pack and on each Decision. The adapter mode only decides whether this turn may edit.
+The harness invokes Taste context for relevant UI work, but the coding agent remains the decision-maker. This is a typical path; review and gate steps are conditional on the task and the available Pack.
 
-`SKILL.md` resolves the adapter mode before acting, so an audit does not become an edit and a copy pass does not become a redesign.
+```mermaid
+sequenceDiagram
+  actor User
+  participant Harness as User's coding harness
+  participant Agent as Coding agent
+  participant Pack as Taste Pack
+  participant Tools as Repo / Git / browser tools
+  participant Gate as Deterministic Gates
 
-| Adapter mode | Required behavior |
-| --- | --- |
-| Shape | Frame the problem, alternatives, flow, states, acceptance criteria, and open decisions. Edit only when asked. |
-| Implement | Resolve material product decisions, then make the smallest coherent change in scope. |
-| Review | Inspect source and rendered evidence. Report findings. Edit only when asked. Critique runs here. |
-| Copy | Edit user-facing language and the JSX that language requires. Report structural blockers without widening scope. |
-| Harden | Keep the settled direction. Fix state, resilience, responsive behavior, accessibility, and finish. |
-
-When the verb is ambiguous, use the narrowest mode. A URL, screenshot, route, or component sets scope. It does not by itself authorize edits.
-
-**Routing.** The Router loads focused references for the task and the surface. Material changes load product-judgment and interface-quality. Copy, layout, interaction, and resilience each route to their own reference. A modal loads destructive-action patterns. A settings form loads labels, validation, and disclosure. Component APIs, design-system docs, and accessibility criteria stay with their owners. The Skill links to them.
-
-**Decision authority.** Adopt Vercel's order. Rung 3 is the target repo's own canonical docs.
-
-1. The user's explicit goal and constraints for this task.
-2. Verified user and product evidence, including what shipped.
-3. Repository-canonical guidance: `AGENTS.md`, component APIs, the product's design-system docs, routed Skills.
-4. Accepted Decisions and Exemplars with stable Evidence.
-5. Verified adjacent shipped patterns in the same product area.
-6. General interface heuristics.
-
-The PRD rule sits on rungs 2 and 5: when a stated preference conflicts with what shipped, shipped wins. The user's goal for the current task still comes first. Shipped code is Evidence of what exists. It becomes an accepted Decision only through the record in [First surface](#first-surface).
-
-**Governance.** From Vercel's skill integrity. These are Learn and Sweep rules.
-
-- Add or change a rule only after current-source verification and human acceptance.
-- Record scope, rationale, evidence, exceptions, and a bad/good example.
-- Prefer the narrowest destination: canonical source, routed reference, Exemplar, Gate or EvalFixture, or CoverageGap.
-- Keep deterministic checks mechanical. Keep judgment in prose, with its evidence and its degree of freedom.
-- Never promote one screenshot, one shipped file, or one reviewer comment into a universal rule by itself.
-
-Stable ids point at the canonical source. Vercel's shape, which the adapter stores as a Decision:
-
-```
-rule/destructive-names-action
-Source: copy.md > Actionable; verbs.md
-Rule:   Destructive CTAs follow Verb + Noun.
-        Never use Confirm, OK, or a bare verb.
+  User->>Harness: UI task and constraints
+  Harness->>Agent: Start task in existing agent loop
+  Agent->>Pack: Read entry guidance and relevant route
+  Pack-->>Agent: Skill, linked context, examples, applicable checks
+  Agent->>Tools: Inspect product behavior and source evidence
+  Tools-->>Agent: Code, states, product references
+  Agent->>Agent: Interpret context and make design decisions
+  Agent->>Tools: Implement scoped product change
+  opt Relevant reliable Gate exists
+    Agent->>Gate: Check changed code
+    Gate-->>Agent: Mechanical findings
+    Agent->>Tools: Correct findings when appropriate
+  end
+  opt Contextual review is useful
+    Agent->>Agent: Review against Pack with Critique guidance
+    Agent->>Agent: Decide which findings apply and revise
+  end
+  opt Visual or interaction quality changed
+    Agent->>Tools: Render and inspect changed states
+    Tools-->>Agent: Rendered evidence
+  end
+  Agent-->>Harness: Change, verification evidence, remaining questions
+  Harness-->>User: Reviewable result
 ```
 
-That rule is their example of an observable Decision (`statement` plus `bad_example`). A target product's Decisions come from Sweep.
+The coding agent can ask the user for missing product intent or access through the harness. The diagram does not make Gate, Critique, or rendered review mandatory on every task.
 
-## Knowledge layers
+## Components
 
-[Content Studio](https://www.langchain.com/blog/design-agent) organizes an agent's knowledge into four functions. That is the v0 baseline, and it is how Pack records are grouped. [Anthropic's frontend-skills article](https://claude.com/resources/articles/improving-frontend-design-through-skills) is the other half of the baseline: Skills are dynamic context, loaded for the task, rather than a permanent system prompt.
+### Pack
 
-| Layer | L1 types | Role |
-| --- | --- | --- |
-| Skills | Skill, Router | How to do a job. Job-scoped, behind a Router. A description reads like a routing rule, including when not to use it. |
-| Wiki | Wiki | Shared craft and product facts: brand tokens, voice, patterns, product behavior. Skills link to the Wiki. They do not copy it. |
-| Gates | Gate | Deterministic checks for anything measurable. |
-| Memory | MemoryLesson | Fast: a correction is saved in the same turn. Slow: lessons that hold are promoted into a Skill, the Wiki, or a Decision. |
+The Pack is the portable product-specific context used by a harness. It can hold observable design judgments, their rationale and evidence, useful examples and known flaws, shared product facts, gaps in what is understood, and guidance for applying that knowledge.
 
-**Router.** The Router is mostly one table. Each row maps a kind of ask to the specialist Skill that handles it. Content Studio uses this so craft is written once and jobs compose. Taste uses the same shape. Adapter request modes are one kind of row: they keep a Review from turning into an edit.
+These are useful kinds of information to preserve, not a required record taxonomy or schema. A Pack should make it possible to distinguish an evidence-backed product rule from a general suggestion, identify where a rule applies, and see what remains uncertain.
 
-**Wiki.** Shared facts live in one place. LangChain: "Rather than duplicating this information across skills, we link directly to the wiki." A font rule changes once. Every Skill follows the link. In the default adapter those facts sit in `references/` until a later adapter adds a `wiki/` path. The Wiki type does not change.
+The first Conformance Pack lives under the target repository's `taste/` directory. Its content follows Vercel's useful pattern—an entry Skill, focused product references, examples, Gates, and evals—while keeping product-owned knowledge together in a harness-neutral location. Adapt the contents to the chosen product and surface; keep the directory structure open to revision if use shows a better fit.
 
-**Judgment in prompts, invariants in code.** Content Studio: "The order that must always hold lives in code, and the judgment stays in the prompt." They had described a required review order in instructions, and the agent skipped it. The order moved into code. Creative calls stayed in the prompt. Taste uses the same split. A Gate can count options, reject a nested modal, or flag a token that is off the product scale. Choosing the right object and consequence for a destructive action stays on the Decision, with its Evidence.
+### Discover and extract
 
-**Memory.** Fast loop: when someone states a rule or a correction, Learn writes a MemoryLesson in the same turn (`record_correction`). Slow loop: Learn later promotes evidence-backed lessons into the Skill, the Wiki, or a Decision. Content Studio runs that promotion on a weekly pass. The cadence is not locked. Shared standards take precedence over a personal preference. A company-channel or product rule follows the product voice.
+A Sweeper-like capability uses agent intelligence to inspect shipped work and available review evidence, then surface candidate judgments across relevant design angles. The first surface should be one where repeated review decisions already exist—the hardest step is choosing that surface. The coding agent should be nudged to document the repeated decision, why it matters, its scope, exceptions, examples, and evidence in the narrowest useful Pack guidance.
 
-**Rules expire.** Content Studio's [Bitter Lesson](http://www.incompleteideas.net/IncIdeas/BitterLesson.html): "Rules designed to compensate for a model's weaknesses become less useful as models improve." After a model upgrade, delete the compensating rules. Keep the design principles. Set the MemoryLesson or Decision status to `expired`, then re-run Evaluate. Their early `AGENTS.md` grew to 500K tokens. They cut it to a 200-line index. Taste keeps `AGENTS.md` as a bounded index. The 200-line figure is their practice, not a Taste cap. Growth goes into Skills and the Wiki.
+Use a three-part intake pattern, adapted from Vercel. The **Collector** gathers raw artifacts and source links without proposing rules. The **Intake Judge** groups related evidence, checks coverage and provenance, and separates verified facts, inferences, and open questions into a review packet. A **human reviewer** decides whether each candidate becomes a Skill/reference, Gate, Exemplar, Eval case, coverage gap, or no change. Keep these as distinct responsibilities even if one model or tool performs more than one step.
 
-**Altitude.** Anthropic, on prompting at the right altitude: avoid "low-altitude hardcoded logic like specifying exact hex codes and vague high-altitude guidance that assumes shared context." A Skill states why a Decision is right and the observable rule an agent can follow. Vague praise is not a Decision. A hex value the product did not ship is not a Decision. A token the product actually shipped is a Wiki fact, and a Gate may check it.
+Do not infer a universal rule from one screenshot, one file, or one comment. The agent records evidence and uncertainty, and proposes a candidate for review; it does not silently turn a pattern into accepted product policy. The product-specific dogfood begins with the surface named in the PRD. Sweep followed by historical replay is one possible discovery path, not the only one.
 
-## Conformance path
+This applies Vercel's first-surface method: start where decisions recur in shipped work and reviews, and turn the reasoning behind those decisions into guidance an agent can find. The agent should make that candidate visible when it encounters a repeated judgment missing from the Pack. It can draft the record; product owners review whether it becomes a shared standard.
 
-Conformance is the mode where Sweep fills a Pack from a shipped product and Learn keeps it current. Interview stays off this path.
-
-Sweep steps. The first-surface rule and the Decision template are in [First surface](#first-surface). The product names which surface is first. Ally's choice is in the [dogfood appendix](#dogfood-appendix), not in this algorithm.
-
-1. Pack loader reads the adapter. If the Pack is empty, PackManifest `mode` is `conformance` and `adapter` is `vercel-product-design`.
-2. Pick one surface where the same review comments already repeat.
-3. Collect shipped examples and reviews as Evidence (`pr`, `commit`, `path`, `review`, `preview`).
-4. Write one Decision per observable judgment. Status `proposed`. Map it to the narrowest `references/` file. Add an Angle file only when no current reference is the right home.
-5. Write Exemplars: decisions worth repeating, and known flaws.
-6. Write CoverageGaps for anything still unstated. Leave them visible.
-7. Propose a Gate only when the [gate decision tree](#gates-and-linters) says code can identify the failure. Otherwise the Decision stays prose.
-8. Stop. A human accepts, rejects, or leaves each candidate pending.
-9. Expand surface by surface. Re-run Evaluate when a Decision or Gate changes.
-
-**Shipped, flaws, and preferences.** Three different facts:
-
-- A stated preference that conflicts with the shipped product loses. Shipped wins.
-- A shipped pattern is Evidence, with rationale if any exists, scope, exceptions, and known flaws. Exemplars document decisions worth repeating and mistakes to avoid.
-- Similarity to shipped code is not the success score. Vercel: "Shipped code can contain a flaw that the agent should improve instead of reproduce."
-
-**Learn loop.** Vercel's update loop is Learn. Cadence is not locked.
-
-1. A collector gathers messages, links, and nearby context. It does not propose rules. Output is Evidence plus raw notes.
-2. A separate judge groups the Evidence, verifies sources, and records open questions. Candidates stay pending. This judge is the intake judge, not Evaluate's JudgeResult.
-3. A human accepts a candidate into the narrowest L1 destination:
-
-| Vercel destination | L1 write |
-| --- | --- |
-| Agent guidance | Decision, Skill, or Wiki |
-| Lint rule | Gate |
-| Example | Exemplar |
-| Eval | EvalFixture |
-| Coverage gap | CoverageGap |
-| No change | Nothing |
-
-Evidence includes review comments, shipped pull requests, and previews. When Evidence is thin, record the code or commit needed to check it. The harness may ask the user for git history. See [Critique and Evaluate](#critique-and-evaluate).
-
-The PRD angle list is Sweep's search list: style, fonts and typography, themes and tokens, UX, interaction, flow, copy, and more. The abstract set that holds across products stays open.
-
-## Expression path
-
-Expression is deferred. The operator is Interview. The dogfood surface is omnipresent, later. The lifecycle switch (Expression closed, design locked, Taste returns to Conformance) has no trigger yet. See the [PRD](prd.md).
-
-Until that trigger exists, ExpressionPriors are stored on the Pack and are not applied when PackManifest `mode` is `conformance`. When a Conformance Pack exists, it wins. OpenAI's own exception:
-
-> Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.
-
-If the product shipped Inter, or a purple brand, Conformance keeps it. An ExpressionPrior rejects a default the product did not choose.
-
-ExpressionPrior fields: `id`, `source` (`anthropic`, `openai`, or `emil`), `statement`, `applies_when: expression`, `subordinate_to: conformance pack when one exists`.
-
-Generic UI is what the model emits when the Pack is silent. Anthropic and OpenAI are the starting ExpressionPriors for that failure. Emil is the starting shape for aspect Skills.
-
-Anthropic, on an unguided landing page: models "almost always conform to Inter fonts, purple gradients on white backgrounds, and minimal animations." They name the cause [distributional convergence](https://en.wikipedia.org/wiki/Convergence_of_random_variables): sampling sits on the high-probability center of the training data. Their axes for steering are typography, color and theme, motion, and backgrounds. They also warn that a ban list can create a new local maximum (their example is Space Grotesk). Name the product's own alternatives. Do not swap one generic default for another.
-
-OpenAI, on underspecified prompts: "models often fall back to high-frequency patterns from the training data." Their hard rules are ExpressionPriors: one composition in the first viewport, a hero budget, cardless by default, brand-first, expressive type, atmosphere instead of a flat field. The portable pack pattern is their [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill). Those priors are subordinate to Conformance once a product Pack exists.
-
-**Aspect Skills.** [Emil Kowalski](https://emilkowal.ski/ui/agents-with-taste): "My way of getting there is to create a skill file for each aspect of the interface. If you know what great feels like, describe the rules, then give them to your agents so they can follow them." Each file says why the choice feels right, then a strict table or flowchart so the agent does not invent a rule. His easing example: "This is strict so the agent doesn't have to guess or make up its own rules." He uses Anthropic's [skill-creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) to package that.
-
-Compose aspect Skills under the Router. The Router is job-scoped (the adapter modes, and later the product's real jobs). The aspect Skill is the specialist for one Angle: animation, typography, color, and the rest of the open set. Why and rules live there. Measurable slices graduate into Gates. Expression-only aspect guidance (distinctive type, anti-slop bans, hero budget) waits for greenfield or an unlocked design.
-
-Anthropic's other point is the Conformance reading: a custom Skill can encode the organization's design system and component patterns as a reusable asset, loaded on demand. That is the product Pack. The generic frontend-aesthetics skill is not a substitute for it.
-
-## Gates and linters
-
-Use a Gate when code can identify the failure reliably. Leave the judgment on the Decision when it needs product context.
-
-Vercel: "Code can count two or three static options, so a linter can recommend radio buttons. Naming the right object and consequence for a destructive action requires product context, so the skill handles it."
-
-Their codebase examples illustrate that split. They are Vercel's Gates. A target product's Gates come from Sweep.
-
-- Nested modals, which break focus, keyboard navigation, and layering.
-- Radio buttons instead of a select for two or three static options.
-- Accessible names for icon buttons and form controls. Custom focus rings that bypass shared focus tokens.
-- `className` must not override a design-system component's color, radius, or shadow. Layout classes can stay.
-- `Modal.Body`, so long content scrolls and headers and footers can stay sticky.
-- Theme-aware Material classes instead of raw shadows. Borders that duplicate a Material's built-in treatment.
-- Spacing that falls off the 4px grid, with a standard utility when one exists.
-
-Decision tree, from Vercel. The Gate runner implements the "yes, a linter" branch. The other branches write a Decision or a warning and no Gate.
-
-- Can code identify the failure without rendering?
-  - No: agent guidance (Decision or Skill).
-  - Yes: can the rule avoid likely false positives?
-    - No: agent guidance.
-    - Yes: does the violation have a concrete fix?
-      - Yes: a Gate (`engine` chosen by the adapter).
-      - No: a warning, or agent guidance.
-- Needs product or codebase context: agent guidance.
-- Establishes a new standard or product policy: a human decision.
-- Either path gets an Exemplar or an EvalFixture that can catch a regression.
-- If a rule stays reliable only with many exceptions, move it back to agent guidance. Drop the Gate. Keep the Decision.
-
-Each Gate says why the pattern is a problem and suggests a concrete fix. Some may autofix a safe migration. The explanation of why, and any judgment call, stay in the Decision prose.
-
-## Critique and Evaluate
-
-**Critique.** The Critic is a review subagent in the user's harness, on a bigger model, with a crafted brief in the Pack. It reviews generator output (generate–review). The GAN metaphor is historical only. It runs in the adapter's Review mode. It cites the references it loaded. It does not edit unless asked. The exact message protocol, model choice, and number of passes are not locked. Changing them does not change Sweep.
-
-The brief tells the Critic to check the change against the Rubric, the Exemplars (including known flaws), and the Gates. Findings are CriticFindings: location, verification, canonical source, user consequence, and the smallest concrete fix. Lead with user impact. Starting severity labels, from Vercel, until a dogfood review shows a better scale:
-
-- **P0:** blocks the primary task, creates severe accessibility failure, or can cause unrecoverable user harm.
-- **P1:** likely task failure, misleading consequence, missing critical state, or major responsive/accessibility defect.
-- **P2:** meaningful friction, inconsistency, weak hierarchy, or recoverability issue.
-- **P3:** minor craft or consistency improvement.
-
-**Rendered check.** Vercel: "Source inspection establishes behavior; a rendered interface establishes visual and interaction quality. Never claim visual verification from code alone." The Pack instructs the harness to verify the rendered surface, including materially changed states. [OpenAI's Playwright / computer-use note](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) is one way a harness can do that. Taste does not ship a browser. A CriticFinding with `verification: rendered` requires that check.
-
-**Evaluate.** Adopt Vercel's guidance evals as the Evaluate operator. Their `copywriting-eval` is a narrower copy check. It is not this loop.
-
-1. EvalFixtures come from Exemplars documented in the Skill. Each fixture has a before state and an after state under `tooling/scripts/evals/`.
-2. An agent edits the before state.
-3. A judge checks the result against a Rubric and writes a JudgeResult.
-4. Holdouts hide their expected edits, so the test is whether the guidance generalizes.
-5. Run the same fixtures without the Skill (`run: without_skill`). That is the baseline for whether the Pack changed the agent's behavior.
-6. Score `rule_correctness` separately from `similarity_to_shipped`.
-
-Vercel, quoted:
-
-> An agent edits a before state, then a judge checks the results against a rubric.
->
-> Evals come from shipped examples documented in the skill. Holdouts hide their expected edits, testing whether the guidance generalizes. We also run fixtures without the skill to measure whether it changed the agent's behavior.
->
-> We score rule correctness separately from similarity to the shipped result. Shipped code can contain a flaw that the agent should improve instead of reproduce.
-
-Test retrieval and application separately. Failing to load the Skill and failing to follow a rule are different problems. The repo `AGENTS.md` trigger is its own test (`skill_loaded`).
-
-**Data the eval may need.** A fixture sometimes cannot be built from the working tree alone. The coding agent, in the user's harness, may ask the user for access to production data and git history. That request stays in the harness, with the user approving it. The EvalFixture flags `requires_prod_data` and `requires_git_history` record the need. They do not grant access.
-
-The PRD success signal is the Rubric: a mergeable first pass, no long design prompt, no re-teaching per screen. Gate pass rate and a with/without-pack comparison on past Ally UI changes are one optional path, not the only one. What proves a mergeable first pass without hand-labelling is still an open product question.
-
-## First surface
-
-Vercel, on where to start:
-
-> The hardest part is picking the first surface. Every team has decisions worth encoding. The question is whether they live in someone's head or somewhere agents can find them.
-
-Taste's job is to nudge the coding agent to write that surface as Decisions. Sweep, Learn, and the coding agent under the Skill follow the same discipline.
-
-Start with one product surface where the same review comments already repeat. Collect shipped examples and real reviews as Evidence. Write the Decision, why it matters, the exceptions, and the source. Expand surface by surface. Keep CoverageGaps current.
-
-Observable Decisions, not adjectives. Vercel:
-
-> Avoid starting with broad adjectives like `clear`, `polished`, or `intuitive`. Agents need observable decisions. `Destructive actions use Verb + Noun` is usable. `Buttons should be clear` is not.
-
-**Decision template.** This is the adapter serialization of a Decision. Fill it in before widening to the next surface. Status stays `proposed` until a human accepts it. Fields are Vercel's decision record.
-
-```
-# Decision: {name}
-
-Status: proposed | accepted | rejected
-Scope:
-Decision:
-Rationale:
-Evidence:
-Exceptions:
-Bad example:
-Good example:
-Assumptions:
-Open decisions:
+```mermaid
+flowchart LR
+  Surface[Choose a surface with recurring decisions]
+  Evidence[Collect shipped examples and review evidence]
+  Collector[Collector gathers raw examples and source links]
+  IntakeJudge[Intake Judge groups evidence and separates facts, inferences, and questions]
+  Candidate[Draft scoped guidance with why, evidence, exceptions, good and bad examples]
+  Review[Human reviews candidate and unresolved questions]
+  Route{Best home for this knowledge?}
+  Skill[Skill or Wiki reference]
+  Example[Exemplar or coverage gap]
+  Gate[Gate only if failure is mechanically reliable]
+  Surface --> Evidence --> Collector --> IntakeJudge --> Candidate --> Review --> Route
+  Route --> Skill
+  Route --> Example
+  Route --> Gate
 ```
 
-| Template line | Decision field |
-| --- | --- |
-| Status | status |
-| Scope | scope |
-| Decision | statement |
-| Rationale | rationale |
-| Evidence | evidence_ids |
-| Exceptions | exceptions |
-| Bad example | bad_example |
-| Good example | good_example |
-| Assumptions | assumptions |
-| Open decisions | open_decisions |
+The destinations are logical roles, not a fixed file tree. Product-context judgment stays in agent-readable guidance; only a narrow, reliable invariant graduates to a Gate. This follows Vercel's distinction between a linter finding a mechanical issue and a Skill explaining a decision that depends on product context.
 
-`mode` and `angle_id` are Taste fields the template does not have. The Pack loader sets them from the PackManifest and the reference file the record lives in.
+### Capture and maintain
 
-The Skill's operating contract includes the nudge: when the same decision shows up and the Pack does not contain it, the agent writes this record into the narrowest file and leaves it pending. It does not silently invent a universal rule.
+A Learner-like capability captures corrections and other new evidence so useful knowledge can be updated. A fast path can preserve a correction in the same turn in the configured harness or plugin's local working-memory store; it should not create loose files at the repository root or silently edit the shared Pack. A slower review determines whether the correction is product knowledge and should be promoted into `taste/`. The exact storage and promotion process remain open.
 
-## Experiment loop
+Candidate guidance should carry enough evidence, scope, rationale, exceptions, and counterexamples to be reviewed. Human review is a useful governance pattern from the source material; the exact acceptance workflow for Taste remains to be determined. A correction can update working context immediately, but changing shared product guidance or adding a Gate goes through evidence review and human approval. Private, session-specific memory remains in harness/plugin storage; reviewed product-wide knowledge is committed under `taste/` so other harnesses and future clones can reuse it.
 
-An experiment changes Pack data and re-measures. Schemas stay stable. Operators stay the same unless the experiment's question is the operator itself.
+### Deliver guidance
 
-**Define.** Write an experiment record next to the run, in the harness notes or a doc. It is not a new product noun.
+Skills are one source-backed way to load job-specific guidance only when relevant. An agent-facing Router can help the model select focused guidance for the current task, while shared product facts can live in a linked reference rather than being copied into every Skill. Taste may use this organization if it works across target repositories and harnesses.
 
-| Field | Content |
-| --- | --- |
-| id | `exp/{slug}` |
-| question | What this run is trying to learn. |
-| mode | `conformance` or `expression`. |
-| changed | The only records this run may edit: Decision, Gate, Skill, or Rubric. One lever. |
-| stable | `schemas`, and every operator that is not the question. |
-| fixture_ids | Including holdouts. |
-| baseline | `without_skill`. |
+Guidance should be specific enough to help an agent act, without hardcoding details the product has not chosen or falling back on vague praise. Where the product has an existing design system, its established patterns take precedence in conformance work.
 
-```json
-{
-  "id": "exp/example-rule-correctness",
-  "question": "Does this Decision raise rule_correctness on holdout fixtures?",
-  "mode": "conformance",
-  "changed": [{ "type": "Decision", "id": "decision/example" }],
-  "stable": ["schemas", "Sweep", "Critique protocol", "Gate engine"],
-  "fixture_ids": [],
-  "baseline": "without_skill"
-}
+This also addresses Anthropic's observation that unguided generation can converge on familiar, generic frontend choices. Load product-specific Skill guidance when it applies, rather than adding frontend rules to every coding request. Keep generic anti-default prompts subordinate to what the product has actually chosen.
+
+LangChain's Content Studio also treats some rules as model-version workarounds: remove or revise them when stronger models no longer need them, while preserving the product principle they were trying to enforce. Pack guidance should remain maintainable rather than accumulating permanent compensating instructions.
+
+### MCP interface
+
+The PRD includes an MCP server as a Taste component. Its architectural role is to expose Pack and check capabilities to external harnesses—for example, loading focused guidance, running a relevant Gate, or recording a correction. The MCP server does not own planning, model selection, generation, Critique orchestration, or the task loop. The specific tool names, capability boundaries, and which operations may instead use ordinary repository files are still open.
+
+### Agent judgment and deterministic logic
+
+Use the coding agent's intelligence for work that needs meaning or product context: interpreting evidence, noticing patterns, deciding which guidance applies, weighing exceptions and tradeoffs, proposing UI, and reviewing whether the result fits the product. Taste should give the agent evidence and reasons so it can exercise that judgment; it should not try to encode the full design decision tree as application logic.
+
+Keep deterministic code for narrow operations whose inputs and outcomes are explicit and reliably checkable: locating or loading a known reference, simple routing among named guidance, and mechanical checks with low false-positive risk. Routing does not have to be deterministic: in the cited LangChain and Vercel examples, a model-facing Router Skill or entry Skill describes the routes. A rules engine should not decide product meaning merely because an operation can be expressed in code.
+
+This is the intended split, not a claim that every implementation needs a Router or a linter. When a check requires judgment, depends on product context, or produces unreliable flags, keep it in agent guidance and review.
+
+### Check and review
+
+Taste can support two complementary kinds of feedback:
+
+- **Gates** for failures code can identify reliably and explain with a concrete fix. False-positive-prone or context-dependent judgments belong in guidance or review instead.
+- **Critique** for contextual review of generated work against the Pack, relevant examples, and the user's task. The existing coding agent can run a review pass using the relevant Skill; a harness may delegate to its own subagent feature if available. Taste supplies no separate Critic agent or agent configuration.
+- **Intake Judge** for checking and grouping evidence during Pack upkeep; its output is a pending review packet, not a verdict that changes product standards.
+- **Eval Judge** for scoring controlled with/without-Skill outputs against an evaluation Rubric. This is a different task and context from Critique: Critique reviews the current implementation; the Eval Judge compares evaluation runs. The harness supplies the judge reasoning, potentially in a separate context or through its own evaluator facility.
+
+Source inspection can establish behavior, but visual and interaction quality require rendered evidence. A review should say what was actually checked and cite the relevant product guidance. Taste does not need to ship a browser to support rendered verification; the harness can use its own tools.
+
+### Evaluate
+
+Evaluation asks whether the Pack and its delivery improve results. Vercel's proof of concept provides a concrete starting method: an agent edits a before state, then a judge checks the result against a Rubric; fixtures come from shipped examples, and holdouts hide expected edits to check generalization. Run comparable fixtures with and without relevant Skill guidance. Score rule correctness separately from similarity to shipped output; a high similarity score is not success when the shipped example has a known flaw.
+
+Each fixture starts from a real shipped example: a task prompt and before state for the generator, the expected after state and relevant Pack guidance, plus a Rubric for the Eval Judge. For a holdout, keep the expected after state out of the generator's context and make it available to the judge. Run the same task with and without the selected Skill; keep the model, repository state, and other harness context the same where practical, and record any differences. The with-Skill run records which Skill and references were actually loaded.
+
+The intended Eval Judge is a higher-capacity model subagent managed by the coding harness, separate in role and context from the generator. Taste supplies the evaluation Skill, Rubric, fixture, and expected result; the harness delegates the judging pass to its configured higher-capacity model and returns the scored assessment. Taste does not host or configure that subagent. The Eval Judge scores each output independently and gives reasons tied to observed evidence. The harness records which Skills and references each generator run loaded; that retrieval evidence is joined with the Judge's scores rather than guessed by the Judge. Compare paired scores after judging. Where practical, hide the with/without arm label from the Judge until its individual scores are recorded. Human review can calibrate the Rubric and adjudicate uncertain results. The exact model and harness delegation mechanism remain open. The user-facing quality dimensions remain anchored to the PRD; rule correctness and similarity to shipped work are separate diagnostic dimensions.
+
+For a practical first evaluation, select several shipped changes from the first surface, retain some as examples the Skill can reference, and reserve held-out cases whose expected edits are hidden from the coding agent. Compare both runs, then review misses to distinguish a retrieval failure, a guidance failure, a task-context problem, or an evaluation problem. A good score informs human Pack review; it does not automatically promote or rewrite product guidance.
+
+The coding agent's harness may need production data or Git history to construct or run a useful fixture. When required, the harness can ask the user for access through its own tools and permissions. Taste records the need; it does not grant access or collect the data independently. Retrieval (did the agent load the guidance?) and application (did it follow the guidance?) are distinct questions and should be observable separately.
+
+```mermaid
+flowchart TD
+  NeedData{Needs production data or Git history?}
+  NeedData -->|No| Source[Shipped example and product guidance]
+  NeedData -->|Yes| Ask[Harness asks user for access]
+  Ask -->|Approved| Access[Harness retrieves approved evidence]
+  Access --> Source
+  Ask -->|Declined| Record[Record unavailable evidence / skip fixture]
+  Source --> Fixture[Fixture: before state and task context]
+  Source --> Oracle[Expected after, Pack rule, and Rubric; hidden from agent on holdouts]
+  Fixture --> RunWith[Agent edits with relevant Skill]
+  Fixture --> RunWithout[Comparable agent edits without Skill]
+  RunWith --> Judge[Eval Judge assesses outputs]
+  RunWithout --> Judge
+  Oracle --> Judge
+  Judge --> Scores[Score user-facing quality, rule correctness, and shipped similarity separately]
+  RunWith --> Trace[Harness records Skill/reference retrieval and run conditions]
+  RunWithout --> Trace
+  Scores --> Compare[Join scores with retrieval evidence; compare paired runs]
+  Trace --> Compare
+  Compare --> Improve[Review misses and revise or retire Pack guidance]
 ```
 
-The example id is illustrative. It is not an Ally rule.
+The Eval Judge is an agent role, not a deterministic linter. People can review its Rubric and adjudicate uncertain results. Use deterministic checks only for the mechanical rules they can establish. An evaluation run should preserve enough information to tell whether the Skill was retrieved, what evidence was available, and how the output was judged.
 
-**Execute.** Pack loader reads the adapter into a PackManifest. The harness runs the operator the question needs. Conformance questions run Sweep or Learn, then Critique, then Evaluate. Expression questions wait until that path is open, then run Interview. The harness owns the model loop. MCP stubs are how it calls L3. The user approves any prod-data or git-history request the fixture flags.
+Keep the Judge's responsibilities explicit:
 
-**Eval.** Evaluate writes a JudgeResult per fixture, once `with_skill` and once `without_skill`. Read `rule_correctness` and `similarity_to_shipped` as separate numbers. Read `skill_loaded` before blaming a Decision for a miss.
+- The **Intake Judge** validates sources and coverage and prepares proposed Pack updates from raw evidence.
+- The **Eval Judge** sees the output, the Rubric, and the expected result (including holdout answers), then assesses the result. The generator does not see holdout answers.
+- Neither Judge owns product policy. A person decides whether Pack guidance changes, and the Eval Judge's scores are evidence rather than automatic approval.
 
-**Modify.** Edit only the `changed` records. Re-run Evaluate on the same fixtures.
+The starting Rubric should track the PRD's mergeable-first-pass goal and its signals: whether the first pass is mergeable, whether it required a long design prompt, and whether the agent needed re-teaching for each screen. The Judge assesses the result and, with the run transcript, whether it appears mergeable without a long prompt or screen-by-screen correction. The harness records `skill_loaded` and other retrieval evidence separately. Keep rule correctness and similarity to shipped work as distinct Judge scores. A Gate pass rate is useful when the relevant Gate exists, but it is not a proxy for overall UI quality.
 
-| If you need to change… | Touch | Leave stable |
-| --- | --- | --- |
-| A judgment | Decision (and the adapter file that stores it) | Gate engine, Critic protocol, schemas |
-| A mechanical check | Gate | Decision statement |
-| How a job is done | Skill or Router row | L1 field names |
-| What success means | Rubric dimension | EvalFixture before/after bytes, unless the fixture itself is the question |
-| Review behavior | Critique protocol | Sweeper outputs |
-| Where files live | Pack adapter id | PackManifest's other fields |
-| A model workaround that no longer helps | MemoryLesson or Decision status `expired` | The principles on L0 |
+The PRD's success signals remain central: a mergeable first pass, no long design prompt, and no re-teaching on each screen. The with/without-Skill comparison is the starting method for judging Pack effect; Gate pass rate is supplemental, not a proxy for overall UI quality. What establishes a mergeable first pass without hand-labeling remains an open question.
 
-That is the loop: define the lever, execute the operator, read the JudgeResult, modify the lever, evaluate again.
+## Mode selection, loops, and lifecycle
 
-## Dogfood appendix
+Conformance and Expression are different design activities inside one Taste system. They share the target repository's Pack, entry Skill, shared product facts, harness connection, and capabilities such as capture, critique, and evaluation. Their evidence, guidance, task criteria, and eval fixtures can remain distinct. The shared structure should let either mode be built and exercised end to end; Expression is not structurally blocked on completing Conformance first, even though the current dogfood sequence starts with Conformance.
 
-L4 bindings. They pass a repo path into Sweep. They do not appear on Pack schemas.
+### Mode selection belongs to the product Skill
 
-| Track | Surface | Mode | What runs |
-| --- | --- | --- | --- |
-| Now | HelloAlly ally-platform | Conformance | First pain: flow and interaction, as the first surface Sweep should look at. Critic and Evaluate run against that Pack. |
-| Later | omnipresent | Expression | Interview. ExpressionPriors from the Expression path. |
+Each product's entry Skill defines the mode-selection policy because the right trigger depends on that product's history, intent, and state. At task start, the coding agent reads the user's request and relevant product context, then follows that Skill's instructions to select Conformance, Expression, or ask a clarifying question. The Skill should describe concrete signals, examples, and boundary cases, and explain when an explicit user request overrides its default. For example, a request to match settled shipped patterns points toward Conformance; a request to establish a new direction, explore alternatives, or deliberately extend the product points toward Expression. These are examples, not universal deterministic rules.
 
-Ally is the dogfood surface only. Product thinking stays harness-agnostic and product-agnostic. The lifecycle switch back to Conformance has no trigger yet.
+If intent is mixed or unclear, the agent should surface the ambiguity and ask through its harness before committing to a mode when the choice could change the work. If the user explicitly names a mode, follow that request unless it conflicts with product authority or the task is underspecified. A product Skill may define a mode transition signal—for instance, the user accepting a new direction and choosing to apply it consistently—but the agent evaluates that signal from the product's evidence and user intent. Taste code may load the selected, named guidance or expose it to the harness; it should not infer semantic intent or silently switch modes using a hard-coded classifier. The harness remains responsible for carrying out the selected workflow and can make the active mode visible to the user.
 
-Discovery is dual-track. Sweep followed by historical replay is one path. It is not locked as the only path.
+This keeps the trigger product-specific and inspectable. A harness can support mode switching by following the Skill or passing the selected mode into its task context; it does not need a separate product-specific rules engine. The shared Pack can then be used by multiple harnesses, with each harness adapter responsible for loading the same Skill and references.
 
-## Open questions
+### Conformance loop
 
-Not locked, on purpose:
+The system could support this high-level loop:
 
-- The final abstract set of Angles.
-- The MCP tool surface. The stub names in this doc are a starting list for experiments.
-- The Critique protocol beyond generate–review (model, passes, message shape). The GAN metaphor is historical only.
-- The trigger that shows Expression is closed and the design is locked, so Taste switches to Conformance.
-- Whether Sweep to historical replay is the only discovery path.
-- Whether further engineering sources should still change this architecture before it is locked. This draft re-homes Vercel, OpenAI, and Emil on top of the LangChain and Anthropic baseline. The set is not closed.
-- How Sweep tells a deliberate pattern from an accidental or legacy one.
-- What Evaluate proves a mergeable first pass without hand-labelling.
-- Which Conformance lessons carry over when Expression starts on omnipresent.
-- The MemoryLesson file layout and the slow-loop cadence. The fast and slow loops are in scope. The storage format is not.
-- The 200-line `AGENTS.md` cap. Bound the index. LangChain's number is not the limit.
+1. Read shipped product work and available review evidence.
+2. Use agent judgment to identify recurring product decisions, known flaws, and gaps in understanding.
+3. Preserve supported findings as candidate Pack guidance with their scope and evidence; a person reviews proposed product-wide standards.
+4. For a coding task, load the relevant Conformance guidance and let the harness produce the change.
+5. Use deterministic checks for reliable mechanical rules and agent Critique for product-context review. Inspect the rendered result when visual or interaction quality matters.
+6. Capture corrections and use evaluation or review evidence to improve, revise, or retire guidance.
 
-## Bibliography
+Shipped work is evidence, not an instruction to copy every pattern. A correction that conflicts with shipped behavior is evidence to investigate, not an automatic conformance rule. Similarity to shipped code does not outweigh known flaws.
 
-What this architecture takes from each source. Quotes above are from these texts. Each source is a starting-base PoC, re-homed under the L1 types.
+### Expression loop
 
-### LangChain — Content Studio
+An Expression loop uses the selected Expression guidance to elicit intent, alternatives, and reasons for a new or evolving direction. The agent uses that context to propose and develop the design; the user judges whether the direction expresses the intended taste. Useful decisions and examples can then be captured as candidate Expression guidance. The precise interview script, approval protocol, and stored schema remain open.
 
-- Article: [Building a design agent](https://www.langchain.com/blog/design-agent)
-- Open source: [langchain-ai/design-agent](https://github.com/langchain-ai/design-agent)
-- Took: job-scoped Skills behind a Router; a Wiki that Skills link to; Gates in code for measurable checks; fast memory in the same turn and slow promotion into Skills and the Wiki; judgment in prompts and invariants in code; anti-default guidance; rules expire after model upgrades ([Bitter Lesson](http://www.incompleteideas.net/IncIdeas/BitterLesson.html)); `AGENTS.md` as a bounded index. The harness owns the loop. Taste does not adopt Content Studio's media computer or Slack product.
+For work on an existing product, settled Conformance guidance remains context when Expression intentionally extends that product; it does not prevent a user-directed change in direction. The PRD's Expression dogfood is on omnipresent, after the current HelloAlly Conformance work, while both modes remain supported by the shared architecture.
 
-### Anthropic — frontend skills
+The [OpenAI frontend article](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) and its [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill) can inform expression-time guidance: distinctive composition, visual references, and avoiding common defaults, while preserving an existing product's visual language. [Emil Kowalski's aspect Skills](https://emilkowal.ski/ui/agents-with-taste) offer examples of capturing the why behind detailed interface guidance, such as animation behavior. These inform the agent's knowledge, not a deterministic Taste rules engine.
 
-- Article: [Improving frontend design through Skills](https://claude.com/resources/articles/improving-frontend-design-through-skills)
-- Took: distributional convergence as the reason unguided UI looks generic; Skills as on-demand context; prompt altitude between hardcoded values and vague praise; axes of typography, color and theme, motion, and backgrounds; custom Skills as the way an organization encodes its own design system. Generic aesthetics are ExpressionPriors. A custom Skill that encodes the shipped system is Conformance.
+### Combined lifecycle
 
-### Vercel — product-design
+The modes share the Pack and harness connection while keeping guidance associated with its mode. A product Skill defines the evidence that indicates an intentional move into Expression and the signal that a direction is settled enough to apply through Conformance. That signal is evaluated with agent judgment and can be explicitly set by the user; the exact product-level transition criteria are left for each Pack to define.
 
-- Article: [Teaching agents product design at Vercel](https://vercel.com/blog/teaching-agents-product-design-at-vercel)
-- Took: the default Pack adapter (skill plus linters plus a human review loop); adapter request modes; references, Exemplars, and CoverageGaps; Gates for deterministic rules and prose for judgment; Evaluate (before state, judge, Rubric, shipped Exemplars, holdouts, with/without-skill baseline, correctness scored separately from similarity); the first-surface quote and the Decision template; Learn as collector, judge, and human acceptance into the narrowest destination.
+```mermaid
+flowchart LR
+  Skill[Product entry Skill<br/>interprets task and product intent]
+  Conformance[Conformance guidance<br/>Learn from shipped work<br/>Guide implementation and review]
+  Expression[Expression guidance<br/>Elicit intent and alternatives<br/>Agent develops options; user judges<br/>Capture the chosen direction]
+  Ask[Ask user through harness<br/>when mode is ambiguous]
+  Skill -->|request aligns with settled shipped direction| Conformance
+  Skill -->|request establishes or explores direction| Expression
+  Skill -->|unclear or mixed intent| Ask
+  Ask -->|user clarifies| Skill
+  Expression -->|user accepts direction; product Skill defines transition signal| Conformance
+```
 
-### OpenAI — delightful frontends
+These loops describe system behavior, not a fixed sequence of agents, APIs, or mandatory steps. The coding harness owns task execution and follows the selected mode; the product Skill carries the mode criteria that let the coding agent select and switch. Keep that decision visible to the user rather than hiding it in deterministic application logic.
 
-- Article: [Designing delightful frontends with GPT-5.4](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4)
-- Pack pattern: [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill)
-- Took: underspecified prompts fall back to high-frequency patterns; hard rules for composition (hero budget, cardless default, brand-first, expressive type, atmosphere) as ExpressionPriors; the exception that an existing design system wins; visual references and early tokens; rendered verification with Playwright or computer use.
+## Taste plugin repository
 
-### Emil Kowalski — agents with taste
+This repository builds a plugin for existing coding harnesses. It packages Skills and tool integrations that the harness's coding agent can use; it does not configure or run an agent. Product-specific Skills and taste knowledge remain in the target repository's `taste/` Pack. A compact starting structure is:
 
-- Article: [Agents with Taste](https://emilkowal.ski/ui/agents-with-taste)
-- Took: one Skill file per interface aspect; articulate why a Decision feels right; strict tables and flowcharts the agent can follow; package that experience so the agent stops guessing. Aspect Skills sit under the Router.
+```text
+taste-plugin/
+├── skills/                  # Taste workflows invoked by the host coding agent
+├── src/
+│   ├── core/                 # Pack lifecycle, evidence/provenance, review, and eval logic
+│   └── tools/                # MCP server and tool interfaces over core operations
+├── plugin.json               # Agent Plugins manifest (Codex and Cursor)
+├── mcp.json                  # portable stdio server configuration
+├── .claude-plugin/
+│   └── plugin.json           # Claude Code native manifest
+├── .mcp.json                 # Claude Code MCP configuration
+├── docs/                    # product, system, and setup documentation
+├── examples/
+│   └── product-pack/        # example shared and mode-specific Pack
+└── tests/                   # plugin, tool, Pack, and harness integration checks
+```
 
-### Product
+The plugin's own Skills guide the host agent through discovering a product Pack, extracting or updating its knowledge, and running evaluations. The product's `taste/skills/product-design/SKILL.md` remains authoritative for product-specific mode selection and routes to that product's Conformance or Expression references. `core/` holds Taste's domain and business logic: Pack discovery and validation, evidence/provenance handling, candidate review state and approval boundaries, eval fixture/run handling, and coordination of reliable checks. It does not decide product meaning; the coding agent follows Skills for interpretation, mode selection, and judgment. Tools expose core operations through MCP. Evaluation fixtures and Rubrics belong with the product Pack; this repository owns reusable evaluation tooling and a small example Pack. The root Agent Plugins package is shared by Codex and Cursor; Claude Code's native manifest and `.mcp.json` point at the same Skills and server rather than maintaining a second implementation. The harness owns higher-capacity subagent delegation for the Eval Judge. These boundaries adapt the source patterns: Vercel's Skill, review loop, and evaluation context stay near product code; Anthropic's focused Skills load on demand; LangChain's knowledge layers inform the Pack; and deterministic Gates remain narrow. This is a revisable starting structure; change it if actual use shows that it fails the intended workflow.
 
-- [docs/prd.md](prd.md), mirroring [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) (Gopi · Draft · Oct 2026).
+## Design status
+
+This architecture uses patterns the cited teams or authors describe in their own work: LangChain's Skills, Wiki, Gates, and Memory; Anthropic's on-demand context; Vercel's product-design Skill, linters, review loop, and eval method; plus OpenAI's frontend guidance and Emil's aspect Skills. Those references make the starting architecture concrete, but do not validate Taste's combined system. The portable Pack location under `taste/`, the shared structure for Conformance and Expression, and product-Skill-led mode selection are the current product direction; internal file grouping, capability boundaries, MCP tools, and Critic arrangement can change as the system is built and used.
+
+## Open system-design questions
+
+- What product knowledge must travel in a Pack for it to be useful across coding harnesses?
+- Which design angles generalize across products, and which should stay product-specific?
+- How can discovery distinguish deliberate product judgment from legacy behavior or accidental patterns?
+- What is the lightest useful way to capture a correction and review whether it should become shared guidance?
+- Which capabilities need a stable tool interface, and which can remain ordinary files or harness behavior?
+- What evidence makes evaluation trustworthy without requiring extensive hand-labeling?
+- How should Taste respond when shipped evidence, a current user goal, and accepted product guidance point in different directions?
+- What transition examples should each product's Skill document for its Expression-to-Conformance handoff?
+
+The portable Pack location is the target repository's `taste/` directory. The internal file grouping can change as the first product Pack is used. Other questions are intentionally open; make the system more specific where actual use needs it and keep it flexible elsewhere.
+
+## References
+
+- Product direction: [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit), mirrored in [docs/prd.md](prd.md).
+- LangChain: [Building a design agent](https://www.langchain.com/blog/design-agent) and [design-agent repository](https://github.com/langchain-ai/design-agent).
+- Anthropic: [Improving frontend design through Skills](https://claude.com/resources/articles/improving-frontend-design-through-skills).
+- Vercel: [Teaching agents product design at Vercel](https://vercel.com/blog/teaching-agents-product-design-at-vercel).
+- OpenAI: [Designing delightful frontends with GPT-5.4](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) and [frontend-skill](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill).
+- Emil Kowalski: [Agents with Taste](https://emilkowal.ski/ui/agents-with-taste).
