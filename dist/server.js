@@ -37244,6 +37244,8 @@ async function getEvaluationJudgePacket(repositoryPath2, mode2, fixtureId, gener
 var DECISION_DIRECTORY = "skills/product-design/references/decisions";
 var STATUSES = /* @__PURE__ */ new Set(["proposed", "accepted", "rejected"]);
 var TRIGGERS = /* @__PURE__ */ new Set(["interview", "sweep", "gap", "rejected_pass"]);
+var EMPTY_NOTE = "_None recorded._";
+var NO_GAP_NOTE = "None recorded.";
 function decisionPath(id) {
   return `${DECISION_DIRECTORY}/${assertDecisionId(id)}.md`;
 }
@@ -37315,7 +37317,8 @@ function parseDecision(file2) {
   const fields = parseFrontmatter(frontmatter[1]);
   const status = fields.status;
   const trigger = fields.trigger;
-  if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope) {
+  const coverageGap = booleanField(fields.coverage_gap);
+  if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope || coverageGap === void 0) {
     return { path: file2.path, id: fields.id || idFromPath, parsed: false, reason: "unparsed" };
   }
   return {
@@ -37325,13 +37328,14 @@ function parseDecision(file2) {
     status,
     trigger,
     scope: fields.scope,
-    coverageGap: fields.coverage_gap === "true",
+    coverageGap,
     shipped: fields.shipped === "true",
     parsed: true
   };
 }
 async function recordSignal(repositoryPath2, input2) {
-  const content = renderDecision(input2);
+  const existing = await loadExistingDecision(repositoryPath2, input2.id);
+  const content = renderDecision(mergeSignal(existing, input2));
   const written = await writePackFile(repositoryPath2, decisionPath(input2.id), content);
   const parsed = parseDecision(written);
   if (!parsed.parsed) {
@@ -37400,6 +37404,84 @@ async function readPartState(repositoryPath2, scope) {
     anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
     note: "Per-part activity only. The Pack does not flip as a whole. Who initiates a move between Expression and Conformance is open; this tool does not decide it."
   };
+}
+function booleanField(value) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return void 0;
+}
+function mergeSignal(existing, input2) {
+  if (!existing) return input2;
+  let coverageGap = input2.coverageGap;
+  if (coverageGap === void 0) {
+    if (existing.coverageGap === void 0) {
+      throw new TasteError(
+        "Existing Decision has a missing or invalid coverage_gap. Provide coverageGap explicitly before updating it.",
+        "invalid_decision"
+      );
+    }
+    coverageGap = existing.coverageGap;
+  }
+  return {
+    id: input2.id,
+    title: input2.title,
+    statement: input2.statement,
+    status: input2.status,
+    trigger: input2.trigger,
+    rationale: input2.rationale !== void 0 ? input2.rationale : existing.rationale,
+    scope: input2.scope !== void 0 ? input2.scope : existing.scope,
+    shippedEvidence: input2.shippedEvidence !== void 0 ? input2.shippedEvidence : existing.shippedEvidence,
+    coverageGap,
+    coverageGapNote: input2.coverageGapNote !== void 0 ? input2.coverageGapNote : existing.coverageGapNote,
+    knownFlaws: input2.knownFlaws !== void 0 ? input2.knownFlaws : existing.knownFlaws,
+    alternatives: input2.alternatives !== void 0 ? input2.alternatives : existing.alternatives
+  };
+}
+async function loadExistingDecision(repositoryPath2, id) {
+  try {
+    const file2 = await readPackFile(repositoryPath2, decisionPath(id));
+    return parseExistingDecision(file2.content);
+  } catch (error62) {
+    if (error62 instanceof TasteError && error62.code === "pack_file_not_found") return null;
+    throw error62;
+  }
+}
+function parseExistingDecision(content) {
+  const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
+  const fields = frontmatter ? parseFrontmatter(frontmatter[1]) : {};
+  const body = frontmatter ? content.slice(frontmatter[0].length) : content;
+  const sections = sectionMap(body);
+  return {
+    scope: fields.scope,
+    coverageGap: booleanField(fields.coverage_gap),
+    statement: meaningful(sections.Statement, []),
+    rationale: meaningful(sections.Rationale, [EMPTY_NOTE]),
+    shippedEvidence: parseEvidence(sections["Shipped evidence"]),
+    coverageGapNote: meaningful(sections["Coverage gap"], [NO_GAP_NOTE]),
+    knownFlaws: meaningful(sections["Known flaws"], [EMPTY_NOTE]),
+    alternatives: meaningful(sections.Alternatives, [EMPTY_NOTE])
+  };
+}
+function sectionMap(body) {
+  const sections = {};
+  for (const part of body.split(/^## /m)) {
+    const newline = part.indexOf("\n");
+    if (newline === -1) continue;
+    const name = part.slice(0, newline).trim();
+    sections[name] = part.slice(newline + 1).trim();
+  }
+  return sections;
+}
+function parseEvidence(section) {
+  if (!section) return [];
+  const items = section.split("\n").map((line) => line.trim()).filter((line) => line.startsWith("- ")).map((line) => line.slice(2).trim()).filter(Boolean);
+  if (items.length === 1 && items[0] === "none") return [];
+  return items;
+}
+function meaningful(text, placeholders) {
+  const trimmed = text?.trim();
+  if (!trimmed || placeholders.includes(trimmed)) return void 0;
+  return trimmed;
 }
 function oneLine(value, label) {
   const trimmed = value.trim();
@@ -37533,7 +37615,7 @@ function createTasteServer() {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Expression and Sweep write path. Create or replace one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place.",
+      description: "Expression and Sweep write path. Create or update one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place. Omitted optional fields keep the stored rationale, scope, shipped evidence, coverage gap, known flaws, and alternatives.",
       inputSchema: {
         repositoryPath,
         id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
@@ -37544,7 +37626,7 @@ function createTasteServer() {
         status: external_exports.enum(["proposed", "accepted", "rejected"]),
         trigger: external_exports.enum(["interview", "sweep", "gap", "rejected_pass"]),
         shippedEvidence: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
-        coverageGap: external_exports.boolean().optional().describe("True when current artefacts cannot justify the next step. Defaults to true when trigger is gap."),
+        coverageGap: external_exports.boolean().optional().describe("True when current artefacts cannot justify the next step. On create, defaults to true when trigger is gap. On update, omit to keep the stored value."),
         coverageGapNote: external_exports.string().max(2e3).optional(),
         knownFlaws: external_exports.string().max(4e3).optional(),
         alternatives: external_exports.string().max(4e3).optional()

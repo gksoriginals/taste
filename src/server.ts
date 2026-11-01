@@ -129,7 +129,7 @@ export function createTasteServer(): McpServer {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Expression and Sweep write path. Create or replace one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place.",
+      description: "Expression and Sweep write path. Create or update one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place. Omitted optional fields keep the stored rationale, scope, shipped evidence, coverage gap, known flaws, and alternatives.",
       inputSchema: {
         repositoryPath,
         id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
@@ -140,7 +140,7 @@ export function createTasteServer(): McpServer {
         status: z.enum(["proposed", "accepted", "rejected"]),
         trigger: z.enum(["interview", "sweep", "gap", "rejected_pass"]),
         shippedEvidence: z.array(z.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
-        coverageGap: z.boolean().optional().describe("True when current artefacts cannot justify the next step. Defaults to true when trigger is gap."),
+        coverageGap: z.boolean().optional().describe("True when current artefacts cannot justify the next step. On create, defaults to true when trigger is gap. On update, omit to keep the stored value."),
         coverageGapNote: z.string().max(2000).optional(),
         knownFlaws: z.string().max(4000).optional(),
         alternatives: z.string().max(4000).optional(),

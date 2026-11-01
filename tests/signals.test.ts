@@ -3,8 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { initializePack } from "../src/core/pack.js";
-import { deriveDecisionActivity, readPartState, recordSignal } from "../src/core/signals.js";
+import { initializePack, writePackFile } from "../src/core/pack.js";
+import { decisionPath, deriveDecisionActivity, parseDecision, readPartState, recordSignal } from "../src/core/signals.js";
 
 async function withPack(run: (repositoryPath: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(path.join(os.tmpdir(), "taste-signal-test-"));
@@ -79,6 +79,109 @@ test("an empty Pack derives Expression and does not flip other parts when one pa
     assert.equal(checkout?.activity, "conformance");
     assert.equal(settingsPart?.activity, "expression");
     assert.equal(all.anyPartNeedsExpression, true);
+  });
+});
+
+test("missing or invalid coverage_gap does not derive Conformance", async () => {
+  const acceptedShipped = (id: string, coverageGapLine: string) => `---
+id: ${id}
+title: One primary button
+status: accepted
+trigger: interview
+scope: settings
+${coverageGapLine}shipped: true
+---
+
+# One primary button
+
+## Statement
+
+Use one filled primary button per screen.
+
+## Shipped evidence
+
+- src/screens/Settings.tsx
+`;
+
+  const missing = parseDecision({ path: decisionPath("missing-gap"), content: acceptedShipped("missing-gap", "") });
+  const invalid = parseDecision({ path: decisionPath("invalid-gap"), content: acceptedShipped("invalid-gap", "coverage_gap: yes\n") });
+  assert.equal(missing.parsed, false);
+  assert.equal(invalid.parsed, false);
+
+  await withPack(async (repositoryPath) => {
+    await writePackFile(repositoryPath, decisionPath("missing-gap"), acceptedShipped("missing-gap", ""));
+    await writePackFile(repositoryPath, decisionPath("invalid-gap"), acceptedShipped("invalid-gap", "coverage_gap: yes\n"));
+    const state = await readPartState(repositoryPath);
+    for (const id of ["missing-gap", "invalid-gap"]) {
+      const decision = state.decisions.find((item) => item.id === id);
+      assert.equal(decision?.reason, "unparsed");
+      assert.equal(decision?.activity, "expression");
+    }
+    assert.equal(state.scopes.every((scope) => scope.activity === "expression"), true);
+    await assert.rejects(
+      () => recordSignal(repositoryPath, {
+        id: "missing-gap",
+        title: "One primary button",
+        statement: "Use one filled primary button per screen.",
+        status: "accepted",
+        trigger: "interview",
+      }),
+      /coverage_gap/,
+    );
+  });
+});
+
+test("updating status keeps omitted evidence and notes", async () => {
+  await withPack(async (repositoryPath) => {
+    await recordSignal(repositoryPath, {
+      id: "primary-button",
+      title: "One primary button",
+      statement: "Use one filled primary button per screen.",
+      rationale: "Reviewed against the shipped settings screen.",
+      status: "proposed",
+      trigger: "sweep",
+      scope: "settings",
+      shippedEvidence: ["src/screens/Settings.tsx", "screenshot 2026-11-01"],
+      coverageGap: true,
+      coverageGapNote: "Spacing is still unsettled.",
+      knownFlaws: "Icon button sometimes looks primary.",
+      alternatives: "Two primary buttons was rejected.",
+    });
+
+    const updated = await recordSignal(repositoryPath, {
+      id: "primary-button",
+      title: "One primary button",
+      statement: "Use one filled primary button per screen.",
+      status: "accepted",
+      trigger: "sweep",
+    });
+
+    assert.equal(updated.activity, "expression");
+    assert.equal(updated.reason, "coverage_gap");
+    assert.match(updated.content, /status: accepted/);
+    assert.match(updated.content, /coverage_gap: true/);
+    assert.match(updated.content, /scope: settings/);
+    assert.match(updated.content, /src\/screens\/Settings\.tsx/);
+    assert.match(updated.content, /screenshot 2026-11-01/);
+    assert.match(updated.content, /Reviewed against the shipped settings screen/);
+    assert.match(updated.content, /Spacing is still unsettled/);
+    assert.match(updated.content, /Icon button sometimes looks primary/);
+    assert.match(updated.content, /Two primary buttons was rejected/);
+
+    const replaced = await recordSignal(repositoryPath, {
+      id: "primary-button",
+      title: "One primary button",
+      statement: "Use one filled primary button per screen.",
+      status: "accepted",
+      trigger: "sweep",
+      rationale: "Replaced rationale.",
+      shippedEvidence: ["docs/new.png"],
+    });
+    assert.match(replaced.content, /Replaced rationale/);
+    assert.match(replaced.content, /docs\/new.png/);
+    assert.doesNotMatch(replaced.content, /Settings\.tsx/);
+    assert.match(replaced.content, /Icon button sometimes looks primary/);
+    assert.match(replaced.content, /Spacing is still unsettled/);
   });
 });
 

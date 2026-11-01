@@ -1,4 +1,4 @@
-import { listPackMarkdown, TasteError, writePackFile, type PackFile } from "./pack.js";
+import { listPackMarkdown, readPackFile, TasteError, writePackFile, type PackFile } from "./pack.js";
 
 export const DECISION_DIRECTORY = "skills/product-design/references/decisions";
 
@@ -80,6 +80,19 @@ export interface PackPartState {
 
 const STATUSES = new Set<DecisionStatus>(["proposed", "accepted", "rejected"]);
 const TRIGGERS = new Set<SignalTrigger>(["interview", "sweep", "gap", "rejected_pass"]);
+const EMPTY_NOTE = "_None recorded._";
+const NO_GAP_NOTE = "None recorded.";
+
+interface ExistingDecision {
+  scope?: string;
+  coverageGap?: boolean;
+  statement?: string;
+  rationale?: string;
+  shippedEvidence: string[];
+  coverageGapNote?: string;
+  knownFlaws?: string;
+  alternatives?: string;
+}
 
 export function decisionPath(id: string): string {
   return `${DECISION_DIRECTORY}/${assertDecisionId(id)}.md`;
@@ -160,7 +173,8 @@ export function parseDecision(file: PackFile): ParsedDecision | UnparsedDecision
   const fields = parseFrontmatter(frontmatter[1]);
   const status = fields.status as DecisionStatus;
   const trigger = fields.trigger as SignalTrigger;
-  if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope) {
+  const coverageGap = booleanField(fields.coverage_gap);
+  if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope || coverageGap === undefined) {
     return { path: file.path, id: fields.id || idFromPath, parsed: false, reason: "unparsed" };
   }
   return {
@@ -170,14 +184,15 @@ export function parseDecision(file: PackFile): ParsedDecision | UnparsedDecision
     status,
     trigger,
     scope: fields.scope,
-    coverageGap: fields.coverage_gap === "true",
+    coverageGap,
     shipped: fields.shipped === "true",
     parsed: true,
   };
 }
 
 export async function recordSignal(repositoryPath: string, input: SignalInput): Promise<{ path: string; activity: PartActivity; reason: DecisionReason; content: string }> {
-  const content = renderDecision(input);
+  const existing = await loadExistingDecision(repositoryPath, input.id);
+  const content = renderDecision(mergeSignal(existing, input));
   const written = await writePackFile(repositoryPath, decisionPath(input.id), content);
   const parsed = parseDecision(written);
   if (!parsed.parsed) {
@@ -251,6 +266,95 @@ export async function readPartState(repositoryPath: string, scope?: string): Pro
     anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
     note: "Per-part activity only. The Pack does not flip as a whole. Who initiates a move between Expression and Conformance is open; this tool does not decide it.",
   };
+}
+
+function booleanField(value: string | undefined): boolean | undefined {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+}
+
+function mergeSignal(existing: ExistingDecision | null, input: SignalInput): SignalInput {
+  if (!existing) return input;
+  let coverageGap = input.coverageGap;
+  if (coverageGap === undefined) {
+    if (existing.coverageGap === undefined) {
+      throw new TasteError(
+        "Existing Decision has a missing or invalid coverage_gap. Provide coverageGap explicitly before updating it.",
+        "invalid_decision",
+      );
+    }
+    coverageGap = existing.coverageGap;
+  }
+  return {
+    id: input.id,
+    title: input.title,
+    statement: input.statement,
+    status: input.status,
+    trigger: input.trigger,
+    rationale: input.rationale !== undefined ? input.rationale : existing.rationale,
+    scope: input.scope !== undefined ? input.scope : existing.scope,
+    shippedEvidence: input.shippedEvidence !== undefined ? input.shippedEvidence : existing.shippedEvidence,
+    coverageGap,
+    coverageGapNote: input.coverageGapNote !== undefined ? input.coverageGapNote : existing.coverageGapNote,
+    knownFlaws: input.knownFlaws !== undefined ? input.knownFlaws : existing.knownFlaws,
+    alternatives: input.alternatives !== undefined ? input.alternatives : existing.alternatives,
+  };
+}
+
+async function loadExistingDecision(repositoryPath: string, id: string): Promise<ExistingDecision | null> {
+  try {
+    const file = await readPackFile(repositoryPath, decisionPath(id));
+    return parseExistingDecision(file.content);
+  } catch (error) {
+    if (error instanceof TasteError && error.code === "pack_file_not_found") return null;
+    throw error;
+  }
+}
+
+function parseExistingDecision(content: string): ExistingDecision {
+  const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
+  const fields = frontmatter ? parseFrontmatter(frontmatter[1]) : {};
+  const body = frontmatter ? content.slice(frontmatter[0].length) : content;
+  const sections = sectionMap(body);
+  return {
+    scope: fields.scope,
+    coverageGap: booleanField(fields.coverage_gap),
+    statement: meaningful(sections.Statement, []),
+    rationale: meaningful(sections.Rationale, [EMPTY_NOTE]),
+    shippedEvidence: parseEvidence(sections["Shipped evidence"]),
+    coverageGapNote: meaningful(sections["Coverage gap"], [NO_GAP_NOTE]),
+    knownFlaws: meaningful(sections["Known flaws"], [EMPTY_NOTE]),
+    alternatives: meaningful(sections.Alternatives, [EMPTY_NOTE]),
+  };
+}
+
+function sectionMap(body: string): Record<string, string> {
+  const sections: Record<string, string> = {};
+  for (const part of body.split(/^## /m)) {
+    const newline = part.indexOf("\n");
+    if (newline === -1) continue;
+    const name = part.slice(0, newline).trim();
+    sections[name] = part.slice(newline + 1).trim();
+  }
+  return sections;
+}
+
+function parseEvidence(section: string | undefined): string[] {
+  if (!section) return [];
+  const items = section.split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2).trim())
+    .filter(Boolean);
+  if (items.length === 1 && items[0] === "none") return [];
+  return items;
+}
+
+function meaningful(text: string | undefined, placeholders: string[]): string | undefined {
+  const trimmed = text?.trim();
+  if (!trimmed || placeholders.includes(trimmed)) return undefined;
+  return trimmed;
 }
 
 function oneLine(value: string, label: string): string {
