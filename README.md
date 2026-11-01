@@ -1,109 +1,131 @@
 # Taste
 
-Taste is a plugin for an existing coding harness (Cursor, Codex, or Claude Code). Skills and a local MCP server drive the workflow on **the product repository**, not on this repo:
+**Product design memory for coding agents.** Taste helps a coding harness carry a product’s approved UI decisions across screens, tasks, and sessions. Product knowledge lives in a versioned `taste/` Pack inside the product repository.
 
-1. For an explicit setup request, create one Pack at `taste/`. For a UI task with no Pack, keep it absent while Expression explores and the host implements, reviews, and checks the design.
-2. When a Pack exists, load it before UI work. Conformance uses accepted Decisions with host-reported validation and user-approval evidence, shipped evidence, and no coverage gap.
-3. Keep new direction, early reactions, and iteration feedback in the host task context.
-4. For a greenfield UI task, create the Pack and record a Decision only after the host reports checks passed and the user approves the exact tested artifact and reusable Decision. An agent's review is not user approval. The host owns checks, review, readiness, and push timing.
+Taste is an early-stage plugin for [Codex](https://developers.openai.com/codex), [Cursor](https://cursor.com/), and [Claude Code](https://code.claude.com/). It provides reusable Skills and a local MCP server; the host harness remains responsible for implementation, tests, review, and shipping.
 
-Expression is the learner. There is no second Learner module, no daemon, and no hard CI gate in this slice. This repository is the plugin. Packs live in the product repo.
+## What Taste does
 
-When Expression needs specialist visual, interaction, UX-flow, or product-decision craft, Taste guides the host to detect installed capabilities, ask before external search/install, try approved candidates, and lock a useful choice in the host's workflow. Taste does not curate or install these capabilities, and locks do not belong in the Pack. See [the host-portable workflow](docs/plugin-workflows.md#optional-craft-capabilities-during-expression).
+- **Keeps product decisions with the product.** A Pack is committed alongside the code it describes and can be read by different supported harnesses.
+- **Applies established direction.** Conformance uses accepted Decisions that have matching validation and user-approval evidence, inspected shipped evidence, and no unresolved coverage gap.
+- **Explores requested changes.** Expression handles greenfield work, new directions, corrections, and gaps. Exploratory feedback stays in the host’s active task while the design is changing.
+- **Learns at the right time.** After the host’s relevant checks pass and the user approves the exact tested artifact, the host automatically records a concise reusable Decision. There is no separate confirmation to write the Pack.
 
-Codex and compatible harnesses use the portable [Agent Plugins](https://agent-plugins.org/) package at this repository root. Cursor uses the same Skills and server with its Cursor-specific manifest and MCP path expansion under `.cursor-plugin/`. Claude Code uses the same Skills and server through `.claude-plugin/` and `.claude.mcp.json`.
+The Pack is not updated from an early “I like this direction” reaction. Taste does not run tests, decide readiness, review the design on the user’s behalf, or push changes.
 
-## Install in a harness
+## How it works
 
-Requirements: Node.js 20 or later. `dist/server.js` is committed; you do not need to build before install unless you are changing TypeScript.
-
-```sh
-npm install
-npm test
+```text
+User request
+    ↓
+Host loads the Taste Pack and routes the task per UI part
+    ↓
+Conformance applies accepted shipped Decisions
+Expression explores new direction or corrections; feedback stays task-local
+    ↓
+Host implements and runs its own checks
+    ↓
+User approves the exact tested artifact
+    ↓
+Host records the reusable Decision in taste/
 ```
 
-### Cursor
+When a user asks to change an existing UI, the host passes that intent to Taste. `taste_part_state` returns a task-local Expression route even if the Pack still derives to Conformance. The Pack’s durable state is left untouched during exploration.
 
-Cursor's local plugin copy uses its Cursor-specific manifest so the MCP server path expands correctly. Local plugins are copied, not symlinked out of the folder. Copy the source while excluding the portable and other harness manifests:
+## Try it
+
+Install Taste in your coding harness, open a **product repository**, and ask for a UI task in natural language. For example:
+
+> Use Taste while simplifying the settings screen. Keep exploratory feedback out of the Pack. After the implementation passes this repository’s checks, show me the tested version; when I approve it, record the reusable decision.
+
+The harness should load an existing `taste/` Pack before UI work. If no Pack exists, a design task starts with transient Expression; setup is deferred until the tested artifact is approved. For a step-by-step check of both greenfield and existing-Pack workflows, see the [harness smoke-test guide](docs/harness-smoke-test.md).
+
+## Install
+
+Taste requires Node.js 20 or later. The bundled MCP server is committed, so you do not need to build it to install the plugin. Installation details can change with host releases; these are the repository’s current local development paths.
+
+<details>
+<summary><strong>Cursor</strong></summary>
+
+Cursor needs its own manifest and MCP path expansion. From the Taste checkout:
 
 ```sh
 mkdir -p ~/.cursor/plugins/local/taste
-# Copy the plugin. A symlink that points outside ~/.cursor/plugins/local is ignored.
-rsync -a --exclude .git --exclude plugin.json --exclude mcp.json --exclude .mcp.json --exclude .claude-plugin --exclude .claude.mcp.json --exclude .codex-plugin --exclude .agents ./ ~/.cursor/plugins/local/taste/
+rsync -a \
+  --exclude .git \
+  --exclude plugin.json \
+  --exclude mcp.json \
+  --exclude .mcp.json \
+  --exclude .claude-plugin \
+  --exclude .claude.mcp.json \
+  --exclude .codex-plugin \
+  --exclude .agents \
+  ./ ~/.cursor/plugins/local/taste/
 ```
 
-Restart Cursor, or run **Developer: Reload Window**. Open **Customize** and confirm the Taste skills and the `taste` MCP server. Enterprise installs need **Allow Local Plugin Imports** enabled. If a marketplace plugin named `taste` is already installed, that copy wins over the local folder.
+Reload Cursor, then check **Customize** for Taste’s Skills and MCP server. The local plugin import setting may need to be enabled by your organization. Cursor uses `.cursor-plugin/plugin.json` and `.cursor.mcp.json` in the copied folder.
 
-The Cursor manifest at `.cursor-plugin/plugin.json` points to `.cursor.mcp.json`, which launches the server using `${CURSOR_PLUGIN_ROOT}`. Node must be on `PATH`.
+</details>
 
-### Diagnostics
+<details>
+<summary><strong>Codex</strong></summary>
 
-Taste writes structured diagnostic events to the MCP server's stderr, never stdout. The default `error` level records only tool failures and stable error codes. To debug a harness smoke test, add `"env": { "TASTE_LOG_LEVEL": "debug" }` to the Taste server entry in that harness's MCP config. Debug logs include startup, tool names, outcomes, and durations; they never include tool arguments, Pack contents, conversation text, or repository paths. Set the level to `off` to disable diagnostics.
+Open this repository in Codex and select the `taste-local` repository marketplace from `.agents/plugins/marketplace.json`. To register it from the CLI:
 
-### Claude Code
+```sh
+codex plugin marketplace add /absolute/path/to/taste
+```
 
-From a checkout of this repo:
+</details>
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+From a Taste checkout, launch Claude Code with:
 
 ```sh
 claude --plugin-dir /absolute/path/to/taste
 ```
 
-### Codex
+</details>
 
-Open this repository and select the `taste-local` repo marketplace (`.agents/plugins/marketplace.json`). To register it from the CLI: `codex plugin marketplace add /absolute/path/to/taste`.
+## Product Pack
 
-More detail: [docs/plugin-development.md](docs/plugin-development.md).
+Each product has one Pack at `taste/`:
 
-## Harness end-to-end check
+```text
+taste/
+├── manifest.json
+├── skills/product-design/SKILL.md
+└── skills/product-design/references/
+    ├── shared/product-facts.md
+    └── decisions/
+```
 
-Use any product repo. A throwaway git repo is enough. It does not need to be Ally. Install the plugin in the harness first, then open the **product** repo (not this plugin repo) in that harness. To verify the greenfield approval gate, skip the explicit setup prompt below and start with a design task; `taste/` should remain absent until final approval.
+Decisions are scoped to product parts. Conformance and Expression are derived activities, not folders or a Pack-wide switch. If an approved artifact changes, the host must revalidate it and get approval for that version before updating its Decision; a changed artifact does not inherit the previous version’s shipped evidence.
 
-Say these prompts in order. Wait for each one to finish. The Pack must remain unchanged through draft exploration and update only at the final approved-artifact checkpoint.
+## Diagnostics
 
-1. **Setup**
+The local MCP server writes structured diagnostics to stderr, keeping stdout available for MCP messages. By default, it logs tool failures and stable error codes only. To debug a harness run, set `TASTE_LOG_LEVEL=debug` in the MCP server’s environment. Debug events include startup, tool names, outcomes, and durations; they do not include arguments, Pack contents, conversation text, or repository paths. Use `TASTE_LOG_LEVEL=off` to disable diagnostics. See [plugin development](docs/plugin-development.md) for more detail.
 
-   > Set up Taste for this repository. Initialize one Pack under taste/. The product is called Fieldnote. Do not invent shipped decisions. Do not add a CI gate.
+## Develop and validate
 
-   Expect `taste/manifest.json`, `taste/skills/product-design/SKILL.md`, and `taste/skills/product-design/references/decisions/README.md`. No `supportedModes` field. No `references/conformance/` or `references/expression/` trees.
+```sh
+npm ci
+npm run typecheck
+npm test
+npm run validate:package
+```
 
-2. **Expression exploration**
+`npm test` builds the bundled server and exercises Pack safety, Decision promotion, derived routing, and an MCP stdio client/server exchange. Package checks verify the portable manifests and host adapters. They do not prove that a GUI harness loaded the plugin; use the [smoke-test guide](docs/harness-smoke-test.md) in each host you plan to support.
 
-   > Interview me about the settings screen. I want one filled primary button, field errors under their fields, and spacing that is dense but not cramped. Keep these signals in the host task while we explore; do not write Decisions to the Pack yet.
+## Project docs
 
-   Answer the questions in chat. Then say:
+- [Product direction](docs/prd.md)
+- [Engineering design](docs/engineering.md)
+- [Plugin development and host adapters](docs/plugin-development.md)
+- [Workflow and skill routing](docs/plugin-workflows.md)
+- [Implementation plan](docs/implementation-plan.md)
+- [Synthetic evaluation results](docs/validation-results.md)
 
-   > I like this direction. Build the first version, but do not update the Pack yet.
-
-   Expect no Decision files. The host should continue implementation and follow the product repository's existing validation and review workflow.
-
-3. **UI from the Pack**
-
-   > Design a settings screen for notification preferences. Load the Taste Pack before you write UI. Use the interview direction from this task. Do not add a Decision to the Pack while the version is in progress.
-
-   Expect the screen to use one primary button, inline field errors, and dense spacing. Expect no new Conformance claim.
-
-4. **Validate and approve**
-
-   > The settings screen used two primary buttons. Correct it and rerun the checks this repository uses. Keep the failed version and correction in the host task. Show me the tested final version and a concise Decision for approval.
-
-   Do not write a Decision for the failed version or unresolved gap. After the user approves the tested final version and Decision, call `taste_record_signal` with the exact artifact reference, host-reported validation results, matching user-approval evidence, `status: accepted`, and `coverageGap: false`. Include shipped evidence only if the host inspected an actually shipped version.
-
-5. **Confirm**
-
-   > Show taste_part_state for scope settings and quote the Decision files you changed.
-
-   You should see the files on disk in the product repo. Chat summaries do not count.
-
-Optional, if the product already has UI: ask for `taste-sweep` on one flow. Keep candidate judgments in the host task until the owner approves the Decision and the host supplies evidence for the inspected artifact. Do not write `proposed` Decisions during the sweep.
-
-## Docs
-
-- [docs/prd.md](docs/prd.md) — PRD mirror of the Google Doc plus Gopi and North's locked decisions
-- [docs/engineering.md](docs/engineering.md) — system design and what the code actually does
-- [docs/implementation-plan.md](docs/implementation-plan.md) — v1 plumbing, not a finished product
-- [docs/plugin-development.md](docs/plugin-development.md) — local plugin setup
-- [docs/plugin-workflows.md](docs/plugin-workflows.md) — which skill fires when
-- [docs/validation-results.md](docs/validation-results.md) — synthetic eval smoke only
-- [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) — product source of truth
-
-Read [agent.md](agent.md) before changing project conventions.
+Taste is still plumbing toward the larger goal: helping coding agents produce UI that reflects a product’s approved design judgment. Synthetic evaluations and package tests are not evidence that it improves real product outcomes; validate it in your actual harness and product repository.
