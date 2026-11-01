@@ -40,7 +40,12 @@ async function toolResult<T extends object>(operation: () => Promise<T>) {
 }
 
 export function createTasteServer(): McpServer {
-  const server = new McpServer({ name: "taste", version: "0.1.0" });
+  const server = new McpServer(
+    { name: "taste", version: "0.1.0" },
+    {
+      instructions: "For UI tasks, interpret the current user request before calling taste_part_state and always pass taskIntent plus the affected scope. A requested change or correction uses Expression routing even if the Pack says Conformance; do not infer task mode from Pack state alone. This task-local route does not modify the Pack.",
+    },
+  );
 
   server.registerTool(
     "taste_mode_resolve",
@@ -130,7 +135,7 @@ export function createTasteServer(): McpServer {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact and the Decision statement. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
+      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact. That artifact approval authorizes the host to derive and record the reusable Decision automatically; do not ask for separate Pack-write or Decision-text confirmation. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
       inputSchema: {
         repositoryPath,
         id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
@@ -138,12 +143,12 @@ export function createTasteServer(): McpServer {
         statement: z.string().min(1).max(8000).describe("The judgment, in the user's terms."),
         rationale: z.string().max(8000).optional(),
         scope: z.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
-        status: z.literal("accepted").describe("Only record after the tested artifact and this Decision are approved by the user."),
+        status: z.literal("accepted").describe("Record only after the user approves the tested artifact; that approval authorizes recording the derived reusable Decision."),
         trigger: z.enum(["interview", "sweep", "gap", "rejected_pass"]),
         validatedArtifact: z.string().trim().min(1).max(1000).describe("Stable reference to the exact final artifact the host's workflow validated, such as a commit, release candidate, or inspected deployed version."),
         validationEvidence: z.array(z.string().trim().min(1).max(1000)).min(1).max(30).describe("Host-reported results and evidence for relevant product-specific checks. The host chooses these; Taste does not run or judge them."),
         userApprovedArtifact: z.string().trim().min(1).max(1000).describe("Must identify the same final artifact as validatedArtifact."),
-        userApprovalEvidence: z.string().trim().min(1).max(1000).describe("Brief host-reported evidence that the user approved this tested artifact and Decision statement."),
+        userApprovalEvidence: z.string().trim().min(1).max(1000).describe("Brief host-reported evidence that the user approved this exact tested artifact."),
         shippedEvidence: z.array(z.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
         coverageGap: z.literal(false).default(false).describe("An unresolved coverage gap cannot be promoted to the Pack."),
         knownFlaws: z.string().max(4000).optional(),
@@ -158,14 +163,15 @@ export function createTasteServer(): McpServer {
     "taste_part_state",
     {
       title: "Derive Taste part activity",
-      description: "Derive Conformance or Expression per Decision from acceptance, matching host-reported validation and user-approval evidence, shipped evidence, and coverage gap. Conformance requires all of these; accepted but unshipped or legacy Decisions without promotion evidence remain Expression. An empty Pack is Expression. This tool does not run or judge checks, write a mode field, flip the Pack, or decide who initiates a change. User intent can still route a task into Expression.",
+      description: "Derive durable Conformance or Expression per Decision from Pack evidence and require a host-interpreted taskIntent. Use apply_existing when following established guidance, inspect_only for setup or Pack maintenance, and new_direction, correction, gap, greenfield, or unclear for Expression work. Expression intents add a task-local routing override while preserving durable Pack-derived state. The host supplies this structured interpretation because the tool cannot read conversation text. This tool does not run or judge checks, write a mode field, or flip the Pack.",
       inputSchema: {
         repositoryPath,
         scope: z.string().min(1).max(200).optional().describe("Optional part name or decision id to filter."),
+        taskIntent: z.enum(["apply_existing", "new_direction", "correction", "gap", "greenfield", "unclear", "inspect_only"]).describe("Required host-interpreted current task intent. Use apply_existing when following established guidance; inspect_only for setup or Pack maintenance; use new_direction, correction, gap, greenfield, or unclear to force a task-local Expression route regardless of durable Pack state."),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, scope }) => toolResult(async () => readPartState(root, scope)),
+    async ({ repositoryPath: root, scope, taskIntent }) => toolResult(async () => readPartState(root, scope, taskIntent)),
   );
 
   server.registerTool(

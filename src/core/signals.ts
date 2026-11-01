@@ -5,6 +5,7 @@ export const DECISION_DIRECTORY = "skills/product-design/references/decisions";
 export type DecisionStatus = "proposed" | "accepted" | "rejected";
 export type SignalTrigger = "interview" | "sweep" | "gap" | "rejected_pass";
 export type PartActivity = "conformance" | "expression";
+export type TaskIntent = "apply_existing" | "new_direction" | "correction" | "gap" | "greenfield" | "unclear" | "inspect_only";
 export type DecisionReason =
   | "accepted_shipped"
   | "promotion_evidence_missing"
@@ -74,6 +75,13 @@ export interface PartState {
   decisionIds: string[];
 }
 
+export interface TaskRouting {
+  scope: string;
+  activity: "expression";
+  intent: TaskIntent;
+  note: string;
+}
+
 export interface PackPartState {
   decisions: DerivedDecision[];
   scopes: PartState[];
@@ -82,6 +90,8 @@ export interface PackPartState {
    * This is not a pack-wide mode and does not flip the Pack.
    */
   anyPartNeedsExpression: boolean;
+  /** Task-local routing override. It never changes the Pack-derived scopes above. */
+  taskRouting?: TaskRouting;
   note: string;
 }
 
@@ -241,7 +251,7 @@ export async function recordSignal(repositoryPath: string, input: SignalInput): 
   return { path: written.path, activity: derived.activity, reason: derived.reason, content: written.content };
 }
 
-export async function readPartState(repositoryPath: string, scope?: string): Promise<PackPartState> {
+export async function readPartState(repositoryPath: string, scope?: string, taskIntent?: TaskIntent): Promise<PackPartState> {
   const files = await listPackMarkdown(repositoryPath, DECISION_DIRECTORY);
   const wanted = scope?.trim();
   const decisions: DerivedDecision[] = [];
@@ -279,6 +289,7 @@ export async function readPartState(repositoryPath: string, scope?: string): Pro
       decisions: [],
       scopes: [{ scope: wanted || "(pack)", activity: "expression", reason: "no_decisions", decisionIds: [] }],
       anyPartNeedsExpression: true,
+      ...(taskIntent ? { taskRouting: expressionTaskRouting(wanted, taskIntent) } : {}),
       note: "No structured Decision matches. Expression applies for that part until a Decision has complete matching validation and user-approval evidence, shipped evidence, and no coverage gap. The host owns the workflow; this report only derives part activity.",
     };
   }
@@ -304,7 +315,25 @@ export async function readPartState(repositoryPath: string, scope?: string): Pro
     decisions,
     scopes,
     anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
+    ...(taskIntent ? { taskRouting: expressionTaskRouting(wanted, taskIntent) } : {}),
     note: "Per-part activity only. The Pack does not flip as a whole. An early positive reaction nudges the host to continue its workflow; it does not promote a Decision. The host owns checks, readiness, user review, and push.",
+  };
+}
+
+function expressionTaskRouting(scope: string | undefined, intent: TaskIntent): TaskRouting | undefined {
+  if (intent === "apply_existing" || intent === "inspect_only") return undefined;
+  const detail: Record<Exclude<TaskIntent, "apply_existing" | "inspect_only">, string> = {
+    new_direction: "The current task asks for a new direction, so use Expression for this task even if the Pack contains Conformance Decisions.",
+    correction: "The current task corrects existing UI or product guidance, so use Expression for this task even if the Pack contains Conformance Decisions.",
+    gap: "The current task identifies a gap in the existing guidance, so use Expression for this task.",
+    greenfield: "The current task is creating a new part, so use Expression for this task.",
+    unclear: "The request does not clearly indicate whether to apply or change existing guidance. Stay in Expression while the host clarifies the intended direction.",
+  };
+  return {
+    scope: scope ?? "(current task scope not specified)",
+    activity: "expression",
+    intent,
+    note: detail[intent],
   };
 }
 

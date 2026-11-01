@@ -35,6 +35,19 @@ test("Claude Code compatibility manifest points to the shared MCP package", asyn
   assert.deepEqual(mcp.mcpServers?.taste?.args, ["${CLAUDE_PLUGIN_ROOT}/dist/server.js"]);
 });
 
+test("Cursor compatibility manifest uses Cursor-specific plugin root expansion", async () => {
+  const manifest = JSON.parse(await readFile(path.join(root, ".cursor-plugin/plugin.json"), "utf8")) as { name?: string; skills?: string; mcpServers?: string };
+  const mcp = JSON.parse(await readFile(path.join(root, ".cursor.mcp.json"), "utf8")) as { mcpServers?: Record<string, { command?: string; args?: string[]; cwd?: string }> };
+  assert.equal(manifest.name, "taste");
+  assert.equal(manifest.skills, "./skills/");
+  assert.equal(manifest.mcpServers, "./.cursor.mcp.json");
+  assert.deepEqual(mcp.mcpServers?.taste, {
+    command: "node",
+    args: ["${CURSOR_PLUGIN_ROOT}/dist/server.js"],
+    cwd: "${CURSOR_PLUGIN_ROOT}",
+  });
+});
+
 test("Codex compatibility manifest routes to its plugin-root MCP config and Skills", async () => {
   const manifest = JSON.parse(await readFile(path.join(root, ".codex-plugin/plugin.json"), "utf8")) as {
     name?: string;

@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f3ef" />
-    <meta name="description" content="Taste helps coding agents follow design decisions you have approved." />
+    <meta name="description" content="Taste helps coding agents reuse product decisions you have tested and approved." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2320221f'/%3E%3Ctext x='7' y='24' fill='%23f4f3ef' font-family='monospace' font-size='23' font-weight='bold'%3Et.%3C/text%3E%3C/svg%3E" />
-    <title>Taste — design, reviewed by you</title>
+    <title>Taste — keep the decisions that matter</title>
     <style>
       :root {
         color-scheme: light;
@@ -38,264 +38,208 @@
       a:focus-visible, button:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
       .skip-link { position: absolute; top: 8px; left: -9999px; z-index: 5; padding: 8px 12px; background: var(--ink); color: white; }
       .skip-link:focus { left: 12px; }
-      .shell { max-width: 1180px; margin: 0 auto; padding: 0 30px; }
+      .shell { width: min(1120px, calc(100% - 60px)); margin: 0 auto; }
       .topbar {
-        min-height: 72px;
+        min-height: 70px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         border-bottom: 1px solid var(--line);
       }
-      .wordmark { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 750; letter-spacing: -0.04em; }
+      .wordmark { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 750; letter-spacing: -.04em; }
       .mark { display: inline-grid; place-items: center; width: 29px; height: 29px; background: var(--ink); color: var(--paper); font: 700 14px var(--mono); }
-      .toplinks { display: flex; align-items: center; gap: 27px; font-size: 14px; }
+      .toplinks { display: flex; align-items: center; gap: 24px; font-size: 14px; }
       .toplinks a { text-decoration: none; color: var(--muted); }
       .toplinks a:hover { color: var(--ink); }
-      .toplinks .install { padding: 8px 12px; color: var(--ink); border: 1px solid var(--ink); }
-      main { padding: 64px 0 88px; }
-      .intro { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .7fr); gap: 54px; align-items: end; margin-bottom: 42px; }
-      h1 { max-width: 680px; margin: 0; font-size: clamp(2.5rem, 5.2vw, 4.6rem); line-height: .99; letter-spacing: -.075em; font-weight: 680; }
-      .intro p { max-width: 390px; margin: 0 0 5px; color: var(--muted); font-size: 17px; }
-      .demo {
-        display: grid;
-        grid-template-columns: minmax(0, 1.38fr) minmax(310px, .82fr);
-        border: 1px solid var(--line);
-        background: var(--white);
-        min-height: 485px;
-      }
-      .workbench { padding: 25px 27px 27px; border-right: 1px solid var(--line); }
-      .demo-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-      .demo-head strong { font-size: 14px; font-weight: 650; }
-      .demo-note { font: 11px var(--mono); color: var(--muted); }
-      .modes { display: flex; gap: 8px; margin: 24px 0 20px; }
-      .mode {
-        border: 1px solid var(--line);
-        background: transparent;
-        padding: 7px 11px;
-        color: var(--muted);
-        cursor: pointer;
-        font-size: 13px;
-      }
-      .mode[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); background: #eeeee8; }
-      .mode-note { min-height: 20px; margin: -10px 0 16px; color: var(--muted); font-size: 12px; }
-      .artifact { border: 1px solid var(--line); background: #f9f8f4; min-height: 300px; display: grid; grid-template-columns: 1fr .9fr; }
-      .artifact-copy { padding: 26px 23px; border-right: 1px solid var(--line); }
-      .artifact-label { margin: 0 0 19px; color: var(--muted); font: 11px var(--mono); }
-      .artifact-copy h2 { font-size: 24px; line-height: 1.13; letter-spacing: -.045em; margin: 0 0 12px; font-weight: 650; }
-      .artifact-copy p { margin: 0; color: var(--muted); font-size: 14px; }
-      .fake-form { align-self: center; padding: 22px; }
-      .fake-label { display: block; margin-bottom: 6px; font-size: 12px; }
-      .fake-input { height: 37px; border: 1px solid #c9cbc3; background: white; margin-bottom: 15px; }
-      .fake-button { min-height: 37px; padding: 8px 13px; border: 0; background: var(--red); color: white; font-size: 12px; }
-      .workflow { padding: 25px 25px 24px; display: flex; flex-direction: column; }
-      .workflow h2 { margin: 0 0 3px; font-size: 17px; letter-spacing: -.025em; }
-      .workflow > p { margin: 0 0 21px; color: var(--muted); font-size: 13px; }
-      .steps { list-style: none; padding: 0; margin: 0; }
-      .steps li { position: relative; display: grid; grid-template-columns: 20px 1fr; gap: 11px; padding: 0 0 20px; color: var(--muted); font-size: 13px; }
-      .steps li:not(:last-child)::after { content: ""; position: absolute; left: 8px; top: 19px; width: 1px; height: calc(100% - 19px); background: var(--line); }
-      .step-mark { z-index: 1; width: 17px; height: 17px; border: 1px solid #aeb1a8; background: var(--white); border-radius: 50%; }
-      .steps li.done { color: var(--ink); }
-      .steps li.done .step-mark { border-color: var(--green); background: var(--green); box-shadow: inset 0 0 0 4px var(--white); }
-      .steps li.current { color: var(--ink); font-weight: 620; }
-      .steps li.current .step-mark { border: 2px solid var(--red); }
-      .step-title { display: block; color: var(--ink); font-weight: 620; }
-      .pack-state { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding: 13px 12px; border: 1px solid var(--line); font-size: 12px; }
-      .pack-state span:first-child { font-family: var(--mono); }
-      .pack-value { color: var(--red); font-weight: 650; }
-      .controls { display: flex; align-items: center; gap: 15px; margin-top: 18px; }
-      .advance { border: 0; padding: 10px 14px; background: var(--ink); color: white; cursor: pointer; font-size: 13px; }
-      .advance:hover { background: #3d403b; }
-      .advance:disabled { background: #e7e7e1; color: #676a64; cursor: default; }
-      .reset { border: 0; padding: 8px 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
-      .feedback { min-height: 21px; margin: 11px 0 0; font-size: 12px; color: var(--green); }
-      .principles { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); margin-top: 58px; }
-      .principle { padding: 19px 25px 0 0; }
-      .principle + .principle { padding-left: 25px; border-left: 1px solid var(--line); }
-      .principle h3 { margin: 0 0 6px; font-size: 14px; }
-      .principle p { margin: 0; max-width: 300px; color: var(--muted); font-size: 13px; }
+      .toplinks .plugin-link { padding: 7px 11px; border: 1px solid var(--ink); color: var(--ink); }
+
+      main { padding: 72px 0 84px; }
+      .intro { max-width: 780px; margin-bottom: 46px; }
+      h1 { margin: 0; max-width: 760px; font-size: clamp(2.8rem, 6.4vw, 5.2rem); line-height: .96; letter-spacing: -.075em; font-weight: 680; }
+      .intro p { max-width: 600px; margin: 24px 0 0; color: var(--muted); font-size: clamp(1rem, 1.7vw, 1.2rem); }
+
+      .demo { border: 1px solid var(--line); background: var(--white); }
+      .demo-head { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+      .demo-head strong { font-size: 14px; }
+      .demo-status { color: var(--red); font: 11px var(--mono); }
+      .demo-body { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); min-height: 420px; }
+      .task { padding: 30px; border-right: 1px solid var(--line); }
+      .section-label { margin: 0 0 10px; color: var(--muted); font: 11px var(--mono); }
+      .task h2, .pack h2 { margin: 0; font-size: 23px; line-height: 1.2; letter-spacing: -.035em; }
+      .task-copy { max-width: 520px; min-height: 50px; margin: 9px 0 24px; color: var(--muted); font-size: 14px; }
+      .screen { display: grid; grid-template-columns: minmax(0, 1fr) 190px; border: 1px solid var(--line); background: #f9f8f4; }
+      .screen-copy { padding: 24px; border-right: 1px solid var(--line); }
+      .screen-copy strong { display: block; margin-bottom: 7px; font-size: 15px; }
+      .screen-copy p { margin: 0; max-width: 310px; color: var(--muted); font-size: 13px; }
+      .screen-form { padding: 20px; }
+      .field-label { display: block; margin-bottom: 5px; font-size: 11px; }
+      .field { height: 34px; margin-bottom: 13px; border: 1px solid #c9cbc3; background: var(--white); }
+      .save { display: inline-block; padding: 8px 11px; background: var(--red); color: white; font-size: 11px; }
+      .review-note { display: none; margin: 18px 0 0; padding: 13px 15px; border-left: 3px solid var(--green); background: var(--green-pale); font-size: 13px; }
+      .demo[data-state="review"] .review-note { display: block; }
+
+      .pack { display: flex; flex-direction: column; padding: 30px 26px 26px; }
+      .pack-copy { margin: 9px 0 24px; color: var(--muted); font-size: 14px; }
+      .pack-file { margin-top: auto; border: 1px solid var(--line); background: var(--paper); }
+      .pack-file-head { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); font: 11px var(--mono); }
+      .pack-file-head span:last-child { color: var(--red); }
+      .pack-file-body { min-height: 116px; display: grid; place-items: center; padding: 22px; text-align: center; color: var(--muted); font-size: 13px; }
+      .proposal { display: none; width: 100%; text-align: left; }
+      .proposal strong { display: block; margin-bottom: 5px; color: var(--green); font: 11px var(--mono); }
+      .proposal p { margin: 0; color: var(--ink); font-size: 13px; }
+      .demo[data-state="review"] .pack-empty { display: none; }
+      .demo[data-state="review"] .proposal { display: block; }
+      .demo[data-state="review"] .pack-file-body { background: var(--green-pale); }
+      .demo-controls { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 20px; border-top: 1px solid var(--line); }
+      .demo-controls p { margin: 0; color: var(--muted); font-size: 12px; }
+      .toggle { flex: 0 0 auto; border: 0; padding: 10px 14px; background: var(--ink); color: white; cursor: pointer; font-size: 13px; }
+      .toggle:hover { background: #3d403b; }
+
+      .activities { display: grid; grid-template-columns: 1fr 1fr; margin-top: 52px; border-top: 1px solid var(--line); }
+      .activity { padding: 20px 28px 0 0; }
+      .activity + .activity { padding-left: 28px; border-left: 1px solid var(--line); }
+      .activity h2 { margin: 0 0 7px; font-size: 15px; }
+      .activity p { margin: 0; max-width: 460px; color: var(--muted); font-size: 14px; }
       footer { border-top: 1px solid var(--line); padding: 22px 0 27px; color: var(--muted); font-size: 12px; }
       footer .shell { display: flex; justify-content: space-between; gap: 16px; }
-      @media (max-width: 820px) {
-        .intro { grid-template-columns: 1fr; gap: 20px; }
-        .intro p { max-width: 600px; }
-        .demo { grid-template-columns: 1fr; }
-        .workbench { border-right: 0; border-bottom: 1px solid var(--line); }
-        .workflow { min-height: 400px; }
+
+      @media (max-width: 760px) {
+        .shell { width: min(100% - 38px, 1120px); }
+        main { padding: 48px 0 62px; }
+        .intro { margin-bottom: 32px; }
+        .demo-body { grid-template-columns: 1fr; }
+        .task { padding: 22px 18px; border-right: 0; border-bottom: 1px solid var(--line); }
+        .pack { padding: 22px 18px; }
+        .pack-file { margin-top: 8px; }
       }
-      @media (max-width: 540px) {
-        .shell { padding: 0 19px; }
+      @media (max-width: 520px) {
         .topbar { min-height: 62px; }
-        .toplinks { gap: 13px; font-size: 12px; }
-        .toplinks a:nth-child(2) { display: none; }
-        main { padding: 43px 0 62px; }
-        .intro { margin-bottom: 29px; }
-        h1 { font-size: clamp(2.5rem, 12vw, 3.6rem); }
-        .intro p { font-size: 15px; }
-        .workbench { padding: 19px 17px; }
-        .demo-note { max-width: 125px; text-align: right; }
-        .artifact { grid-template-columns: minmax(0, 1fr) minmax(0, .82fr); min-height: 235px; }
-        .artifact-copy { border-right: 1px solid var(--line); border-bottom: 0; padding: 16px 12px; }
-        .artifact-copy h2 { font-size: 18px; }
-        .artifact-copy p { font-size: 12px; }
-        .fake-form { padding: 14px 10px; }
-        .workflow { padding: 21px 18px; }
-        .principles { grid-template-columns: 1fr; margin-top: 39px; }
-        .principle, .principle + .principle { padding: 16px 0; border-left: 0; border-bottom: 1px solid var(--line); }
+        .toplinks { gap: 12px; font-size: 12px; }
+        .toplinks a:first-child { display: none; }
+        .intro p { margin-top: 18px; }
+        .demo-head { align-items: flex-start; padding: 14px 16px; }
+        .demo-status { max-width: 118px; text-align: right; }
+        .screen { grid-template-columns: 1fr; }
+        .screen-copy { padding: 18px; border-right: 0; border-bottom: 1px solid var(--line); }
+        .screen-form { padding: 16px 18px; }
+        .demo-controls { align-items: flex-start; flex-direction: column; padding: 15px 16px; }
+        .toggle { width: 100%; }
+        .activities { grid-template-columns: 1fr; margin-top: 38px; }
+        .activity, .activity + .activity { padding: 17px 0; border-left: 0; border-bottom: 1px solid var(--line); }
         footer .shell { display: block; }
+        footer .shell span { display: block; }
       }
       @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
     </style>
   </head>
   <body>
-    <a class="skip-link" href="#workflow">Skip to workflow</a>
+    <a class="skip-link" href="#workflow">Skip to how Taste works</a>
     <header class="shell topbar">
       <a class="wordmark" href="#top" aria-label="Taste home"><span class="mark" aria-hidden="true">t.</span><span>Taste</span></a>
       <nav class="toplinks" aria-label="Main navigation">
         <a href="#workflow">How it works</a>
-        <a href="#principles">Principles</a>
-        <a class="install" href="https://github.com/gksoriginals/taste">View the plugin</a>
+        <a class="plugin-link" href="https://github.com/gksoriginals/taste">View the plugin</a>
       </nav>
     </header>
 
     <main id="top" class="shell">
       <section class="intro" aria-labelledby="page-title">
-        <h1 id="page-title">Your approval makes taste reusable.</h1>
-        <p>Taste helps your coding agent carry approved product decisions into the next screen. Try the workflow below.</p>
+        <h1 id="page-title">Keep the decisions. Lose the noise.</h1>
+        <p>Taste helps coding agents reuse product decisions you have tested, approved, and shipped—not every draft along the way.</p>
       </section>
 
-      <section id="workflow" class="demo" aria-label="Interactive Taste workflow demonstration">
-        <div class="workbench">
-          <div class="demo-head"><strong>A settings screen, in progress</strong><span class="demo-note">SIMULATED WORKFLOW · NO PACK WRITTEN</span></div>
-          <div class="modes" role="group" aria-label="Choose a Taste activity">
-            <button class="mode" type="button" data-mode="expression" aria-pressed="true">Expression</button>
-            <button class="mode" type="button" data-mode="conformance" aria-pressed="false">Conformance example</button>
-          </div>
-          <p class="mode-note" id="mode-note">A new direction starts in Expression. No Pack exists yet.</p>
-          <div class="artifact" aria-live="polite">
-            <div class="artifact-copy">
-              <p class="artifact-label" id="artifact-label">FIRST PASS · EXPRESSION</p>
-              <h2 id="artifact-title">Make alerts easier to manage.</h2>
-              <p id="artifact-copy">The agent is shaping a new screen from your direction. Its early draft is still just a draft.</p>
-            </div>
-            <div class="fake-form" aria-hidden="true">
-              <label class="fake-label">Weekly summary</label>
-              <div class="fake-input"></div>
-              <label class="fake-label">Product updates</label>
-              <div class="fake-input"></div>
-              <button class="fake-button" type="button" tabindex="-1">Save preferences</button>
-            </div>
-          </div>
-          <div class="controls">
-            <button class="advance" type="button" id="advance">Continue the demo</button>
-            <button class="reset" type="button" id="reset">Start over</button>
-          </div>
-          <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+      <section id="workflow" class="demo" data-state="work" aria-label="Taste workflow example">
+        <div class="demo-head">
+          <strong>A new settings direction</strong>
+          <span class="demo-status">EXPRESSION · PACK UNCHANGED</span>
         </div>
 
-        <aside class="workflow" aria-labelledby="workflow-title">
-          <h2 id="workflow-title">The Pack follows your approval</h2>
-          <p id="workflow-description">A first pass is not a saved rule.</p>
-          <ol class="steps" id="steps">
-            <li class="current"><span class="step-mark" aria-hidden="true"></span><span><span class="step-title">Explore a direction</span>Keep reactions and revisions in the task.</span></li>
-            <li><span class="step-mark" aria-hidden="true"></span><span><span class="step-title">Build and check</span>The host runs the product's checks.</span></li>
-            <li><span class="step-mark" aria-hidden="true"></span><span><span class="step-title">You review the result</span>Approve this tested screen and its reusable Decision.</span></li>
-            <li><span class="step-mark" aria-hidden="true"></span><span><span class="step-title">Then update the Pack</span>Only your approval makes this a learning.</span></li>
-          </ol>
-          <div class="pack-state"><span>taste/</span><span class="pack-value" id="pack-value">not created · demo only</span></div>
-        </aside>
+        <div class="demo-body">
+          <div class="task">
+            <p class="section-label">ACTIVE TASK</p>
+            <h2 id="task-title">Explore without creating memory.</h2>
+            <p class="task-copy" id="task-copy">Drafts, reactions, and revisions stay in the task while the agent builds and checks the screen.</p>
+
+            <div class="screen" aria-label="Example notification settings artifact">
+              <div class="screen-copy">
+                <strong>Notification settings</strong>
+                <p>Choose which updates reach your inbox. Essential account messages stay on.</p>
+              </div>
+              <div class="screen-form" aria-hidden="true">
+                <span class="field-label">Weekly summary</span>
+                <div class="field"></div>
+                <span class="field-label">Product updates</span>
+                <div class="field"></div>
+                <span class="save">Save preferences</span>
+              </div>
+            </div>
+
+            <p class="review-note" id="review-note"><strong>Tested artifact ready.</strong> The user reviews this exact version and the proposed Decision together.</p>
+          </div>
+
+          <aside class="pack" aria-labelledby="pack-title">
+            <p class="section-label">TASTE PACK</p>
+            <h2 id="pack-title">Nothing is saved early.</h2>
+            <p class="pack-copy" id="pack-copy">The Pack stays empty until the tested artifact and its reusable Decision are approved.</p>
+            <div class="pack-file" aria-live="polite">
+              <div class="pack-file-head"><span>taste/decisions</span><span>UNCHANGED</span></div>
+              <div class="pack-file-body">
+                <span class="pack-empty">No Decision recorded</span>
+                <div class="proposal">
+                  <strong>PROPOSED · NOT SAVED</strong>
+                  <p>Keep Taste's landing page focused on one clear workflow, with plain language and no repeated explanation.</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="demo-controls">
+          <p id="demo-caption">New direction uses Expression. The Pack is read first and remains unchanged.</p>
+          <button class="toggle" type="button" id="toggle-review" aria-pressed="false">Show the review point</button>
+        </div>
       </section>
 
-      <section id="principles" class="principles" aria-label="Taste principles">
-        <article class="principle"><h3>Two activities</h3><p>Expression explores new direction. Conformance applies decisions already accepted and shipped.</p></article>
-        <article class="principle"><h3>Your product, your Pack</h3><p>Design knowledge stays with the product repository. Taste does not run your agent or your checks.</p></article>
-        <article class="principle"><h3>Approval is the gate</h3><p>The agent's review is not your approval. A draft becomes a reusable Decision only after you confirm it.</p></article>
+      <section class="activities" aria-label="Taste activities">
+        <article class="activity">
+          <h2>Expression explores</h2>
+          <p>Use it when a product part needs new direction or has no approved Decision.</p>
+        </article>
+        <article class="activity">
+          <h2>Conformance applies</h2>
+          <p>Use it when a matching Decision has already been approved, validated, and shipped.</p>
+        </article>
       </section>
     </main>
 
-    <footer><div class="shell"><span>Taste · design guidance for coding agents</span><span>Made to keep product decisions in your hands.</span></div></footer>
+    <footer><div class="shell"><span>Taste · product design guidance for coding agents</span><span>Your approval stays the gate.</span></div></footer>
 
     <script>
-      const steps = [...document.querySelectorAll("#steps li")];
-      const advance = document.querySelector("#advance");
-      const reset = document.querySelector("#reset");
-      const feedback = document.querySelector("#feedback");
-      const packValue = document.querySelector("#pack-value");
-      const description = document.querySelector("#workflow-description");
-      const modeNote = document.querySelector("#mode-note");
-      const modeButtons = [...document.querySelectorAll(".mode")];
-      let stage = 0;
-      let mode = "expression";
-      const expressionStages = [
-        {
-          label: "FIRST PASS · EXPRESSION",
-          title: "Make alerts easier to manage.",
-          text: "The agent is shaping a new screen from your direction. Its early draft is still just a draft.",
-          description: "A first pass is not a saved rule."
-        },
-        {
-          label: "HOST CHECKPOINT · DEMO",
-          title: "Check the exact version.",
-          text: "In a real task, the host runs product checks and reviews this artifact. This demo does not run or report those checks.",
-          description: "The host checks the build; Taste does not run tests."
-        },
-        {
-          label: "USER REVIEW · DEMO",
-          title: "Would you approve this version?",
-          text: "A real Pack stays absent while you review the exact tested artifact and proposed Decision.",
-          description: "Your approval is the gate. The agent cannot approve for you."
-        },
-        {
-          label: "APPROVAL EXAMPLE · DEMO",
-          title: "Approval unlocks promotion.",
-          text: "This simulation does not record consent or create a Pack. In a real workflow, Taste is called only after your approval.",
-          description: "The demo ends without creating or changing a Pack."
-        }
-      ];
-      const copy = {
-        conformance: {
-          label: "USING AN ACCEPTED DECISION · CONFORMANCE",
-          title: "Make alerts easier to manage.",
-          text: "The Pack already holds an approved, shipped decision for this screen. The agent applies it while building.",
-          description: "An existing shipped Decision guides the work."
-        }
-      };
-      function render() {
-        const content = mode === "expression" ? expressionStages[stage] : copy.conformance;
-        document.querySelector("#artifact-label").textContent = content.label;
-        document.querySelector("#artifact-title").textContent = content.title;
-        document.querySelector("#artifact-copy").textContent = content.text;
-        description.textContent = content.description;
-        modeNote.textContent = mode === "expression"
-          ? "A new direction starts in Expression. No Pack exists yet."
-          : "Example only: this path assumes an existing Pack with an accepted, shipped Decision.";
-        steps.forEach((step, index) => {
-          step.classList.toggle("done", mode === "expression" && index < stage);
-          step.classList.toggle("current", mode === "expression" && index === Math.min(stage, steps.length - 1));
-        });
-        if (mode === "conformance") {
-          packValue.textContent = "existing Pack · example";
-          packValue.style.color = "var(--green)";
-          advance.textContent = "Show a new direction";
-          feedback.textContent = "New requirements still go through Expression.";
-        } else {
-          packValue.textContent = "not created · demo only";
-          packValue.style.color = "var(--red)";
-          advance.textContent = stage === 0 ? "Show host checks" : stage === 1 ? "Show review checkpoint" : stage === 2 ? "Simulate approval" : "Demo complete";
-          feedback.textContent = stage < 2 ? "" : stage === 2 ? "Demo only: this click does not approve a real artifact." : "Demo complete. No files or Pack were changed.";
-        }
-        advance.disabled = mode === "expression" && stage >= 3;
-        advance.setAttribute("aria-disabled", String(advance.disabled));
-        modeButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.mode === mode)));
-      }
-      advance.addEventListener("click", () => {
-        if (mode === "conformance") { mode = "expression"; stage = 0; }
-        else if (stage === 2) { stage = 3; }
-        else if (stage < 3) { stage += 1; }
-        render();
+      const demo = document.querySelector("#workflow");
+      const toggle = document.querySelector("#toggle-review");
+      const taskTitle = document.querySelector("#task-title");
+      const taskCopy = document.querySelector("#task-copy");
+      const packTitle = document.querySelector("#pack-title");
+      const packCopy = document.querySelector("#pack-copy");
+      const caption = document.querySelector("#demo-caption");
+
+      toggle.addEventListener("click", () => {
+        const reviewing = demo.dataset.state !== "review";
+        demo.dataset.state = reviewing ? "review" : "work";
+        toggle.setAttribute("aria-pressed", String(reviewing));
+        toggle.textContent = reviewing ? "Back to the active task" : "Show the review point";
+        taskTitle.textContent = reviewing ? "Review the exact tested artifact." : "Explore without creating memory.";
+        taskCopy.textContent = reviewing
+          ? "The work is complete enough to present. Approval still belongs to the user, not the agent."
+          : "Drafts, reactions, and revisions stay in the task while the agent builds and checks the screen.";
+        packTitle.textContent = reviewing ? "The proposed Decision is visible." : "Nothing is saved early.";
+        packCopy.textContent = reviewing
+          ? "It is ready for approval, but the Pack is still unchanged."
+          : "The Pack stays empty until the tested artifact and its reusable Decision are approved.";
+        caption.textContent = reviewing
+          ? "Review point: artifact and Decision shown together. No approval is simulated and nothing is written."
+          : "New direction uses Expression. The Pack is read first and remains unchanged.";
       });
-      reset.addEventListener("click", () => { mode = "expression"; stage = 0; render(); });
-      modeButtons.forEach(button => button.addEventListener("click", () => { mode = button.dataset.mode; stage = 0; render(); }));
-      render();
     </script>
   </body>
 </html>

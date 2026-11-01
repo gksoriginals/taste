@@ -36722,19 +36722,19 @@ This is the entry point for one Taste Pack. Decisions live under \`references/de
 
 ## Derived part activity
 
-Read Decisions and call \`taste_part_state\` before UI work. Activity is derived, not authored:
+Read Decisions and call \`taste_part_state\` before UI work with the affected scope and a required \`taskIntent\`: use \`apply_existing\` to follow established guidance, \`inspect_only\` for setup or Pack maintenance, or \`new_direction\`, \`correction\`, \`gap\`, \`greenfield\`, or \`unclear\` for the corresponding task. The tool reports task-local Expression routing separately from durable Pack state. Activity is derived, not authored:
 
 - **Conformance:** the Decision is \`accepted\`, includes matching host-reported validation and user-approval evidence, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
 - **Expression:** anything else \u2014 no Decision, a legacy or unapproved Decision, missing promotion evidence, accepted but not shipped, or a coverage gap. The host keeps iteration feedback in its active task and records only a finalized Decision with \`taste_record_signal\`.
 - **User intent:** a request for new taste, a correction, or greenfield judgment uses Expression for that task, even when other Decisions are Conformance.
 
-The Pack never flips as a whole. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional \`decisionPromotionCheckpoint\` in the manifest is reminder text only. Do not add another mode or put host workflow inside the Pack. \`taste_mode_resolve\` is deprecated and is not the product rule.
+The Pack never flips as a whole. The host interprets the current request and supplies \`taskIntent\`; the tool cannot read conversation text. The task-local route never changes persisted Decisions. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional \`decisionPromotionCheckpoint\` in the manifest is reminder text only. Do not add another mode or put host workflow inside the Pack. \`taste_mode_resolve\` is deprecated and is not the product rule.
 
 ## Apply this Pack
 
 Read \`references/shared/product-facts.md\` and the Decisions that touch the task. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
 
-For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When the user likes an early direction, continue the host's workflow without writing to the Pack. Record only after the host reports relevant checks passed and the user approved the exact tested artifact and Decision. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
+For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When the user likes an early direction, continue the host's workflow without writing to the Pack. After the host reports relevant checks passed and the user approves the exact tested artifact, derive and record its concise reusable Decision automatically; do not ask for separate Pack-write or Decision-text confirmation. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 function createStarterPackFiles(productName, surfaces = [], decisionPromotionCheckpoint) {
   const normalizedName = productName.trim();
@@ -36776,7 +36776,7 @@ Record reviewed product facts that apply across parts. Add evidence and source l
 
 One Pack. Each other file in this directory is one Decision written by \`taste_record_signal\`. Do not author a mode field.
 
-A Decision can be recorded only after the host reports a final artifact, its relevant validation evidence, and the user's approval of that same artifact and Decision. Taste stores the host's report; it does not run or judge checks or user review.
+A Decision can be recorded after the host reports a final artifact, its relevant validation evidence, and the user's approval of that same artifact. That approval authorizes the host to derive and record the concise reusable Decision; no separate Pack-write or Decision-text confirmation is needed. Taste stores the host's report; it does not run or judge checks or user review.
 
 Derived activity for a Decision:
 
@@ -37393,7 +37393,7 @@ async function recordSignal(repositoryPath2, input2) {
   const derived2 = deriveDecisionActivity(parsed);
   return { path: written.path, activity: derived2.activity, reason: derived2.reason, content: written.content };
 }
-async function readPartState(repositoryPath2, scope) {
+async function readPartState(repositoryPath2, scope, taskIntent) {
   const files = await listPackMarkdown(repositoryPath2, DECISION_DIRECTORY);
   const wanted = scope?.trim();
   const decisions = [];
@@ -37430,6 +37430,7 @@ async function readPartState(repositoryPath2, scope) {
       decisions: [],
       scopes: [{ scope: wanted || "(pack)", activity: "expression", reason: "no_decisions", decisionIds: [] }],
       anyPartNeedsExpression: true,
+      ...taskIntent ? { taskRouting: expressionTaskRouting(wanted, taskIntent) } : {},
       note: "No structured Decision matches. Expression applies for that part until a Decision has complete matching validation and user-approval evidence, shipped evidence, and no coverage gap. The host owns the workflow; this report only derives part activity."
     };
   }
@@ -37452,7 +37453,24 @@ async function readPartState(repositoryPath2, scope) {
     decisions,
     scopes,
     anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
+    ...taskIntent ? { taskRouting: expressionTaskRouting(wanted, taskIntent) } : {},
     note: "Per-part activity only. The Pack does not flip as a whole. An early positive reaction nudges the host to continue its workflow; it does not promote a Decision. The host owns checks, readiness, user review, and push."
+  };
+}
+function expressionTaskRouting(scope, intent) {
+  if (intent === "apply_existing" || intent === "inspect_only") return void 0;
+  const detail = {
+    new_direction: "The current task asks for a new direction, so use Expression for this task even if the Pack contains Conformance Decisions.",
+    correction: "The current task corrects existing UI or product guidance, so use Expression for this task even if the Pack contains Conformance Decisions.",
+    gap: "The current task identifies a gap in the existing guidance, so use Expression for this task.",
+    greenfield: "The current task is creating a new part, so use Expression for this task.",
+    unclear: "The request does not clearly indicate whether to apply or change existing guidance. Stay in Expression while the host clarifies the intended direction."
+  };
+  return {
+    scope: scope ?? "(current task scope not specified)",
+    activity: "expression",
+    intent,
+    note: detail[intent]
   };
 }
 function booleanField(value) {
@@ -37609,7 +37627,12 @@ async function toolResult(operation) {
   }
 }
 function createTasteServer() {
-  const server2 = new McpServer({ name: "taste", version: "0.1.0" });
+  const server2 = new McpServer(
+    { name: "taste", version: "0.1.0" },
+    {
+      instructions: "For UI tasks, interpret the current user request before calling taste_part_state and always pass taskIntent plus the affected scope. A requested change or correction uses Expression routing even if the Pack says Conformance; do not infer task mode from Pack state alone. This task-local route does not modify the Pack."
+    }
+  );
   server2.registerTool(
     "taste_mode_resolve",
     {
@@ -37692,7 +37715,7 @@ function createTasteServer() {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact and the Decision statement. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
+      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact. That artifact approval authorizes the host to derive and record the reusable Decision automatically; do not ask for separate Pack-write or Decision-text confirmation. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
       inputSchema: {
         repositoryPath,
         id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
@@ -37700,12 +37723,12 @@ function createTasteServer() {
         statement: external_exports.string().min(1).max(8e3).describe("The judgment, in the user's terms."),
         rationale: external_exports.string().max(8e3).optional(),
         scope: external_exports.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
-        status: external_exports.literal("accepted").describe("Only record after the tested artifact and this Decision are approved by the user."),
+        status: external_exports.literal("accepted").describe("Record only after the user approves the tested artifact; that approval authorizes recording the derived reusable Decision."),
         trigger: external_exports.enum(["interview", "sweep", "gap", "rejected_pass"]),
         validatedArtifact: external_exports.string().trim().min(1).max(1e3).describe("Stable reference to the exact final artifact the host's workflow validated, such as a commit, release candidate, or inspected deployed version."),
         validationEvidence: external_exports.array(external_exports.string().trim().min(1).max(1e3)).min(1).max(30).describe("Host-reported results and evidence for relevant product-specific checks. The host chooses these; Taste does not run or judge them."),
         userApprovedArtifact: external_exports.string().trim().min(1).max(1e3).describe("Must identify the same final artifact as validatedArtifact."),
-        userApprovalEvidence: external_exports.string().trim().min(1).max(1e3).describe("Brief host-reported evidence that the user approved this tested artifact and Decision statement."),
+        userApprovalEvidence: external_exports.string().trim().min(1).max(1e3).describe("Brief host-reported evidence that the user approved this exact tested artifact."),
         shippedEvidence: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
         coverageGap: external_exports.literal(false).default(false).describe("An unresolved coverage gap cannot be promoted to the Pack."),
         knownFlaws: external_exports.string().max(4e3).optional(),
@@ -37719,14 +37742,15 @@ function createTasteServer() {
     "taste_part_state",
     {
       title: "Derive Taste part activity",
-      description: "Derive Conformance or Expression per Decision from acceptance, matching host-reported validation and user-approval evidence, shipped evidence, and coverage gap. Conformance requires all of these; accepted but unshipped or legacy Decisions without promotion evidence remain Expression. An empty Pack is Expression. This tool does not run or judge checks, write a mode field, flip the Pack, or decide who initiates a change. User intent can still route a task into Expression.",
+      description: "Derive durable Conformance or Expression per Decision from Pack evidence and require a host-interpreted taskIntent. Use apply_existing when following established guidance, inspect_only for setup or Pack maintenance, and new_direction, correction, gap, greenfield, or unclear for Expression work. Expression intents add a task-local routing override while preserving durable Pack-derived state. The host supplies this structured interpretation because the tool cannot read conversation text. This tool does not run or judge checks, write a mode field, or flip the Pack.",
       inputSchema: {
         repositoryPath,
-        scope: external_exports.string().min(1).max(200).optional().describe("Optional part name or decision id to filter.")
+        scope: external_exports.string().min(1).max(200).optional().describe("Optional part name or decision id to filter."),
+        taskIntent: external_exports.enum(["apply_existing", "new_direction", "correction", "gap", "greenfield", "unclear", "inspect_only"]).describe("Required host-interpreted current task intent. Use apply_existing when following established guidance; inspect_only for setup or Pack maintenance; use new_direction, correction, gap, greenfield, or unclear to force a task-local Expression route regardless of durable Pack state.")
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, scope }) => toolResult(async () => readPartState(root, scope))
+    async ({ repositoryPath: root, scope, taskIntent }) => toolResult(async () => readPartState(root, scope, taskIntent))
   );
   server2.registerTool(
     "taste_eval_list_fixtures",

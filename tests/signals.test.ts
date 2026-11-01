@@ -82,6 +82,18 @@ test("early feedback cannot write; finalized artifacts promote per part and arti
     assert.equal(beforeCorrection.scopes.find((item) => item.scope === "Settings")?.activity, "conformance");
     assert.equal(beforeCorrection.scopes.find((item) => item.scope === "Profile")?.activity, "expression");
 
+    const correctionTask = await readPartState(repositoryPath, "Settings", "correction");
+    assert.equal(correctionTask.scopes.find((item) => item.scope === "Settings")?.activity, "conformance");
+    assert.deepEqual(correctionTask.taskRouting, {
+      scope: "Settings",
+      activity: "expression",
+      intent: "correction",
+      note: "The current task corrects existing UI or product guidance, so use Expression for this task even if the Pack contains Conformance Decisions.",
+    });
+    const unclearTask = await readPartState(repositoryPath, "Settings", "unclear");
+    assert.equal(unclearTask.taskRouting?.activity, "expression");
+    assert.equal(unclearTask.taskRouting?.intent, "unclear");
+
     const correctedReleaseCandidate = await recordSignal(repositoryPath, promotedSignal({
       scope: "Settings",
       statement: "Use one filled primary button per screen, with an explicit saved state.",

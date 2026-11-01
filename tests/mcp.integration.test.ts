@@ -172,11 +172,44 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
 
     const parts = await client.callTool({
       name: "taste_part_state",
-      arguments: { repositoryPath, scope: "settings" },
+      arguments: { repositoryPath, scope: "settings", taskIntent: "inspect_only" },
     });
     assert.equal(parts.isError, undefined);
     assert.match(JSON.stringify(parts.structuredContent), /accepted_not_shipped/);
     assert.match(JSON.stringify(parts.structuredContent), /settings/);
+
+    const shippedCorrection = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "primary-button",
+        title: "One filled primary button",
+        statement: "Each screen has one filled primary button, with a clear success state.",
+        status: "accepted",
+        trigger: "rejected_pass",
+        scope: "settings",
+        validatedArtifact: "commit:abc456",
+        validationEvidence: ["Host reports: corrected settings tests passed at commit abc456."],
+        userApprovedArtifact: "commit:abc456",
+        userApprovalEvidence: "Host reports: user approved the tested settings update at commit abc456.",
+        shippedEvidence: ["https://example.test/settings — host inspected the shipped settings update at commit abc456."],
+      },
+    });
+    assert.equal(shippedCorrection.isError, undefined);
+
+    const correctionRoute = await client.callTool({
+      name: "taste_part_state",
+      arguments: { repositoryPath, scope: "settings", taskIntent: "correction" },
+    });
+    assert.equal(correctionRoute.isError, undefined);
+    const correctionState = correctionRoute.structuredContent as { scopes: Array<{ activity: string }>; taskRouting: { activity: string; intent: string } };
+    assert.equal(correctionState.scopes[0]?.activity, "conformance");
+    assert.deepEqual(correctionState.taskRouting, {
+      scope: "settings",
+      activity: "expression",
+      intent: "correction",
+      note: "The current task corrects existing UI or product guidance, so use Expression for this task even if the Pack contains Conformance Decisions.",
+    });
 
     const directDecisionWrite = await client.callTool({
       name: "taste_pack_write",

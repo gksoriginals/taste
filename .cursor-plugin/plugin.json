@@ -1,0 +1,7 @@
+{
+  "name": "taste",
+  "version": "0.1.0",
+  "description": "Harness plugin that sets up a product taste/ Pack, sweeps or interviews design judgment into it, loads that Pack for UI work, and records new signals through Expression.",
+  "skills": "./skills/",
+  "mcpServers": "./.cursor.mcp.json"
+}

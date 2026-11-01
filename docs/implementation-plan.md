@@ -6,7 +6,7 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 
 ### Portable harness plugin
 
-- Skills and a local stdio MCP server in the Agent Plugins root format for Codex and Cursor.
+- Skills and a local stdio MCP server in the Agent Plugins root format for Codex and compatible hosts; Cursor has a Cursor-specific manifest/MCP config for its path expansion.
 - Claude Code native compatibility metadata over the same Skills and server.
 - Manifest checks and local development docs. No daemon and no hosted agent.
 
@@ -21,7 +21,7 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 
 - Inspect, read, validate, and write files inside `taste/`.
 - `taste_record_signal` writes one Decision (Expression interview, Sweep proposal, coverage gap, or rejected pass).
-- `taste_part_state` derives Conformance or Expression from status, shipped evidence, and coverage gap. It does not decide who initiates a change.
+- `taste_part_state` requires a host-interpreted `taskIntent`, derives durable Conformance or Expression from Pack evidence, and returns a task-local Expression override for new directions, corrections, gaps, greenfield work, or unclear requests. It does not parse conversation text or change the Pack.
 - Writes stay inside the Pack, reject symlink parents, and cap size at 256 KiB.
 
 ### Evaluation packets

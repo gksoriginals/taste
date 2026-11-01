@@ -8,12 +8,13 @@ The repository root is a portable Agent Plugins package:
 
 - `plugin.json` declares the package and its version.
 - `skills/` contains the plugin workflows loaded by the host agent.
-- `mcp.json` starts the bundled stdio MCP server using a package-relative path.
+- `mcp.json` starts the bundled stdio MCP server using the Agent Plugins `${PLUGIN_ROOT}` variable.
 - `.agents/plugins/marketplace.json` makes the root package discoverable from this repository in Codex's local plugin marketplace.
 - `.codex-plugin/plugin.json` and `.mcp.json` provide the Codex CLI compatibility path for clients that do not load the portable root MCP manifest.
 - `.claude-plugin/plugin.json` and `.claude.mcp.json` provide Claude Code's native compatibility path. The Claude manifest points at its MCP config, which launches the same bundled server.
+- `.cursor-plugin/plugin.json` and `.cursor.mcp.json` provide Cursor's MCP path using `${CURSOR_PLUGIN_ROOT}`. Cursor loads the Agent Plugins format but does not expand `${PLUGIN_ROOT}` in its MCP configuration, so use the Cursor manifest/config for Cursor installs.
 
-Codex and Cursor can consume the Agent Plugins package. Claude Code currently uses its native plugin format. These are adapters around one implementation, not separate Taste products. The agent plugin standard and each harness evolve; verify the linked official documentation before changing manifests or install instructions.
+Codex and other standard-compatible hosts can consume the Agent Plugins package. Cursor uses its Cursor-specific manifest/config adapter. Claude Code uses its native plugin format. These are adapters around one implementation, not separate Taste products. The agent plugin standard and each harness evolve; verify the linked official documentation before changing manifests or install instructions.
 
 The local install source for development is this repository. A published release or marketplace can be added later without changing the Pack format. The bundled `dist/server.js` is committed so an installed plugin can start without running a build step. Run `npm run build` after changing TypeScript.
 
@@ -27,9 +28,9 @@ For Claude Code, from a checkout run:
 claude --plugin-dir /absolute/path/to/taste
 ```
 
-The root Agent Plugins manifests are the portable package format for Codex and Cursor. Cursor's plugin manager can load the package from its repository or release source. Do not copy Taste Skills into provider-specific project folders; the harness should load the plugin and the Pack should remain in the product repository.
+The root Agent Plugins manifests are the portable package format for Codex and compatible hosts. Cursor's local copy must use `.cursor-plugin/plugin.json` and `.cursor.mcp.json`; the README copy command excludes the root portable manifests to avoid Cursor loading the unsupported `${PLUGIN_ROOT}` path. Do not copy Taste Skills into provider-specific project folders; the harness should load the plugin and the Pack should remain in the product repository.
 
-When a product repository has a Pack at `taste/`, the plugin tools take its absolute repository path from the host harness. `taste_pack_initialize` creates one shared Pack and never edits `AGENTS.md`, `CLAUDE.md`, or other harness instructions. Expression and Sweep keep provisional feedback in the host's active task; only `taste_record_signal` can write a finalized Decision, after the host reports relevant checks and user approval for the same artifact. The tool stores those reports without running or judging the checks. `taste_pack_write` cannot write Decision files; it remains for other files inside `taste/`, rejects symlink parents, and limits writes to 256 KiB. Starter files are not product knowledge.
+When a product repository has a Pack at `taste/`, the plugin tools take its absolute repository path from the host harness. `taste_pack_initialize` creates one shared Pack and never edits `AGENTS.md`, `CLAUDE.md`, or other harness instructions. Expression and Sweep keep provisional feedback in the host's active task; only `taste_record_signal` can write a finalized Decision. For design changes, after the host reports relevant checks and the user approves the same tested artifact, that approval authorizes the host to derive and record its reusable Decision without asking for separate Pack-write or Decision-text confirmation. The tool stores those reports without running or judging the checks. `taste_pack_write` cannot write Decision files; it remains for other files inside `taste/`, rejects symlink parents, and limits writes to 256 KiB. Starter files are not product knowledge.
 
 An optional `decisionPromotionCheckpoint` may be stored in `taste/manifest.json` as plain-language reminder text for when the host should invoke Taste. It does not observe test results or configure/execute host checks, user review, readiness, or push timing. The host follows its existing product workflow and chooses before/after-push timing.
 

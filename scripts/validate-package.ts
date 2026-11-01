@@ -14,6 +14,8 @@ const codexManifest = await readJson<{ name?: string; version?: string; skills?:
 const codexMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }> }>(".mcp.json");
 const claudeManifest = await readJson<{ name?: string; mcpServers?: string }>(".claude-plugin/plugin.json");
 const claudeMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[] }> }>(".claude.mcp.json");
+const cursorManifest = await readJson<{ name?: string; skills?: string; mcpServers?: string }>(".cursor-plugin/plugin.json");
+const cursorMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[]; cwd?: string }> }>(".cursor.mcp.json");
 const codexMarketplace = await readJson<{ name?: string; plugins?: Array<{ name?: string; source?: { source?: string; path?: string }; policy?: { installation?: string; authentication?: string }; category?: string }> }>(".agents/plugins/marketplace.json");
 
 const ajv = new Ajv2020({ strict: false });
@@ -23,6 +25,9 @@ if (!validatePlugin(plugin)) issues.push(`plugin.json: ${JSON.stringify(validate
 if (!validateMcp(portableMcp)) issues.push(`mcp.json: ${JSON.stringify(validateMcp.errors)}`);
 if (claudeManifest.name !== plugin.name) issues.push("Claude Code and portable plugin names must match.");
 if (claudeManifest.mcpServers !== "./.claude.mcp.json") issues.push("Claude Code manifest must point to its native MCP config.");
+if (cursorManifest.name !== plugin.name || cursorManifest.skills !== "./skills/" || cursorManifest.mcpServers !== "./.cursor.mcp.json") {
+  issues.push("Cursor manifest must point to the shared Skills and Cursor-specific MCP config.");
+}
 if (codexManifest.name !== plugin.name || codexManifest.version !== plugin.version) issues.push("Codex and portable plugin identity/version must match.");
 if (codexManifest.skills !== "./skills/" || codexManifest.mcpServers !== "./.mcp.json") issues.push("Codex compatibility manifest must point to the root Skills and Codex MCP config.");
 const codexEntry = codexMarketplace.plugins?.find((entry) => entry.name === plugin.name);
@@ -53,6 +58,10 @@ const claudeServer = claudeMcp.mcpServers?.taste;
 if (claudeServer?.command !== "node" || claudeServer.args?.[0] !== "${CLAUDE_PLUGIN_ROOT}/dist/server.js") {
   issues.push("Claude MCP config must resolve the bundled server from CLAUDE_PLUGIN_ROOT.");
 }
+const cursorServer = cursorMcp.mcpServers?.taste;
+if (cursorServer?.command !== "node" || cursorServer.args?.[0] !== "${CURSOR_PLUGIN_ROOT}/dist/server.js" || cursorServer.cwd !== "${CURSOR_PLUGIN_ROOT}") {
+  issues.push("Cursor MCP config must resolve the bundled server from CURSOR_PLUGIN_ROOT.");
+}
 if (!(await stat(path.join(root, "dist/server.js")).then((item) => item.isFile()).catch(() => false))) {
   issues.push("dist/server.js is missing; run npm run build before packaging the plugin.");
 }
@@ -82,5 +91,5 @@ if (issues.length > 0) {
   for (const issue of issues) console.error(`✗ ${issue}`);
   process.exitCode = 1;
 } else {
-  console.log(`Plugin package valid: ${skillCount} Skills, Agent Plugins 1.0, Codex marketplace, and Claude Code compatibility.`);
+  console.log(`Plugin package valid: ${skillCount} Skills, Agent Plugins 1.0, Codex marketplace, Cursor compatibility, and Claude Code compatibility.`);
 }

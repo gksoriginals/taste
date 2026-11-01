@@ -9,7 +9,9 @@ Taste is a plugin for an existing coding harness (Cursor, Codex, or Claude Code)
 
 Expression is the learner. There is no second Learner module, no daemon, and no hard CI gate in this slice. This repository is the plugin. Packs live in the product repo.
 
-Codex and Cursor use the portable [Agent Plugins](https://agent-plugins.org/) package at this repository root. Claude Code uses the same Skills and server through `.claude-plugin/` and `.mcp.json`.
+When Expression needs specialist visual, interaction, UX-flow, or product-decision craft, Taste guides the host to detect installed capabilities, ask before external search/install, try approved candidates, and lock a useful choice in the host's workflow. Taste does not curate or install these capabilities, and locks do not belong in the Pack. See [the host-portable workflow](docs/plugin-workflows.md#optional-craft-capabilities-during-expression).
+
+Codex and compatible harnesses use the portable [Agent Plugins](https://agent-plugins.org/) package at this repository root. Cursor uses the same Skills and server with its Cursor-specific manifest and MCP path expansion under `.cursor-plugin/`. Claude Code uses the same Skills and server through `.claude-plugin/` and `.claude.mcp.json`.
 
 ## Install in a harness
 
@@ -22,17 +24,17 @@ npm test
 
 ### Cursor
 
-Cursor loads this root `plugin.json` as an Agent Plugin (skills + MCP). Local plugins are copied, not symlinked out of the folder:
+Cursor's local plugin copy uses its Cursor-specific manifest so the MCP server path expands correctly. Local plugins are copied, not symlinked out of the folder. Copy the source while excluding the portable and other harness manifests:
 
 ```sh
 mkdir -p ~/.cursor/plugins/local/taste
 # Copy the plugin. A symlink that points outside ~/.cursor/plugins/local is ignored.
-rsync -a --exclude .git ./ ~/.cursor/plugins/local/taste/
+rsync -a --exclude .git --exclude plugin.json --exclude mcp.json --exclude .mcp.json --exclude .claude-plugin --exclude .claude.mcp.json --exclude .codex-plugin --exclude .agents ./ ~/.cursor/plugins/local/taste/
 ```
 
 Restart Cursor, or run **Developer: Reload Window**. Open **Customize** and confirm the Taste skills and the `taste` MCP server. Enterprise installs need **Allow Local Plugin Imports** enabled. If a marketplace plugin named `taste` is already installed, that copy wins over the local folder.
 
-The MCP server is `node ./dist/server.js` with working directory `.` (the plugin root). Node must be on `PATH`.
+The Cursor manifest at `.cursor-plugin/plugin.json` points to `.cursor.mcp.json`, which launches the server using `${CURSOR_PLUGIN_ROOT}`. Node must be on `PATH`.
 
 ### Claude Code
 

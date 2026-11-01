@@ -16,7 +16,7 @@ This repository contains the Taste plugin implementation and documentation. Exam
 
 ### Current promotion flow (Nov 1 update)
 
-The host harness owns implementation, checks, readiness, user review, and push. Early feedback, rejected drafts, and unresolved gaps remain in the host's active task context. When the user likes an early direction, Taste's skill nudges the host to continue its own workflow; this is not approval of final Pack guidance. `taste_record_signal` records a Decision only after the host reports checks passed and user approval of the exact tested artifact and Decision. Taste stores those claims as evidence; it does not run checks or observe host events. Conformance also requires shipped evidence and no coverage gap. The optional `decisionPromotionCheckpoint` manifest field is plain-language reminder text for the host, with timing determined by that host's workflow. Learning from interaction history beyond the approved artifact is a later experiment (issue #7).
+The host harness owns implementation, checks, readiness, user review, and push. Early feedback, rejected drafts, and unresolved gaps remain in the host's active task context. When the user likes an early direction, Taste's skill nudges the host to continue its own workflow; this is not approval of a final tested artifact. `taste_record_signal` records a Decision after the host reports checks passed and the user approves the exact tested artifact. That approval authorizes the host to derive and record a reusable Decision automatically; no separate Pack-write or Decision-text confirmation is needed. Taste stores those claims as evidence; it does not run checks or observe host events. Conformance also requires shipped evidence and no coverage gap. The optional `decisionPromotionCheckpoint` manifest field is plain-language reminder text for the host, with timing determined by that host's workflow. Learning from interaction history beyond the approved artifact is a later experiment (issue #7).
 
 Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). It supplies Skills and MCP tools. It does not run a daemon, and this milestone does not add a hard CI gate. The Pack lives in the product repository at `taste/`, not in this plugin repository.
 
@@ -136,7 +136,7 @@ This uses LangChain's Skills, Wiki, and Gates as Pack knowledge roles, with Verc
 
 The Pack needs a discoverable entry point in the target repo so a coding agent knows when product-design guidance applies. A root `AGENTS.md` can provide a thin trigger for harnesses that read it; it is not Taste itself and is not a universal installation mechanism. Harnesses that do not read `AGENTS.md` need their own adapter or setup. Vercel's example uses repository instructions to trigger an in-repo product-design Skill; its Skill then resolves the task mode and routes to focused references. LangChain's Router is also a Skill with a table mapping job types to specialist Skills. Anthropic describes Skills that the model can autonomously identify and load when the task calls for them.
 
-For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load Decisions as the task requires. The coding agent reads the Pack and `taste_part_state`. That tool derives Conformance or Expression from Decision fields. It does not classify raw language. The user's ask for new taste still routes into Expression for that part.
+For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load Decisions as the task requires. The coding agent reads the Pack and calls `taste_part_state` with a host-interpreted `taskIntent` for new directions, corrections, gaps, greenfield tasks, or unclear requests. The tool returns a separate task-local Expression route without changing durable Decision state. The host interprets raw language because the tool cannot access conversation text.
 
 ### One Pack
 
@@ -184,7 +184,7 @@ For product UI work, use the Taste plugin with this repository's `taste/` Pack.
 If Taste is not installed in your harness, ask it to install this repository's
 Agent Plugins package (or its supported Claude Code compatibility package), then
 load the existing Pack.
-Read the product-design entry Skill, call taste_part_state, and load the Decisions
+Read the product-design entry Skill, call taste_part_state with a required taskIntent, and load the Decisions
 for this task. Use Expression when the part has no accepted shipped Decision,
 when the artefacts cannot justify the next step, or when I ask for new taste.
 ```
@@ -217,12 +217,12 @@ Taste defines explicit, user-invokable workflow Skills and one automatically rel
 | `taste-sweep` | User asks to learn, sweep, or refresh taste from shipped UI | Inspect the live product and keep candidate judgments in the host task until the final promotion checkpoint. |
 | `taste-design` | Any UI/UX task | Load an existing Pack. Conformance where Decisions qualify; transient Expression if absent, empty, gapped, or newly requested. Create an absent Pack only after final user approval. |
 | `taste-conformance` | User asks to match shipped taste, or part state derives Conformance | Apply accepted Decisions with complete promotion evidence, shipped evidence, and no coverage gap. |
-| `taste-expression` | Greenfield, new taste, a gap, or a correction; or part state derives Expression | Interview and explore in the host task; persist only after host checks and user approval of the tested artifact and Decision. |
+| `taste-expression` | Greenfield, new taste, a gap, or a correction; or part state derives Expression | Interview and explore in the host task; after host checks and user approval of the tested artifact, automatically persist its reusable Decision without a second confirmation. |
 | `taste-evaluate` | User asks to evaluate guidance or a calibration run is due | Compare with/without-Skill generation and hand judging to the harness. |
 
 Setup does not fabricate Decisions to make a Pack look like Conformance. An empty Pack derives to Expression. That is the from-scratch rule, not a missing mode route.
 
-This creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. Add a specialized Skill for a craft (such as copy or animation) when routing by job benefits from it; do not create a separate Skill for every topic by default.
+This creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. When a craft needs specialist guidance, Expression uses the host's detect → ask-install → try → lock flow for capabilities the host discovers; Taste does not grow a catalog of third-party craft Skills.
 
 ### Runtime path for a UI task
 
@@ -343,7 +343,7 @@ Keep deterministic code for narrow operations whose inputs and outcomes are expl
 - no Decisions → Expression (`no_decisions`)
 - a scope is Conformance only when every Decision in it is Conformance
 
-`taste_part_state` returns that report. It does not run or observe host checks, user review, or push. The user's early positive reaction prompts the skill to nudge the host to continue its workflow; it does not promote a Decision. `taste_mode_resolve` remains in the server as a deprecated task-local helper from earlier plumbing. It does not read the Pack. Skills should not use it as the ∞ rule. The user's request still routes into Expression when they ask for new taste, a correction, or greenfield judgment, even if another part of the Pack is Conformance.
+`taste_part_state` requires host-interpreted `taskIntent` and returns durable Pack state plus an explicit task-local Expression route when needed. It does not run or observe host checks, user review, or push. The user's early positive reaction prompts the skill to nudge the host to continue its workflow; it does not promote a Decision. `taste_mode_resolve` remains in the server as a deprecated task-local helper from earlier plumbing. It does not read the Pack. Skills should not use it as the mode rule. The host interprets the request and passes task intent, so a correction routes into Expression even if that Pack scope is Conformance.
 
 This is the intended split, not a claim that every implementation needs a Router or a linter. When a check requires judgment, depends on product context, or produces unreliable flags, keep it in agent guidance and review.
 
@@ -407,7 +407,7 @@ The PRD's success signals remain central: a mergeable first pass, no long design
 
 ## Part activity, loops, and lifecycle
 
-Conformance and Expression are activities on parts of one Pack. They share the Pack, the entry Skill, product facts, the harness, critique, and evaluation. A part is Conformance only when its Decisions are accepted, have complete matching host-reported validation and approval evidence, have shipped evidence, and have no coverage gap. Expression explores new direction and corrections; early feedback, rejected drafts, and unresolved gaps stay in the host task until the final tested artifact and Decision are approved.
+Conformance and Expression are activities on parts of one Pack. They share the Pack, the entry Skill, product facts, the harness, critique, and evaluation. A part is Conformance only when its Decisions are accepted, have complete matching host-reported validation and approval evidence, have shipped evidence, and have no coverage gap. Expression explores new direction and corrections; early feedback, rejected drafts, and unresolved gaps stay in the host task until the final tested artifact is approved. That approval authorizes automatic recording of its reusable Decision.
 
 `taste_part_state` reports the derived activity and does not flip unrelated Decisions. A user liking an early direction nudges the host to continue its workflow. The optional `decisionPromotionCheckpoint` manifest value provides reminder text only; each host's workflow determines timing, and Taste does not monitor it.
 
@@ -421,11 +421,11 @@ Conformance and Expression are activities on parts of one Pack. They share the P
 
 ### Expression loop
 
-The host keeps exploration in its task context, then runs its own checks and presents the tested artifact and Decision for user approval. After the user approves both, the host calls `taste_record_signal` with matching artifact references and evidence. Shipped evidence is included only when the host inspected an actually shipped artifact.
+The host keeps exploration in its task context, then runs its own checks and presents the tested artifact for user approval. After approval, the host derives the reusable Decision and calls `taste_record_signal` automatically with matching artifact references and evidence; no separate Decision-text or Pack-write confirmation is required. Shipped evidence is included only when the host inspected an actually shipped artifact.
 
 A confirmed statement remains Expression until it also has shipped evidence and no coverage gap. A pre-push Decision may be updated with shipped evidence after shipping. The tool stores host-reported evidence strings; it does not define or verify the host's checks, approval, or meaning of shipped.
 
-The [OpenAI frontend article](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) and its [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill) can inform expression-time guidance: distinctive composition, visual references, and avoiding common defaults, while preserving an existing product's visual language. [Emil Kowalski's aspect Skills](https://emilkowal.ski/ui/agents-with-taste) offer examples of capturing the why behind detailed interface guidance. These inform the agent's knowledge, not a Taste rules engine.
+When Expression needs specialist visual, interaction, UX-flow, or product-decision craft, the host checks what skills/plugins are already installed. If none fits, it asks the user before searching or installing; it presents candidates and gets approval for a chosen install. The host tries approved capabilities, then asks whether to keep them and stores any user-approved lock (identity, version/source, scope) in its own product or harness workflow. Taste owns no catalog, shortlist, ranking, or install behavior. External examples such as OpenAI's frontend skill or Emil Kowalski's aspect Skills are research pointers only, not a Taste-curated recommendation list. Formal benchmarking is deferred until approved locks and measurable evidence exist.
 
 ### What does not change the Pack
 
@@ -455,7 +455,8 @@ taste-plugin/
 ├── src/
 │   ├── core/                 # Pack lifecycle, evidence/provenance, review, and eval logic
 │   └── tools/                # MCP server and tool interfaces over core operations
-├── plugin.json               # Agent Plugins manifest (Codex and Cursor)
+├── plugin.json               # Agent Plugins manifest (Codex and compatible hosts)
+├── .cursor-plugin/           # Cursor-specific manifest and MCP adapter
 ├── mcp.json                  # portable stdio server configuration
 ├── .claude-plugin/
 │   └── plugin.json           # Claude Code native manifest
@@ -466,7 +467,7 @@ taste-plugin/
 └── tests/                   # plugin, tool, Pack, and harness integration checks
 ```
 
-The plugin Skills tell the host agent when to set up a Pack, sweep, load it for UI, nudge its own workflow after positive early direction, and record finalized signals after host checks and user approval. The product's `taste/skills/product-design/SKILL.md` points at that product's Decisions. `core/` discovers and validates the Pack, writes Decision files, and derives part activity from fields already on those files. It does not decide product meaning, run or observe host workflows, or verify host-reported evidence. Evaluation fixtures and Rubrics belong with the product Pack. The root Agent Plugins package is shared by Codex and Cursor; Claude Code's native manifest and `.mcp.json` point at the same Skills and server. The harness owns higher-capacity subagent delegation for the Eval Judge. This structure is revisable.
+The plugin Skills tell the host agent when to set up a Pack, sweep, load it for UI, nudge its own workflow after positive early direction, and record finalized signals after host checks and user approval. The product's `taste/skills/product-design/SKILL.md` points at that product's Decisions. `core/` discovers and validates the Pack, writes Decision files, and derives part activity from fields already on those files. It does not decide product meaning, run or observe host workflows, or verify host-reported evidence. Evaluation fixtures and Rubrics belong with the product Pack. Codex and standard-compatible hosts use the root Agent Plugins package; Cursor has its own path-expansion adapter; Claude Code's native manifest and MCP config point at the same Skills and server. The harness owns higher-capacity subagent delegation for the Eval Judge. This structure is revisable.
 
 ## Implementation status
 
@@ -481,7 +482,7 @@ Implemented:
 - `taste_pack_read` / `taste_pack_write` — files confined to `taste/`.
 - `taste_pack_validate` — shared decisions home, or a legacy pair of conformance and expression READMEs.
 - `taste_record_signal` — create or replace one accepted, finalized Decision after host-reported checks and approval evidence. Expression and Sweep may use it at that checkpoint.
-- `taste_part_state` — derive Conformance or Expression per Decision. Does not initiate a change.
+- `taste_part_state` — derive durable Conformance or Expression per Decision and task-local Expression routing from required host-interpreted task intent.
 - `taste_eval_list_fixtures`, `taste_eval_get_generator_case`, `taste_eval_get_judge_packet` — fixture lanes named `conformance` and `expression` are storage paths.
 - `taste_mode_resolve` — deprecated task-local helper. Does not read the Pack. Skills should not treat it as the ∞ rule.
 
@@ -489,7 +490,7 @@ Not built, and not claimed:
 
 - A daemon, a hosted agent, or a Critic process of Taste's own.
 - Hard CI gates, or a Gate runner inside Taste. The product repo's linter remains the product repo's.
-- Automatic observation of host checks, user approval, readiness, or push; the host reports completed validation and approval of the exact artifact and Decision.
+- Automatic observation of host checks, user approval, readiness, or push; the host reports completed validation and approval of the exact artifact, which authorizes its reusable Decision to be recorded.
 - A definition of "shipped" beyond the evidence strings stored on the Decision.
 - Detection of "artefacts can't justify" beyond the `coverage_gap` flag the agent sets when it records a gap.
 - Ally-specific dogfood, live IDE install proofs, or a with/without-Pack study on real product history. `docs/validation-results.md` is a synthetic smoke run.
