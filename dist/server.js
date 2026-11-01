@@ -36713,34 +36713,28 @@ var TasteError = class extends Error {
 };
 var starterEntrySkill = (productName) => `---
 name: product-design
-description: Apply ${productName}'s product-specific design judgment when creating, implementing, or reviewing software UI.
+description: Apply ${productName}'s product-specific design judgment when creating, implementing, or reviewing software UI. Load this Pack before UI work.
 ---
 
 # Product design guidance for ${productName}
 
-This is the entry point for the product's Taste Pack. Keep its mode-selection cues specific to this product and update them as product intent becomes clearer.
+This is the entry point for one Taste Pack. Decisions live under \`references/decisions/\`. There is no mode field on a Decision and no separate Conformance or Expression tree.
 
-## Choose and record a task mode
+## Derived part activity
 
-Use the user's explicit mode request when present. Otherwise interpret the task using this product's triggers:
+Read Decisions and call \`taste_part_state\` before UI work. Activity is derived, not authored:
 
-- **Conformance:** the requested change follows an accepted direction documented in the Pack, grounded in visual evidence from the running product and supporting sources. Shipped work is evidence, not automatic policy.
-- **Expression:** the user asks to explore, establish, or intentionally change product direction. Ask the user focused questions through the harness conversation.
-- **Unclear or unsupported:** if intent is mixed, or an important decision lacks evidence, ask one focused question through the harness instead of guessing.
+- **Conformance:** the Decision is \`accepted\`, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
+- **Expression:** anything else \u2014 no Decision, \`proposed\`, \`rejected\`, accepted but not shipped, or a coverage gap. Expression interviews and writes the Decision with \`taste_record_signal\`.
+- **User intent:** a request for new taste, a correction, or greenfield judgment also uses Expression for that part, even when other Decisions are Conformance.
 
-Use the \`taste_mode_resolve\` tool with your interpreted signal (\`explicit_mode\`, \`established_direction\`, \`new_direction\`, \`direction_accepted\`, or \`unclear\`). The tool maps the signal deterministically; it does not classify raw language. A proposed Expression direction moves to Conformance only after the user confirms it as product guidance. Keep mode task-local and tell the user which mode was selected and why.
+The Pack never flips as a whole. Only the Decisions that changed update. Who initiates a move between activities is an open question; do not invent a nudge. \`taste_mode_resolve\` is a deprecated task-local helper and is not the product rule.
 
 ## Apply this Pack
 
-Read \`references/shared/product-facts.md\` when relevant. For Conformance, load the applicable reference under \`references/conformance/\`; for Expression, load the relevant intent and direction under \`references/expression/\`. These routes exist for both modes from setup; an unestablished direction must be labeled as such. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
+Read \`references/shared/product-facts.md\` and the Decisions that touch the task. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
 
-Visual taste was gathered from the running product, not source code alone. For a discovery refresh, follow the Taste \`taste-sweep\` workflow and capture screenshots. When implementing or reviewing visible UI, use the harness's available browser/computer/rendered-preview tools when needed and report what you actually inspected.
-
-## Expression questions
-
-Ask the product owner through the harness conversation. Ask only questions needed to resolve user need, desired outcome, constraints, tradeoffs, or relevant references. Summarize the proposed direction and obtain confirmation before storing it as accepted guidance.
-
-Product-specific guidance is incomplete until its references contain reviewed evidence. Ask the product owner when the task needs a decision the Pack does not support.
+For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 function createStarterPackFiles(productName, surfaces = []) {
   const normalizedName = productName.trim();
@@ -36750,7 +36744,6 @@ function createStarterPackFiles(productName, surfaces = []) {
   const manifest = {
     name: normalizedName,
     version: "0.1.0",
-    supportedModes: ["conformance", "expression"],
     surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean)
   };
   return [
@@ -36758,9 +36751,9 @@ function createStarterPackFiles(productName, surfaces = []) {
       path: "README.md",
       content: `# ${normalizedName} Taste Pack
 
-This directory carries reviewed product-specific design guidance for coding agents. Read \`skills/product-design/SKILL.md\` to choose Conformance or Expression and load only the references needed for the task.
+This directory is the product's one Taste Pack. Read \`skills/product-design/SKILL.md\`, then Decisions under \`skills/product-design/references/decisions/\`.
 
-The starter is not product knowledge: replace its prompts and empty references with evidence-backed decisions before relying on it.
+Conformance and Expression are derived activities, not folders. A Decision is Conformance only when it is accepted, has shipped evidence, and has no coverage gap. Expression writes and updates Decisions. The starter is not product knowledge.
 `
     },
     { path: "manifest.json", content: `${JSON.stringify(manifest, null, 2)}
@@ -36770,28 +36763,28 @@ The starter is not product knowledge: replace its prompts and empty references w
       path: "skills/product-design/references/shared/product-facts.md",
       content: `# Shared product facts
 
-Record only reviewed product facts that apply in both Conformance and Expression. Add evidence and source links.
+Record reviewed product facts that apply across parts. Add evidence and source links. Do not put a mode field here.
 `
     },
     {
-      path: "skills/product-design/references/conformance/README.md",
-      content: `# Conformance references
+      path: "skills/product-design/references/decisions/README.md",
+      content: `# Decisions
 
-Capture decisions supported by evidence from the running product and accepted review evidence. A visual sweep should record relevant URLs/pages, user-flow steps, screenshots or rendered captures, date and viewport, and important interaction states. Correlate those observations with code, Git history, reviews, and product-owned sources where available. Put each decision, rationale, scope, exceptions, examples, evidence gaps, and known flaws beside the relevant surface or craft guidance.
-`
-    },
-    {
-      path: "skills/product-design/references/expression/README.md",
-      content: `# Expression references
+One Pack. Each other file in this directory is one Decision written by \`taste_record_signal\`. Do not author a mode field.
 
-The coding agent interviews the product owner through the harness when they want to establish or extend direction. Capture user intent, alternatives considered, constraints, and the direction the user explicitly confirms. Label proposed and accepted guidance distinctly; do not invent a direction to populate this file. Keep open questions visible.
+Derived activity for a Decision:
+
+- **Conformance** when \`status\` is \`accepted\`, \`shipped\` is true, and \`coverage_gap\` is false.
+- **Expression** otherwise: no Decision yet, \`proposed\`, \`rejected\`, accepted without shipped evidence, or a coverage gap.
+
+Expression is the learner: interviews, greenfield signals, coverage gaps, and corrections (\`rejected_pass\`) all write here. Sweep writes \`proposed\` Decisions with trigger \`sweep\`. The Pack does not flip as a whole. Who initiates a move between activities is an open question; do not invent a nudge.
 `
     },
     {
       path: "metadata/authority.md",
       content: `# Product source authority
 
-List the product's canonical sources and explain how to handle conflicts. The current task's explicit user goal remains immediate authority. Shipped work is evidence of behavior, not automatic approval of flaws.
+List the product's canonical sources and explain how to handle conflicts. The current task's explicit user goal remains immediate authority. Shipped work is evidence of behavior, not automatic approval of flaws. Whether a known flaw or a deliberate break sends a part to Expression is an open question.
 `
     },
     {
@@ -36804,24 +36797,19 @@ Score each dimension from 1 to 5 (1 = fails the task or conflicts with supported
 
 - **User-facing quality:** Does the experience serve the task and user need?
 - **Task completion:** Does the implementation actually deliver the requested behavior, not just its appearance?
-- **Product-rule correctness:** Does it apply the relevant shared and mode-specific guidance?
+- **Product-rule correctness:** Does it apply the relevant Decisions and shared facts?
 - **Accepted-work alignment:** Where expected shipped work is available, does the result reflect the useful accepted decisions? Similarity must not reward known flaws or omissions.
 
 Call out unverified behavior, missing evidence, and protocol deviations separately. Human review calibrates this Rubric and adjudicates uncertain judgments. Scores are evidence for Pack improvement, not automatic approval of a guidance change.
+
+Fixture lanes under \`evals/conformance/\` and \`evals/expression/\` are historical directories for the eval tools. They are not Pack modes.
 `
     },
     {
-      path: "evals/conformance/fixtures/README.md",
-      content: `# Conformance fixtures
+      path: "evals/fixtures/README.md",
+      content: `# Evaluation fixtures
 
-Add fixtures from shipped product changes. Each fixture should include task context, a before state, expected after state, and the Pack guidance and Rubric used by the Judge. Keep expected edits hidden from generator context for holdouts.
-`
-    },
-    {
-      path: "evals/expression/fixtures/README.md",
-      content: `# Expression fixtures
-
-Add fixtures that test how well guidance elicits and applies user intent for a new or extended direction. Keep the user's chosen direction and Judge expectations out of generator context for holdouts.
+Add fixtures as \`evals/<lane>/fixtures/<id>/\` with \`task.md\`, \`before/\`, and \`after/\`. The eval tools still take a lane of \`conformance\` or \`expression\`. That lane is storage for the fixture, not an authored Pack mode. Keep expected edits hidden from generator context for holdouts.
 `
     }
   ];
@@ -36915,6 +36903,30 @@ async function resolveFileWithin(root, relativePath) {
   if (metadata.size > MAX_PACK_FILE_BYTES) throw new TasteError(`File exceeds the ${MAX_PACK_FILE_BYTES}-byte limit.`, "pack_file_too_large");
   return resolved;
 }
+async function listPackMarkdown(repositoryPath2, relativeDirectory) {
+  const { packRoot } = await resolvePackRoot(repositoryPath2);
+  const normalized = normalizePackRelativePath(relativeDirectory);
+  const directory = path.join(packRoot, normalized);
+  let resolved;
+  try {
+    const metadata = await lstat(directory);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) return [];
+    resolved = await realpath(directory);
+  } catch {
+    return [];
+  }
+  if (!isWithin(packRoot, resolved)) {
+    throw new TasteError("Pack directory resolves outside the Taste Pack.", "pack_path_escape");
+  }
+  const entries = await readdir(resolved, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".md") || entry.name === "README.md") continue;
+    const relative = `${normalized.split(path.sep).join("/")}/${entry.name}`;
+    files.push(await readPackFile(repositoryPath2, relative));
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
 async function readPackFile(repositoryPath2, relativePath) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
   const normalized = normalizePackRelativePath(relativePath);
@@ -36973,6 +36985,7 @@ async function inspectPack(repositoryPath2) {
   }
   const referenceRoot = path.join(packRoot, "skills/product-design/references");
   const referenceCount = await countMarkdown(referenceRoot);
+  const decisionCount = await countDecisionFiles(packRoot);
   const fixtureCounts = {
     conformance: (await listFixturesAt(packRoot, "conformance")).length,
     expression: (await listFixturesAt(packRoot, "expression")).length
@@ -36982,9 +36995,29 @@ async function inspectPack(repositoryPath2) {
     manifest,
     entrySkillAvailable: await resolvePackFile(packRoot, ENTRY_SKILL).then(() => true).catch(() => false),
     referenceCount,
+    decisionCount,
+    layout: await packLayout(packRoot),
+    supportedModesDeprecated: manifest?.supportedModes !== void 0,
     fixtureCounts,
     validation: await validatePackAt(packRoot)
   };
+}
+async function packLayout(packRoot) {
+  const hasDecisions = await exists(path.join(packRoot, "skills/product-design/references/decisions/README.md"));
+  const hasLegacy = await exists(path.join(packRoot, "skills/product-design/references/conformance/README.md")) && await exists(path.join(packRoot, "skills/product-design/references/expression/README.md"));
+  if (hasDecisions && hasLegacy) return "mixed";
+  if (hasDecisions) return "shared";
+  if (hasLegacy) return "legacy-split";
+  return "incomplete";
+}
+async function countDecisionFiles(packRoot) {
+  const directory = path.join(packRoot, "skills/product-design/references/decisions");
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".md") && entry.name !== "README.md").length;
+  } catch {
+    return 0;
+  }
 }
 async function countMarkdown(directory) {
   try {
@@ -37000,6 +37033,30 @@ async function countMarkdown(directory) {
     return 0;
   }
 }
+async function exists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var DECISIONS_HOME = "skills/product-design/references/decisions/README.md";
+var LEGACY_CONFORMANCE_HOME = "skills/product-design/references/conformance/README.md";
+var LEGACY_EXPRESSION_HOME = "skills/product-design/references/expression/README.md";
+async function readablePackFile(packRoot, relative, issues) {
+  try {
+    await resolvePackFile(packRoot, relative);
+    return "ok";
+  } catch (error62) {
+    if (error62 instanceof TasteError && error62.code === "pack_file_not_found") return "missing";
+    issues.push({
+      path: relative,
+      message: error62 instanceof TasteError ? error62.message : "Required Pack file is missing or unreadable."
+    });
+    return "bad";
+  }
+}
 async function validatePackAt(packRoot) {
   const issues = [];
   const requiredFiles = [
@@ -37007,18 +37064,22 @@ async function validatePackAt(packRoot) {
     "manifest.json",
     ENTRY_SKILL,
     "skills/product-design/references/shared/product-facts.md",
-    "skills/product-design/references/conformance/README.md",
-    "skills/product-design/references/expression/README.md",
     "metadata/authority.md",
     "evals/rubric.md"
   ];
   for (const relative of requiredFiles) {
-    try {
-      await resolvePackFile(packRoot, relative);
-    } catch (error62) {
-      const message = error62 instanceof TasteError && error62.code !== "pack_file_not_found" ? error62.message : "Required Pack file is missing or unreadable.";
-      issues.push({ path: relative, message });
-    }
+    const state = await readablePackFile(packRoot, relative, issues);
+    if (state === "missing") issues.push({ path: relative, message: "Required Pack file is missing or unreadable." });
+  }
+  const decisionsHome = await readablePackFile(packRoot, DECISIONS_HOME, issues);
+  const legacyConformance = await readablePackFile(packRoot, LEGACY_CONFORMANCE_HOME, issues);
+  const legacyExpression = await readablePackFile(packRoot, LEGACY_EXPRESSION_HOME, issues);
+  const hasLegacyPair = legacyConformance === "ok" && legacyExpression === "ok";
+  if (decisionsHome !== "ok" && !hasLegacyPair) {
+    issues.push({
+      path: DECISIONS_HOME,
+      message: "Pack needs decisions/README.md, or both legacy conformance and expression reference READMEs. New Packs use the shared decisions home."
+    });
   }
   let manifest;
   try {
@@ -37035,9 +37096,8 @@ async function validatePackAt(packRoot) {
     if (typeof record2.version !== "string" || record2.version.trim().length === 0) {
       issues.push({ path: "manifest.json", message: "version must be a non-empty string." });
     }
-    const modes = Array.isArray(record2.supportedModes) ? record2.supportedModes : [];
-    for (const mode2 of ["conformance", "expression"]) {
-      if (!modes.includes(mode2)) issues.push({ path: "manifest.json", message: `supportedModes must include ${mode2}.` });
+    if (record2.supportedModes !== void 0 && (!Array.isArray(record2.supportedModes) || !record2.supportedModes.every((item) => typeof item === "string"))) {
+      issues.push({ path: "manifest.json", message: "supportedModes is deprecated and ignored. Remove it, or keep it as an array of strings." });
     }
     if (record2.surfaces !== void 0 && (!Array.isArray(record2.surfaces) || !record2.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
@@ -37180,6 +37240,278 @@ async function getEvaluationJudgePacket(repositoryPath2, mode2, fixtureId, gener
   return { mode: mode2, fixtureId, task, rubric, generatedOutput, expectedAfter };
 }
 
+// src/core/signals.ts
+var DECISION_DIRECTORY = "skills/product-design/references/decisions";
+var STATUSES = /* @__PURE__ */ new Set(["proposed", "accepted", "rejected"]);
+var TRIGGERS = /* @__PURE__ */ new Set(["interview", "sweep", "gap", "rejected_pass"]);
+var EMPTY_NOTE = "_None recorded._";
+var NO_GAP_NOTE = "None recorded.";
+function decisionPath(id) {
+  return `${DECISION_DIRECTORY}/${assertDecisionId(id)}.md`;
+}
+function assertDecisionId(id) {
+  if (!/^[a-z0-9][a-z0-9-]{0,80}$/.test(id)) {
+    throw new TasteError("Decision id must be a lowercase slug (letters, numbers, hyphens).", "invalid_decision_id");
+  }
+  return id;
+}
+function deriveDecisionActivity(decision) {
+  if (decision.coverageGap) return { activity: "expression", reason: "coverage_gap" };
+  if (decision.status === "rejected") return { activity: "expression", reason: "rejected" };
+  if (decision.status === "proposed") return { activity: "expression", reason: "proposed" };
+  if (!decision.shipped) return { activity: "expression", reason: "accepted_not_shipped" };
+  return { activity: "conformance", reason: "accepted_shipped" };
+}
+function renderDecision(input2) {
+  const id = assertDecisionId(input2.id);
+  const title = oneLine(input2.title, "title");
+  const scope = oneLine(input2.scope?.trim() || "unscoped", "scope");
+  const statement = input2.statement.trim();
+  if (!statement) throw new TasteError("Decision statement is required.", "invalid_decision");
+  const shippedEvidence = (input2.shippedEvidence ?? []).map((item) => item.trim()).filter(Boolean);
+  const coverageGap = input2.coverageGap ?? input2.trigger === "gap";
+  const lines = [
+    "---",
+    `id: ${id}`,
+    `title: ${yamlScalar(title)}`,
+    `status: ${input2.status}`,
+    `trigger: ${input2.trigger}`,
+    `scope: ${yamlScalar(scope)}`,
+    `coverage_gap: ${coverageGap ? "true" : "false"}`,
+    `shipped: ${shippedEvidence.length > 0 ? "true" : "false"}`,
+    "---",
+    "",
+    `# ${title}`,
+    "",
+    "## Statement",
+    "",
+    statement,
+    "",
+    "## Rationale",
+    "",
+    input2.rationale?.trim() || "_None recorded._",
+    "",
+    "## Shipped evidence",
+    "",
+    shippedEvidence.length > 0 ? shippedEvidence.map((item) => `- ${item}`).join("\n") : "- none",
+    "",
+    "## Coverage gap",
+    "",
+    coverageGap ? input2.coverageGapNote?.trim() || "Gap recorded. The Pack cannot justify the next step for this part." : "None recorded.",
+    "",
+    "## Known flaws",
+    "",
+    input2.knownFlaws?.trim() || "_None recorded._",
+    "",
+    "## Alternatives",
+    "",
+    input2.alternatives?.trim() || "_None recorded._",
+    ""
+  ];
+  return lines.join("\n");
+}
+function parseDecision(file2) {
+  const idFromPath = file2.path.split("/").pop()?.replace(/\.md$/, "") ?? file2.path;
+  const frontmatter = file2.content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
+  if (!frontmatter) return { path: file2.path, id: idFromPath, parsed: false, reason: "unparsed" };
+  const fields = parseFrontmatter(frontmatter[1]);
+  const status = fields.status;
+  const trigger = fields.trigger;
+  const coverageGap = booleanField(fields.coverage_gap);
+  if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope || coverageGap === void 0) {
+    return { path: file2.path, id: fields.id || idFromPath, parsed: false, reason: "unparsed" };
+  }
+  return {
+    path: file2.path,
+    id: fields.id,
+    title: fields.title || fields.id,
+    status,
+    trigger,
+    scope: fields.scope,
+    coverageGap,
+    shipped: fields.shipped === "true",
+    parsed: true
+  };
+}
+async function recordSignal(repositoryPath2, input2) {
+  const existing = await loadExistingDecision(repositoryPath2, input2.id);
+  const content = renderDecision(mergeSignal(existing, input2));
+  const written = await writePackFile(repositoryPath2, decisionPath(input2.id), content);
+  const parsed = parseDecision(written);
+  if (!parsed.parsed) {
+    return { path: written.path, activity: "expression", reason: "unparsed", content: written.content };
+  }
+  const derived2 = deriveDecisionActivity(parsed);
+  return { path: written.path, activity: derived2.activity, reason: derived2.reason, content: written.content };
+}
+async function readPartState(repositoryPath2, scope) {
+  const files = await listPackMarkdown(repositoryPath2, DECISION_DIRECTORY);
+  const wanted = scope?.trim();
+  const decisions = [];
+  for (const file2 of files) {
+    const parsed = parseDecision(file2);
+    if (!parsed.parsed) {
+      if (wanted && parsed.id !== wanted) continue;
+      decisions.push({
+        id: parsed.id,
+        path: parsed.path,
+        scope: "unscoped",
+        activity: "expression",
+        reason: "unparsed"
+      });
+      continue;
+    }
+    if (wanted && parsed.scope !== wanted && parsed.id !== wanted) continue;
+    const derived2 = deriveDecisionActivity(parsed);
+    decisions.push({
+      id: parsed.id,
+      path: parsed.path,
+      scope: parsed.scope,
+      activity: derived2.activity,
+      reason: derived2.reason,
+      status: parsed.status,
+      trigger: parsed.trigger,
+      shipped: parsed.shipped,
+      coverageGap: parsed.coverageGap
+    });
+  }
+  if (decisions.length === 0) {
+    return {
+      decisions: [],
+      scopes: [{ scope: wanted || "(pack)", activity: "expression", reason: "no_decisions", decisionIds: [] }],
+      anyPartNeedsExpression: true,
+      note: "No structured Decision matches. Expression applies for that part until a Decision is accepted, has shipped evidence, and has no coverage gap. This report does not start a mode change."
+    };
+  }
+  const byScope = /* @__PURE__ */ new Map();
+  for (const decision of decisions) {
+    const group = byScope.get(decision.scope) ?? [];
+    group.push(decision);
+    byScope.set(decision.scope, group);
+  }
+  const scopes = [...byScope.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([part, group]) => {
+    const blocking = group.find((decision) => decision.activity === "expression");
+    return {
+      scope: part,
+      activity: blocking ? "expression" : "conformance",
+      reason: blocking?.reason ?? "accepted_shipped",
+      decisionIds: group.map((decision) => decision.id)
+    };
+  });
+  return {
+    decisions,
+    scopes,
+    anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
+    note: "Per-part activity only. The Pack does not flip as a whole. Who initiates a move between Expression and Conformance is open; this tool does not decide it."
+  };
+}
+function booleanField(value) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return void 0;
+}
+function mergeSignal(existing, input2) {
+  if (!existing) return input2;
+  let coverageGap = input2.coverageGap;
+  if (coverageGap === void 0) {
+    if (existing.coverageGap === void 0) {
+      throw new TasteError(
+        "Existing Decision has a missing or invalid coverage_gap. Provide coverageGap explicitly before updating it.",
+        "invalid_decision"
+      );
+    }
+    coverageGap = existing.coverageGap;
+  }
+  return {
+    id: input2.id,
+    title: input2.title,
+    statement: input2.statement,
+    status: input2.status,
+    trigger: input2.trigger,
+    rationale: input2.rationale !== void 0 ? input2.rationale : existing.rationale,
+    scope: input2.scope !== void 0 ? input2.scope : existing.scope,
+    shippedEvidence: input2.shippedEvidence !== void 0 ? input2.shippedEvidence : existing.shippedEvidence,
+    coverageGap,
+    coverageGapNote: input2.coverageGapNote !== void 0 ? input2.coverageGapNote : existing.coverageGapNote,
+    knownFlaws: input2.knownFlaws !== void 0 ? input2.knownFlaws : existing.knownFlaws,
+    alternatives: input2.alternatives !== void 0 ? input2.alternatives : existing.alternatives
+  };
+}
+async function loadExistingDecision(repositoryPath2, id) {
+  try {
+    const file2 = await readPackFile(repositoryPath2, decisionPath(id));
+    return parseExistingDecision(file2.content);
+  } catch (error62) {
+    if (error62 instanceof TasteError && error62.code === "pack_file_not_found") return null;
+    throw error62;
+  }
+}
+function parseExistingDecision(content) {
+  const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
+  const fields = frontmatter ? parseFrontmatter(frontmatter[1]) : {};
+  const body = frontmatter ? content.slice(frontmatter[0].length) : content;
+  const sections = sectionMap(body);
+  return {
+    scope: fields.scope,
+    coverageGap: booleanField(fields.coverage_gap),
+    statement: meaningful(sections.Statement, []),
+    rationale: meaningful(sections.Rationale, [EMPTY_NOTE]),
+    shippedEvidence: parseEvidence(sections["Shipped evidence"]),
+    coverageGapNote: meaningful(sections["Coverage gap"], [NO_GAP_NOTE]),
+    knownFlaws: meaningful(sections["Known flaws"], [EMPTY_NOTE]),
+    alternatives: meaningful(sections.Alternatives, [EMPTY_NOTE])
+  };
+}
+function sectionMap(body) {
+  const sections = {};
+  for (const part of body.split(/^## /m)) {
+    const newline = part.indexOf("\n");
+    if (newline === -1) continue;
+    const name = part.slice(0, newline).trim();
+    sections[name] = part.slice(newline + 1).trim();
+  }
+  return sections;
+}
+function parseEvidence(section) {
+  if (!section) return [];
+  const items = section.split("\n").map((line) => line.trim()).filter((line) => line.startsWith("- ")).map((line) => line.slice(2).trim()).filter(Boolean);
+  if (items.length === 1 && items[0] === "none") return [];
+  return items;
+}
+function meaningful(text, placeholders) {
+  const trimmed = text?.trim();
+  if (!trimmed || placeholders.includes(trimmed)) return void 0;
+  return trimmed;
+}
+function oneLine(value, label) {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 200 || /[\r\n]/.test(trimmed)) {
+    throw new TasteError(`${label} must be a single line of 1\u2013200 characters.`, "invalid_decision");
+  }
+  return trimmed;
+}
+function yamlScalar(value) {
+  if (/[:#"'&*!|>%@`[\],{}]/.test(value) || value !== value.trim()) {
+    return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+  }
+  return value;
+}
+function parseFrontmatter(block) {
+  const fields = {};
+  for (const line of block.split("\n")) {
+    const match = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
+    if (!match) continue;
+    fields[match[1]] = unquote(match[2].trim());
+  }
+  return fields;
+}
+function unquote(value) {
+  if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+    return value.slice(1, -1).replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+  }
+  return value;
+}
+
 // src/server.ts
 var repositoryPath = external_exports.string().min(1).describe("Absolute path to the target product repository, obtained from the host harness.");
 var mode = external_exports.enum(["conformance", "expression"]);
@@ -37206,7 +37538,7 @@ function createTasteServer() {
     "taste_mode_resolve",
     {
       title: "Resolve the selected Taste mode",
-      description: "Resolve a product Skill's LLM-interpreted intent signal into a task-local Conformance or Expression mode. Taste does not classify raw user language. Ambiguous intent, missing explicit mode, or an unconfirmed Expression-to-Conformance transition returns a question for the coding agent to ask through its harness.",
+      description: "Deprecated task-local helper. Maps an already-interpreted signal to the words Conformance or Expression. Does not read the Pack, does not derive part activity, and does not decide who starts Expression. Prefer taste_part_state. Taste does not classify raw user language.",
       inputSchema: {
         currentMode: mode.optional().describe("Current task-local mode, if one has already been selected."),
         trigger: external_exports.enum(["explicit_mode", "established_direction", "new_direction", "direction_accepted", "unclear"]),
@@ -37222,7 +37554,7 @@ function createTasteServer() {
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting starter Taste Pack under <repositoryPath>/taste for a product. It creates shared, Conformance, Expression, metadata, and evaluation starter files; it does not edit AGENTS.md, inspect product data, or configure the harness. Call only after the user requests or agrees to initialization.",
+      description: "Create a non-overwriting starter Taste Pack under <repositoryPath>/taste. One shared Pack with a decisions/ home. Does not create separate Conformance and Expression trees, does not edit AGENTS.md, and does not configure the harness. Call only after the user requests or agrees to initialization.",
       inputSchema: {
         repositoryPath,
         productName: external_exports.string().min(2).max(120).describe("Product name for the starter Pack."),
@@ -37236,7 +37568,7 @@ function createTasteServer() {
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack, supported modes, references, evaluation fixtures, and structural validation status. This reads only the repository's taste/ directory.",
+      description: "Summarize the target repository's Taste Pack: layout (shared decisions home or legacy split folders), decision count, references, evaluation fixtures, and structural validation. supportedModes is reported only as a deprecated field. Reads only taste/.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
@@ -37265,7 +37597,7 @@ function createTasteServer() {
         path: external_exports.string().min(1).max(300).describe("Pack-relative destination path."),
         content: external_exports.string().max(256 * 1024).describe("UTF-8 file contents, up to 256 KiB.")
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ repositoryPath: root, path: relativePath, content }) => toolResult(async () => writePackFile(root, relativePath, content))
   );
@@ -37273,11 +37605,48 @@ function createTasteServer() {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check that a Taste Pack has its shared product facts, Conformance and Expression references, authority note, evaluation Rubric, valid manifest, and entry Skill frontmatter. This is structural validation, not a quality judgment.",
+      description: "Check Pack structure: manifest, entry Skill, shared facts, authority, rubric, and either a decisions/ home or the legacy conformance plus expression reference READMEs. Does not require supportedModes. Structural validation only, not a quality judgment.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
     async ({ repositoryPath: root }) => toolResult(async () => validatePack(root))
+  );
+  server2.registerTool(
+    "taste_record_signal",
+    {
+      title: "Record a Taste Decision",
+      description: "Expression and Sweep write path. Create or update one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place. Omitted optional fields keep the stored rationale, scope, shipped evidence, coverage gap, known flaws, and alternatives.",
+      inputSchema: {
+        repositoryPath,
+        id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
+        title: external_exports.string().min(1).max(200),
+        statement: external_exports.string().min(1).max(8e3).describe("The judgment, in the user's terms."),
+        rationale: external_exports.string().max(8e3).optional(),
+        scope: external_exports.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
+        status: external_exports.enum(["proposed", "accepted", "rejected"]),
+        trigger: external_exports.enum(["interview", "sweep", "gap", "rejected_pass"]),
+        shippedEvidence: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
+        coverageGap: external_exports.boolean().optional().describe("True when current artefacts cannot justify the next step. On create, defaults to true when trigger is gap. On update, omit to keep the stored value."),
+        coverageGapNote: external_exports.string().max(2e3).optional(),
+        knownFlaws: external_exports.string().max(4e3).optional(),
+        alternatives: external_exports.string().max(4e3).optional()
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
+    },
+    async (input2) => toolResult(async () => recordSignal(input2.repositoryPath, input2))
+  );
+  server2.registerTool(
+    "taste_part_state",
+    {
+      title: "Derive Taste part activity",
+      description: "Derive Conformance or Expression per Decision from status, shipped evidence, and coverage gap. Conformance means accepted, shipped evidence present, and coverage gap false. Everything else is Expression for that part. An empty Pack is Expression. Does not write a mode field, does not flip the Pack, and does not decide who initiates a change. User intent can still route into Expression.",
+      inputSchema: {
+        repositoryPath,
+        scope: external_exports.string().min(1).max(200).optional().describe("Optional part name or decision id to filter.")
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ repositoryPath: root, scope }) => toolResult(async () => readPartState(root, scope))
   );
   server2.registerTool(
     "taste_eval_list_fixtures",

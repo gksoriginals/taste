@@ -1,13 +1,16 @@
 ---
 name: taste-conformance
-description: Implement or review product UI/UX work against accepted, evidence-backed product direction. Use when the user explicitly asks to conform to existing product taste or the product Skill identifies established direction as the task mode.
+description: Apply accepted shipped Taste while building or reviewing UI. Use when the user asks to match existing product taste, or when taste_part_state derives Conformance for that part (accepted Decision, shipped evidence, no coverage gap). Always read the taste/ Pack first. If the part is not Conformance, hand that part to taste-expression instead of pretending the Pack justifies it.
 ---
 
-# Conformance workflow
+# Conformance uses accepted shipped taste
 
-1. Read the target repository's product-design entry Skill and follow its product-specific triggers. The coding agent interprets user intent and product context; do not classify mode from keywords alone.
-2. If the task router has not already done so, resolve the interpreted signal with `taste_mode_resolve`. Load shared product facts and only the relevant Conformance references. If the Pack has only proposed or weakly supported guidance for a consequential choice, surface the gap rather than treating it as policy.
-3. Implement within the user's requested scope. Use the harness's source, browser, computer-use, and rendered-preview tools when the task requires visual or interaction evidence. Check relevant pages/states and report what was actually viewed.
-4. Run only applicable deterministic Gates; keep product judgments with the coding agent and review. Report mode, references and evidence used, checks performed, and unresolved gaps.
+Conformance is not a folder and not a global mode. It is using Decisions that are accepted, have shipped evidence, and have no coverage gap.
 
-For deliberate new-direction work, use `taste-expression`; do not force an exploratory request into Conformance.
+1. Call `taste_pack_inspect` and `taste_part_state`. Read the entry Skill, shared facts, and the Decisions for this part. If the Pack is missing, follow `taste-setup`.
+2. Use a Decision for implementation only when its derived activity is Conformance. If the part is `no_decisions`, `proposed`, `rejected`, `accepted_not_shipped`, `coverage_gap`, or `unparsed`, stop treating it as Conformance and follow `taste-expression` for that part. Other parts stay put.
+3. Implement within the user's scope. Shipped UI is evidence of behavior, not permission to copy a known flaw. When the task goal and an accepted Decision conflict, say so and ask; do not silently rewrite the Pack.
+4. Use the harness's source, browser, computer-use, and rendered-preview tools when the task needs visual or interaction evidence. Report the pages and states you actually viewed.
+5. Report the Decisions used, checks run, and any part handed to Expression.
+
+Do not call `taste_mode_resolve` to flip the Pack. A part becomes Conformance only through the recorded Decision fields, not through a mode switch.

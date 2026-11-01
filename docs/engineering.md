@@ -8,26 +8,32 @@ This document describes a possible system design for Taste: its responsibility, 
 
 Taste's ambition remains the one in the [PRD](prd.md): extract the taste in a shipped product so a coding harness, given a PRD and the Taste Pack, can produce a first pass the user would merge. The ambition is the destination, not a requirement to settle every architectural question now.
 
-The [Google Doc one-pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is the product source of truth; [docs/prd.md](prd.md) mirrors it. If this document and the Doc disagree about the product, the Doc wins.
+The [Google Doc one-pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is the product source of truth. [docs/prd.md](prd.md) mirrors the Doc and the decisions Gopi and North locked after it (the five ∞ rules, the expanded open questions, and the Nov 1 harness-plugin UX). If this document and the Doc disagree about the product, the Doc wins.
 
 This repository contains the Taste plugin implementation and documentation. Example product Packs live under `examples/`; real Packs live in their target repositories.
 
 ## Product boundaries and direction
 
-Taste is a plugin for existing coding harnesses that supplies a portable, product-specific design-taste layer. Its proposed system includes:
+Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). It supplies Skills and MCP tools. It does not run a daemon, and this milestone does not add a hard CI gate. The Pack lives in the product repository at `taste/`, not in this plugin repository.
 
-- A **Pack** that carries product-specific design knowledge into a target product repository.
-- **Capabilities** that help discover, capture, deliver, and check that knowledge.
-- A connection to the user's **coding harness**, which owns the agent loop, planning, models, tools, and PR workflow.
+- A **Pack** carries one product's design judgment. Conformance and Expression are activities over that Pack, not two trees and not two products.
+- **Expression is the learner.** One Expression skill interviews, walks requirements, and writes Decisions. A correction (coverage gap or rejected pass) is the same skill with a different trigger.
+- **Conformance** means using a Decision that is accepted, has shipped evidence, and has no coverage gap, when the user asks for UI.
+- The **coding harness** owns the agent loop, planning, models, tools, and PR workflow.
 
-Taste supplies Skills, tools, and checks that the harness's existing coding agent can use. Taste does not configure or run an agent; the harness owns the agent, model, loop, and any delegation. Taste is not a component library or design-system product. Product-specific design judgment belongs to the product, not OpenSignal.
+Taste does not configure or run an agent. Taste is not a component library or design-system product. Product-specific design judgment belongs to the product, not OpenSignal.
 
-Conformance comes first:
+Locked ∞ rules, from the product one-pager:
 
-- **Conformance** means matching the judgment a product has already shipped across design angles such as style, typography, themes and tokens, UX, interaction, flow, and copy. The angle set stays open.
-- **Expression** means inventing or extending taste. Its dogfood sequence is later, on omnipresent, but the shared Pack and harness architecture should support it from the outset.
+1. From scratch → Expression.
+2. Defined, agreed, and shipped → Conformance. Same Pack, same artefacts.
+3. When the artefacts cannot justify the next step → Expression for that part.
+4. Otherwise Conformance.
+5. The Pack never flips as a whole. Parts update.
 
-For now, HelloAlly's ally-platform is the conformance dogfood surface, with flow and interaction as the first pain to address. This is sequencing for dogfooding, not a product-specific architecture. Product thinking remains harness- and product-agnostic.
+Per-part activity is derived from Decision `status`, shipped evidence, and `coverage_gap`. There is no authored mode field. `supportedModes` on older manifests is deprecated and is not product truth. Who initiates a change between activities stays open; do not invent a nudge. Pack state selects Expression for a part, and an explicit user ask for new taste, a correction, or greenfield judgment routes into Expression as well.
+
+HelloAlly's ally-platform and omnipresent remain the one-pager's dogfood notes. They are not a blocker. The milestone succeeds when a harness runs setup, Sweep or Expression, UI-with-Pack, and a correction on any product repo.
 
 Shipped work is evidence of what a product does. It is not automatically a rule worth repeating: known flaws should be recorded so similarity to shipped code is not mistaken for quality. A stated preference that conflicts with the shipped product does not become an accepted conformance rule. The user's explicit goal for the current task remains the immediate authority.
 
@@ -44,8 +50,8 @@ flowchart TB
 
   subgraph Pack[Versioned Taste Pack under target repository /taste]
     Entry[Bounded repo entry / trigger]
-    Router[Product Skill: task and mode selection]
-    Skills[Shared and mode-specific guidance]
+    Router[Product Skill: load Decisions for the task]
+    Skills[Shared facts and per-part Decisions]
     Wiki[Wiki and canonical product references]
     Examples[Examples and known flaws beside related guidance]
     Gates[Deterministic Gates for reliable rules]
@@ -126,42 +132,44 @@ This uses LangChain's Skills, Wiki, and Gates as Pack knowledge roles, with Verc
 
 The Pack needs a discoverable entry point in the target repo so a coding agent knows when product-design guidance applies. A root `AGENTS.md` can provide a thin trigger for harnesses that read it; it is not Taste itself and is not a universal installation mechanism. Harnesses that do not read `AGENTS.md` need their own adapter or setup. Vercel's example uses repository instructions to trigger an in-repo product-design Skill; its Skill then resolves the task mode and routes to focused references. LangChain's Router is also a Skill with a table mapping job types to specialist Skills. Anthropic describes Skills that the model can autonomously identify and load when the task calls for them.
 
-For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load deeper guidance as the task requires. The coding agent interprets the request using the product's mode triggers, then passes a structured signal to a small deterministic resolver. The resolver maps explicit signals to Conformance, Expression, or a question; it does not classify raw language or invent product meaning.
+For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load Decisions as the task requires. The coding agent reads the Pack and `taste_part_state`. That tool derives Conformance or Expression from Decision fields. It does not classify raw language. The user's ask for new taste still routes into Expression for that part.
 
-### Shared Pack structure for both modes
+### One Pack
 
-Use Vercel's `product-design` work as the content and workflow baseline: a bounded trigger, an entry Skill that selects task and mode and routes to focused guidance, product references, examples, mechanical Gates, and evals. The Pack structure supports Conformance and Expression from the start, even if dogfooding or particular experiments begin with one mode. They share the repository Pack, entry Skill, product facts, harness integration, and relevant capabilities; each mode has its own evidence, guidance, and evaluation cases where needed. Store the portable Pack in a dedicated `taste/` directory at the target repository root so it is versioned with the product and can be found after a clone. Do not reproduce every Vercel folder just because it appears in their example tree.
+Use Vercel's `product-design` work as the content and workflow baseline: a bounded trigger, an entry Skill, product references, examples, mechanical Gates, and evals. Store the Pack in `taste/` at the product repository root so it is versioned with the product. Do not reproduce every Vercel folder.
+
+New Packs use one shared tree. Conformance and Expression are not directories. A Decision file records `status` (`proposed`, `accepted`, `rejected`), `trigger` (`interview`, `sweep`, `gap`, `rejected_pass`), `scope`, shipped evidence, and `coverage_gap`. Activity is derived:
+
+- **Conformance** when status is `accepted`, shipped evidence is present, and `coverage_gap` is false.
+- **Expression** otherwise, including an empty Pack (`no_decisions`).
+
+`taste_pack_initialize` writes this tree and does not write `supportedModes`. Packs that still have `references/conformance/` and `references/expression/` validate as a legacy layout. New signals go to `references/decisions/` via `taste_record_signal`. The example under `examples/product-pack/` is a legacy layout kept so older fixtures load.
 
 ```text
 target-product-repository/
 ├── AGENTS.md                         # optional thin setup and UI trigger
 └── taste/
-    ├── README.md                     # Pack contents, canonical setup source, and how a harness loads it
-    ├── manifest.json                # product, supported modes, Pack revision, and ownership
+    ├── README.md
+    ├── manifest.json                 # product, revision, surfaces. No mode field.
     ├── skills/
     │   └── product-design/
-    │       ├── SKILL.md              # shared entry, mode-selection policy, task routing
+    │       ├── SKILL.md
     │       └── references/
     │           ├── shared/
     │           │   └── product-facts.md
-    │           ├── conformance/
-    │           │   └── surface-{surface}.md
-    │           └── expression/
-    │               └── direction-{topic}.md
+    │           └── decisions/
+    │               ├── README.md
+    │               └── {decision-id}.md
     ├── metadata/
-    │   ├── authority.md              # canonical product sources and precedence
-    │   └── sources.md                # evidence index, if useful at this scale
+    │   └── authority.md
     └── evals/
-        ├── rubric.md                 # shared Judge dimensions and scoring guidance
-        ├── conformance/
-        │   └── fixtures/{fixture}/{before,after}
-        └── expression/
-            └── fixtures/{fixture}/{before,after}
+        ├── rubric.md
+        └── fixtures/                 # eval lanes are storage, not Pack modes
 ```
 
-This is a small starting shape, not a required set of folders. Shared guidance holds facts that apply in both modes. Conformance references capture decisions inferred from shipped work, with examples and known flaws; Expression references capture intended new direction, rationale, alternatives, and the user's choices. An item may be shared or mode-specific according to its meaning. Put an example, rationale, and any known flaw beside the relevant guidance. Keep missing-evidence notes beside the affected reference too. Add a shared sources or coverage index only when inline notes become difficult to navigate; create a separate Exemplar collection only when the number or reuse of examples warrants it. Keep copy, resilience, terminology, and interface-quality guidance in the surface reference until a distinct Skill or shared reference makes routing clearer.
+Put rationale, shipped evidence, known flaws, and coverage-gap notes on the Decision. Eval tools still accept a fixture lane named `conformance` or `expression` under `evals/<lane>/fixtures/`. That lane is not an authored Pack mode.
 
-The `manifest.json` and metadata docs describe the Pack, supported modes, and source authority; they do not duplicate the actual product guidance. Keep the root `AGENTS.md` small. Where the harness reads it, it can tell the coding agent to use Taste for relevant work and, if Taste is not available, to ask the harness to install or configure it using the canonical source recorded in `taste/README.md`. It may also link to the entry Skill. This file is only a discovery hint: actual installation and tool/Skill registration belong to the harness or its Taste adapter.
+`manifest.json` names the product, version, and surfaces. It does not declare a mode. `supportedModes`, if still present on an older Pack, is ignored as product truth. Metadata docs describe source authority; they do not duplicate Decisions. Keep the root `AGENTS.md` small. Where the harness reads it, it can tell the coding agent to use Taste for UI work and, if Taste is not installed, to install this plugin. This file is only a discovery hint.
 
 The portable Agent Plugins package is the canonical distribution for clients that support that format. Claude Code uses its native `.claude-plugin/plugin.json` and `.mcp.json` compatibility files while sharing the same Skills and server. The repository is the initial install source; a public marketplace URL and release policy can be selected later. After setup, the plugin reads the repository's existing `taste/` Pack, so a clone reuses product knowledge instead of creating a new Pack. Harness-specific plugin loaders point at that same Pack without copying it into provider-specific skill directories.
 
@@ -172,15 +180,16 @@ For product UI work, use the Taste plugin with this repository's `taste/` Pack.
 If Taste is not installed in your harness, ask it to install this repository's
 Agent Plugins package (or its supported Claude Code compatibility package), then
 load the existing Pack.
-Read the product-design entry Skill and follow its instructions to choose Conformance,
-Expression, or ask me to clarify the intended mode.
+Read the product-design entry Skill, call taste_part_state, and load the Decisions
+for this task. Use Expression when the part has no accepted shipped Decision,
+when the artefacts cannot justify the next step, or when I ask for new taste.
 ```
 
 This is illustrative guidance, not a universal `AGENTS.md` contract. Each harness needs a supported way to install/register Taste and expose its Skills or tools; the adapter should use that harness's mechanism.
 
 The target repository's existing linter owns Gate implementation; `taste/` explains which product rule a Gate supports. Do not create a Taste-specific component library or replace the target's design system.
 
-The `SKILL.md` entry can follow Vercel's request modes—Shape, Implement, Review, Copy, and Harden—so the coding agent respects task intent and scope. These task modes are separate from Taste's Conformance and Expression modes. The product Skill defines how the coding agent recognizes each Taste mode and routes to its task-specific and mode-specific guidance. These are starting modes and names, not a requirement that each task follow a rigid workflow.
+The entry Skill can follow Vercel's task shapes — Shape, Implement, Review, Copy, and Harden — so the coding agent respects scope. Those names are task shapes, not Taste modes. Conformance and Expression are derived part activities, not folders the Skill switches between. These shapes are optional, not a required workflow.
 
 - **Shape:** use agent reasoning to frame the user, job, flow, states, alternatives, and acceptance signals before implementation.
 - **Implement:** apply the requested direction with the smallest coherent product change; resolve meaningful product questions with the user or source evidence.
@@ -200,14 +209,14 @@ Taste defines explicit, user-invokable workflow Skills and one automatically rel
 
 | Skill | Trigger | Outcome |
 | --- | --- | --- |
-| `taste-setup` | User explicitly asks to set up Taste for a product | Select a first surface, create/continue the Pack, arrange the initial evidence sweep, establish both mode routes, and report readiness/gaps. |
-| `taste-sweep` | User asks to learn, sweep, or refresh product taste | Inspect the live product with browser/computer tools and capture evidence; correlate with source/history; draft reviewed candidates. |
-| `taste-design` | UI/UX task in a repository with a Taste Pack | Follow product triggers, select a task-local mode, load focused guidance, and implement/review. |
-| `taste-conformance` | User explicitly requests Conformance or product Skill resolves an established direction | Apply accepted evidence-backed product guidance. |
-| `taste-expression` | User asks to explore, establish, or deliberately change direction | Interview the user through the harness, propose alternatives, and record only a confirmed direction as accepted guidance. |
-| `taste-evaluate` | User asks to evaluate guidance or an intentional calibration run is due | Compare controlled with/without-Skill generation and ask the harness to delegate independent higher-capacity judging. |
+| `taste-setup` | User asks to set up Taste or initialize a Pack | Create or continue one `taste/` Pack. Sweep if UI exists; Expression-interview if the part is greenfield or missing. |
+| `taste-sweep` | User asks to learn, sweep, or refresh taste from shipped UI | Inspect the live product and write `proposed` Decisions with trigger `sweep`. |
+| `taste-design` | Any UI/UX task | Load the Pack first. Conformance where Decisions qualify; Expression for empty, gapped, or newly requested parts. |
+| `taste-conformance` | User asks to match shipped taste, or part state derives Conformance | Apply accepted Decisions that have shipped evidence and no coverage gap. |
+| `taste-expression` | Greenfield, new taste, a gap, or a correction; or part state derives Expression | Interview in the harness and persist with `taste_record_signal`. |
+| `taste-evaluate` | User asks to evaluate guidance or a calibration run is due | Compare with/without-Skill generation and hand judging to the harness. |
 
-The Pack should contain both mode routes before routine UI work begins. Setup can leave Expression unestablished if the user has not chosen a new direction; it must label that state rather than fabricate product taste.
+Setup does not fabricate Decisions to make a Pack look like Conformance. An empty Pack derives to Expression. That is the from-scratch rule, not a missing mode route.
 
 This creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. Add a specialized Skill for a craft (such as copy or animation) when routing by job benefits from it; do not create a separate Skill for every topic by default.
 
@@ -222,19 +231,18 @@ sequenceDiagram
   participant Agent as Coding agent
   participant Pack as Taste Pack
   participant Tools as Repo / Git / browser / computer tools
-  participant Mode as Deterministic mode resolver
+  participant Parts as taste_part_state
   participant Gate as Deterministic Gates
 
   User->>Harness: UI task and constraints
   Harness->>Agent: Start task in existing agent loop
-  Agent->>Pack: Read entry guidance and relevant route
-  Pack-->>Agent: Skill, linked context, examples, applicable checks
-  Agent->>Agent: Interpret user intent using product-specific mode triggers
-  Agent->>Mode: Send structured signal and rationale
-  Mode-->>Agent: Resolved task mode or question to ask through harness
+  Agent->>Pack: Read entry Skill, facts, and Decisions
+  Pack-->>Agent: Decisions for the parts this task touches
+  Agent->>Parts: Ask derived activity for those parts
+  Parts-->>Agent: Conformance or Expression per part, not a pack-wide mode
   Agent->>Tools: Inspect product behavior and source evidence
   Tools-->>Agent: Screenshots, rendered states, code, and product references
-  Agent->>Agent: Apply selected mode and make design decisions
+  Agent->>Agent: Apply Conformance Decisions; Expression writes gaps and new signals
   Agent->>Tools: Implement scoped product change
   opt Relevant reliable Gate exists
     Agent->>Gate: Check changed code
@@ -297,9 +305,16 @@ The destinations are logical roles, not a fixed file tree. Product-context judgm
 
 ### Capture and maintain
 
-A Learner-like capability captures corrections and other new evidence so useful knowledge can be updated. A fast path can preserve a correction in the same turn in the configured harness or plugin's local working-memory store; it should not create loose files at the repository root or silently edit the shared Pack. A slower review determines whether the correction is product knowledge and should be promoted into `taste/`. The exact storage and promotion process remain open.
+Expression is that learner. It is not a second module. In the same turn it writes a Decision with `taste_record_signal`:
 
-Candidate guidance should carry enough evidence, scope, rationale, exceptions, and counterexamples to be reviewed. Human review is a useful governance pattern from the source material; the exact acceptance workflow for Taste remains to be determined. A correction can update working context immediately, but changing shared product guidance or adding a Gate goes through evidence review and human approval. Private, session-specific memory remains in harness/plugin storage; reviewed product-wide knowledge is committed under `taste/` so other harnesses and future clones can reuse it.
+- `interview` for greenfield and new requirements
+- `sweep` when Sweep proposes from shipped UI (Sweep calls the same writer)
+- `gap` when the artefacts cannot justify the next step
+- `rejected_pass` when the user corrects shipped or generated work
+
+`status` stays `proposed` until the user accepts or rejects the statement. Reusing the Decision `id` updates that part in place. The rest of the Pack is left alone. Private scratch notes can stay in harness memory; the signal that should survive the turn is the Decision file under `taste/`.
+
+Who is allowed to move a Decision from `proposed` to `accepted`, and whether an Expression part may be implemented before acceptance, are open product questions. The tool records the status the user confirmed. It does not invent an approver.
 
 ### Deliver guidance
 
@@ -313,13 +328,20 @@ LangChain's Content Studio also treats some rules as model-version workarounds: 
 
 ### MCP interface
 
-The PRD includes an MCP server as a Taste component. Its architectural role is to expose Pack and check capabilities to external harnesses—for example, loading focused guidance, resolving an LLM-interpreted mode signal, running a relevant Gate, or recording a correction. The MCP server does not own planning, model selection, generation, Critique orchestration, or the task loop.
+The MCP server exposes Pack reads and writes to the harness. It does not own planning, model selection, generation, Critique, or the task loop. See [Implementation status](#implementation-status) for which tools exist in this repo today. There is no daemon beside the harness's stdio MCP process.
 
 ### Agent judgment and deterministic logic
 
 Use the coding agent's intelligence for work that needs meaning or product context: interpreting evidence, noticing patterns, deciding which guidance applies, weighing exceptions and tradeoffs, proposing UI, and reviewing whether the result fits the product. Taste should give the agent evidence and reasons so it can exercise that judgment; it should not try to encode the full design decision tree as application logic.
 
-Keep deterministic code for narrow operations whose inputs and outcomes are explicit and reliably checkable: locating/loading a known reference, routing a selected mode to named guidance, validating a structured mode transition, and mechanical checks with low false-positive risk. The product Skill supplies product-specific triggers; the coding agent interprets user intent and sends a structured signal to `taste_mode_resolve`. That function deterministically maps `established_direction` to Conformance, `new_direction` to Expression, and `unclear` to a harness question. It honors an explicit mode request and permits an Expression-to-Conformance transition only after user confirmation. It keeps mode task-local and has no global product state. It is not a keyword classifier. A rules engine should not decide product meaning merely because an operation can be expressed in code.
+Keep deterministic code for narrow operations whose inputs and outcomes are explicit: locating a Pack file, writing a Decision from fields the agent already gathered, and deriving part activity from those fields. Derivation is mechanical and is not a keyword classifier:
+
+- accepted + shipped evidence + coverage gap false → Conformance for that Decision
+- anything else → Expression for that Decision
+- no Decisions → Expression (`no_decisions`)
+- a scope is Conformance only when every Decision in it is Conformance
+
+`taste_part_state` returns that report. It does not start Expression and does not choose the approver. `taste_mode_resolve` remains in the server as a deprecated task-local helper from earlier plumbing. It does not read the Pack. Skills should not use it as the ∞ rule. The user's request still routes into Expression when they ask for new taste, a correction, or greenfield judgment, even if another part of the Pack is Conformance.
 
 This is the intended split, not a claim that every implementation needs a Router or a linter. When a check requires judgment, depends on product context, or produces unreliable flags, keep it in agent guidance and review.
 
@@ -381,60 +403,45 @@ The starting Rubric should track the PRD's mergeable-first-pass goal and its sig
 
 The PRD's success signals remain central: a mergeable first pass, no long design prompt, and no re-teaching on each screen. The with/without-Skill comparison is the starting method for judging Pack effect; Gate pass rate is supplemental, not a proxy for overall UI quality. What establishes a mergeable first pass without hand-labeling remains an open question.
 
-## Mode selection, loops, and lifecycle
+## Part activity, loops, and lifecycle
 
-Conformance and Expression are different design activities inside one Taste system. They share the target repository's Pack, entry Skill, shared product facts, harness connection, and capabilities such as capture, critique, and evaluation. Their evidence, guidance, task criteria, and eval fixtures can remain distinct. The shared structure should let either mode be built and exercised end to end; Expression is not structurally blocked on completing Conformance first, even though the current dogfood sequence starts with Conformance.
+Conformance and Expression are activities on parts of one Pack. They share the Pack, the entry Skill, product facts, the harness, critique, and evaluation. A part is Conformance only when its Decisions are accepted, have shipped evidence, and have no coverage gap. Expression is the path that writes or repairs Decisions: from scratch, a gap, a rejected pass, or an explicit request for new taste. Expression is not blocked on finishing some other product first.
 
-### Mode selection belongs to the product Skill
-
-Each product's entry Skill defines the mode-selection policy because the right trigger depends on that product's history, intent, and state. At task start, the coding agent reads the user's request and relevant product context, then follows that Skill's instructions to select Conformance, Expression, or ask a clarifying question. The Skill should describe concrete signals, examples, and boundary cases, and explain when an explicit user request overrides its default. For example, a request to match settled shipped patterns points toward Conformance; a request to establish a new direction, explore alternatives, or deliberately extend the product points toward Expression. These are examples, not universal deterministic rules.
-
-If intent is mixed or unclear, the agent should surface the ambiguity and ask through its harness before committing to a mode when the choice could change the work. If the user explicitly names a mode, follow that request unless it conflicts with product authority or the task is underspecified. A product Skill may define a mode transition signal—for instance, the user accepting a new direction and choosing to apply it consistently—but the agent evaluates that signal from the product's evidence and user intent. Taste code may load the selected, named guidance or expose it to the harness; it should not infer semantic intent or silently switch modes using a hard-coded classifier. The harness remains responsible for carrying out the selected workflow and can make the active mode visible to the user.
-
-This keeps the trigger product-specific and inspectable. A harness can support mode switching by following the Skill or passing the selected mode into its task context; it does not need a separate product-specific rules engine. The shared Pack can then be used by multiple harnesses, with each harness adapter responsible for loading the same Skill and references.
+Who initiates the move is open. `taste_part_state` reports the derived activity. It does not nudge the user and it does not flip unrelated Decisions.
 
 ### Conformance loop
 
-The system could support this high-level loop:
-
-1. Read shipped product work and available review evidence.
-2. Use agent judgment to identify recurring product decisions, known flaws, and gaps in understanding.
-3. Preserve supported findings as candidate Pack guidance with their scope and evidence; a person reviews proposed product-wide standards.
-4. For a coding task, load the relevant Conformance guidance and let the harness produce the change.
-5. Use deterministic checks for reliable mechanical rules and agent Critique for product-context review. Inspect rendered product pages and interactions; use the harness browser/computer tools and capture screenshots for visible or interaction changes.
-6. Capture corrections and use evaluation or review evidence to improve, revise, or retire guidance.
-
-Shipped work is evidence, not an instruction to copy every pattern. A correction that conflicts with shipped behavior is evidence to investigate, not an automatic conformance rule. Similarity to shipped code does not outweigh known flaws.
+1. Load the Pack and the Decisions whose derived activity is Conformance.
+2. If the part does not qualify, hand that part to Expression. Do not treat prose in a legacy folder as accepted shipped taste.
+3. Implement from those Decisions. Shipped UI is evidence, not an instruction to copy a known flaw.
+4. Use mechanical checks only where the product already has a reliable rule. Critique stays with the harness agent.
+5. A correction does not silently become Conformance. Expression records it with trigger `gap` or `rejected_pass`.
 
 ### Expression loop
 
-An Expression loop uses the selected Expression guidance to elicit intent, alternatives, and reasons for a new or evolving direction. The coding agent asks focused questions directly through the user's harness conversation, based on the choices that materially affect the task. It proposes a small number of distinct options when useful, summarizes the intended direction and rationale, and asks the user to confirm before treating it as accepted product guidance. The harness remains the interview surface; Taste supplies the Skill and Pack tools. The user's confirmed direction becomes task guidance immediately and can become Conformance guidance for later work within its stated scope.
+The coding agent asks through the harness conversation, one judgment at a time. It restates the signal and asks the user to accept, revise, or reject it. Then it calls `taste_record_signal` before the turn ends. Proposed stays proposed until the user accepts the statement. Shipped evidence is recorded only for UI that was actually inspected.
 
-For work on an existing product, settled Conformance guidance remains context when Expression intentionally extends that product; it does not prevent a user-directed change in direction. The PRD's Expression dogfood is on omnipresent, after the current HelloAlly Conformance work, while both modes remain supported by the shared architecture.
+A confirmed statement can later derive to Conformance once it is `accepted`, has shipped evidence, and has no coverage gap. What "shipped" means (merged, released, or stable for a period) is an open question. The tool stores the evidence strings the agent supplies; it does not define the word.
 
-The [OpenAI frontend article](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) and its [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill) can inform expression-time guidance: distinctive composition, visual references, and avoiding common defaults, while preserving an existing product's visual language. [Emil Kowalski's aspect Skills](https://emilkowal.ski/ui/agents-with-taste) offer examples of capturing the why behind detailed interface guidance, such as animation behavior. These inform the agent's knowledge, not a deterministic Taste rules engine.
+The [OpenAI frontend article](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) and its [`frontend-skill`](https://github.com/openai/skills/tree/main/skills/.curated/frontend-skill) can inform expression-time guidance: distinctive composition, visual references, and avoiding common defaults, while preserving an existing product's visual language. [Emil Kowalski's aspect Skills](https://emilkowal.ski/ui/agents-with-taste) offer examples of capturing the why behind detailed interface guidance. These inform the agent's knowledge, not a Taste rules engine.
 
-### Combined lifecycle
-
-The modes share the Pack and harness connection while keeping guidance associated with its mode. A product Skill defines product-specific evidence and task examples for entering Expression and settling a direction. The LLM interprets those signals from conversation and product context; deterministic code applies the resulting structured transition, asks for clarification when needed, and requires confirmation before an accepted Expression direction becomes Conformance guidance. Explicit user mode requests override defaults. Mode selection remains task-local and does not silently rewrite product-wide state.
+### What does not change the Pack
 
 ```mermaid
 flowchart LR
-  Skill[Product entry Skill<br/>interprets task and product intent]
-  Signal[LLM-selected structured signal<br/>and rationale]
-  Resolver[Deterministic signal-to-mode resolver]
-  Conformance[Conformance guidance<br/>Learn from shipped work<br/>Guide implementation and review]
-  Expression[Expression guidance<br/>Elicit intent and alternatives<br/>Agent develops options; user judges<br/>Capture the chosen direction]
-  Ask[Ask user through harness<br/>when mode is ambiguous]
-  Skill --> Signal --> Resolver
-  Resolver -->|established_direction / explicit Conformance| Conformance
-  Resolver -->|new_direction / explicit Expression| Expression
-  Resolver -->|unclear or unsupported| Ask
-  Ask -->|user clarifies| Skill
-  Expression -->|user confirms accepted direction| Resolver
+  Pack[One Pack of Decisions]
+  Derive[taste_part_state<br/>status + shipped evidence + coverage gap]
+  Conformance[Use accepted shipped Decisions for UI]
+  Expression[Interview and taste_record_signal<br/>interview, sweep, gap, rejected_pass]
+  Pack --> Derive
+  Derive -->|accepted, shipped, no gap| Conformance
+  Derive -->|otherwise, per part| Expression
+  Expression -->|writes that Decision only| Pack
 ```
 
-These loops describe system behavior, not a fixed sequence of agents, APIs, or mandatory steps. The coding harness owns task execution and follows the selected mode; the product Skill carries the mode criteria that let the coding agent select and switch. Keep that decision visible to the user rather than hiding it in deterministic application logic.
+There is no mode switcher. A review packet, human acceptance, and shipped evidence are what the fields record. The open question is who starts that review. Engineering does not answer it here.
+
+An engineering reading, not a product lock: a proposed Decision's candidate Gate is a warning at most. It does not block the harness. Rung-style reuse of adjacent shipped patterns can inform a Sweep proposal; it does not mark a Decision accepted.
 
 ## Taste plugin repository
 
@@ -453,28 +460,56 @@ taste-plugin/
 ├── .mcp.json                 # Claude Code MCP configuration
 ├── docs/                    # product, system, and setup documentation
 ├── examples/
-│   └── product-pack/        # example shared and mode-specific Pack
+│   └── product-pack/        # legacy split example; new Packs are one decisions tree
 └── tests/                   # plugin, tool, Pack, and harness integration checks
 ```
 
-The plugin's own Skills guide the host agent through discovering a product Pack, extracting or updating its knowledge, and running evaluations. The product's `taste/skills/product-design/SKILL.md` remains authoritative for product-specific mode selection and routes to that product's Conformance or Expression references. `core/` holds Taste's domain and business logic: Pack discovery and validation, evidence/provenance handling, candidate review state and approval boundaries, eval fixture/run handling, and coordination of reliable checks. It does not decide product meaning; the coding agent follows Skills for interpretation, mode selection, and judgment. Tools expose core operations through MCP. Evaluation fixtures and Rubrics belong with the product Pack; this repository owns reusable evaluation tooling and a small example Pack. The root Agent Plugins package is shared by Codex and Cursor; Claude Code's native manifest and `.mcp.json` point at the same Skills and server rather than maintaining a second implementation. The harness owns higher-capacity subagent delegation for the Eval Judge. These boundaries adapt the source patterns: Vercel's Skill, review loop, and evaluation context stay near product code; Anthropic's focused Skills load on demand; LangChain's knowledge layers inform the Pack; and deterministic Gates remain narrow. This is a revisable starting structure; change it if actual use shows that it fails the intended workflow.
+The plugin Skills tell the host agent when to set up a Pack, sweep, load it for UI, and write signals. The product's `taste/skills/product-design/SKILL.md` points at that product's Decisions. `core/` discovers and validates the Pack, writes Decision files, and derives part activity from fields already on those files. It does not decide product meaning and it does not decide who initiates Expression. Evaluation fixtures and Rubrics belong with the product Pack. The root Agent Plugins package is shared by Codex and Cursor; Claude Code's native manifest and `.mcp.json` point at the same Skills and server. The harness owns higher-capacity subagent delegation for the Eval Judge. This structure is revisable.
+
+## Implementation status
+
+This is v1 plumbing: a local plugin a harness can install and drive. It is not a finished taste system, and the milestones in [implementation-plan.md](implementation-plan.md) are plumbing checkpoints, not product completion. No daemon. No hard CI gate.
+
+### MCP tools in this repo
+
+Implemented:
+
+- `taste_pack_initialize` — one shared Pack under `<product-repo>/taste`. Does not overwrite. Does not write `supportedModes` or split trees.
+- `taste_pack_inspect` — layout (`shared`, `legacy-split`, `mixed`, `incomplete`), decision count, validation.
+- `taste_pack_read` / `taste_pack_write` — files confined to `taste/`.
+- `taste_pack_validate` — shared decisions home, or a legacy pair of conformance and expression READMEs.
+- `taste_record_signal` — create or replace one Decision. Expression and Sweep both use it.
+- `taste_part_state` — derive Conformance or Expression per Decision. Does not initiate a change.
+- `taste_eval_list_fixtures`, `taste_eval_get_generator_case`, `taste_eval_get_judge_packet` — fixture lanes named `conformance` and `expression` are storage paths.
+- `taste_mode_resolve` — deprecated task-local helper. Does not read the Pack. Skills should not treat it as the ∞ rule.
+
+Not built, and not claimed:
+
+- A daemon, a hosted agent, or a Critic process of Taste's own.
+- Hard CI gates, or a Gate runner inside Taste. The product repo's linter remains the product repo's.
+- Automatic promotion from `proposed` to `accepted`. The user confirms the statement; who the approver is stays open.
+- A definition of "shipped" beyond the evidence strings stored on the Decision.
+- Detection of "artefacts can't justify" beyond the `coverage_gap` flag the agent sets when it records a gap.
+- Ally-specific dogfood, live IDE install proofs, or a with/without-Pack study on real product history. `docs/validation-results.md` is a synthetic smoke run.
+
+`examples/product-pack/` still uses the legacy split folders so existing fixtures load. New Packs from `taste_pack_initialize` do not.
 
 ## Design status
 
-This architecture uses patterns the cited teams or authors describe in their own work: LangChain's Skills, Wiki, Gates, and Memory; Anthropic's on-demand context; Vercel's product-design Skill, linters, review loop, and eval method; plus OpenAI's frontend guidance and Emil's aspect Skills. Those references make the starting architecture concrete, but do not validate Taste's combined system. The portable Pack location under `taste/`, the shared structure for Conformance and Expression, and product-Skill-led mode selection are the current product direction; internal file grouping, capability boundaries, MCP tools, and Critic arrangement can change as the system is built and used.
+The cited sources make a starting architecture concrete. They do not validate Taste as a combined system. The locked product direction is the plugin loop in the PRD: one Pack in the product repo, derived part activity, Expression as the learner. File grouping, MCP tool names, and the Critic arrangement can still change.
 
 ## Open system-design questions
 
-- What product knowledge must travel in a Pack for it to be useful across coding harnesses?
-- Which design angles generalize across products, and which should stay product-specific?
-- How can discovery distinguish deliberate product judgment from legacy behavior or accidental patterns?
-- What is the lightest useful way to capture a correction and review whether it should become shared guidance?
-- Which capabilities need a stable tool interface, and which can remain ordinary files or harness behavior?
-- What evidence makes evaluation trustworthy without requiring extensive hand-labeling?
-- How should Taste respond when shipped evidence, a current user goal, and accepted product guidance point in different directions?
-- What transition examples should each product's Skill document for its Expression-to-Conformance handoff?
+Product questions that stay open are listed in [prd.md](prd.md), including who initiates an ∞ change, what "shipped" means, who approves, whether Expression work may be implemented before acceptance, known flaws versus "shipped wins", the user-facing unit of the ∞, and the from-scratch threshold. Do not close those here.
 
-The portable Pack location is the target repository's `taste/` directory. The internal file grouping can change as the first product Pack is used. Other questions are intentionally open; make the system more specific where actual use needs it and keep it flexible elsewhere.
+Engineering questions still open:
+
+- Which design angles generalize across products?
+- How a sweep tells deliberate patterns from accidents, sharply enough to avoid thrashing.
+- Which checks are reliable enough to be mechanical, once hard gates are in scope.
+- What evidence makes evaluation trustworthy without extensive hand-labeling.
+
+The Pack location is the product repository's `taste/` directory.
 
 ## References
 

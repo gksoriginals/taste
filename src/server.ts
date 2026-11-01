@@ -14,6 +14,7 @@ import {
   writePackFile,
   type TasteMode,
 } from "./core/pack.js";
+import { readPartState, recordSignal } from "./core/signals.js";
 
 const repositoryPath = z.string().min(1).describe("Absolute path to the target product repository, obtained from the host harness.");
 const mode = z.enum(["conformance", "expression"]);
@@ -45,7 +46,7 @@ export function createTasteServer(): McpServer {
     "taste_mode_resolve",
     {
       title: "Resolve the selected Taste mode",
-      description: "Resolve a product Skill's LLM-interpreted intent signal into a task-local Conformance or Expression mode. Taste does not classify raw user language. Ambiguous intent, missing explicit mode, or an unconfirmed Expression-to-Conformance transition returns a question for the coding agent to ask through its harness.",
+      description: "Deprecated task-local helper. Maps an already-interpreted signal to the words Conformance or Expression. Does not read the Pack, does not derive part activity, and does not decide who starts Expression. Prefer taste_part_state. Taste does not classify raw user language.",
       inputSchema: {
         currentMode: mode.optional().describe("Current task-local mode, if one has already been selected."),
         trigger: z.enum(["explicit_mode", "established_direction", "new_direction", "direction_accepted", "unclear"]),
@@ -62,7 +63,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting starter Taste Pack under <repositoryPath>/taste for a product. It creates shared, Conformance, Expression, metadata, and evaluation starter files; it does not edit AGENTS.md, inspect product data, or configure the harness. Call only after the user requests or agrees to initialization.",
+      description: "Create a non-overwriting starter Taste Pack under <repositoryPath>/taste. One shared Pack with a decisions/ home. Does not create separate Conformance and Expression trees, does not edit AGENTS.md, and does not configure the harness. Call only after the user requests or agrees to initialization.",
       inputSchema: {
         repositoryPath,
         productName: z.string().min(2).max(120).describe("Product name for the starter Pack."),
@@ -77,7 +78,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack, supported modes, references, evaluation fixtures, and structural validation status. This reads only the repository's taste/ directory.",
+      description: "Summarize the target repository's Taste Pack: layout (shared decisions home or legacy split folders), decision count, references, evaluation fixtures, and structural validation. supportedModes is reported only as a deprecated field. Reads only taste/.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -108,7 +109,7 @@ export function createTasteServer(): McpServer {
         path: z.string().min(1).max(300).describe("Pack-relative destination path."),
         content: z.string().max(256 * 1024).describe("UTF-8 file contents, up to 256 KiB."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ repositoryPath: root, path: relativePath, content }) => toolResult(async () => writePackFile(root, relativePath, content)),
   );
@@ -117,11 +118,50 @@ export function createTasteServer(): McpServer {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check that a Taste Pack has its shared product facts, Conformance and Expression references, authority note, evaluation Rubric, valid manifest, and entry Skill frontmatter. This is structural validation, not a quality judgment.",
+      description: "Check Pack structure: manifest, entry Skill, shared facts, authority, rubric, and either a decisions/ home or the legacy conformance plus expression reference READMEs. Does not require supportedModes. Structural validation only, not a quality judgment.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ repositoryPath: root }) => toolResult(async () => validatePack(root)),
+  );
+
+  server.registerTool(
+    "taste_record_signal",
+    {
+      title: "Record a Taste Decision",
+      description: "Expression and Sweep write path. Create or update one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place. Omitted optional fields keep the stored rationale, scope, shipped evidence, coverage gap, known flaws, and alternatives.",
+      inputSchema: {
+        repositoryPath,
+        id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
+        title: z.string().min(1).max(200),
+        statement: z.string().min(1).max(8000).describe("The judgment, in the user's terms."),
+        rationale: z.string().max(8000).optional(),
+        scope: z.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
+        status: z.enum(["proposed", "accepted", "rejected"]),
+        trigger: z.enum(["interview", "sweep", "gap", "rejected_pass"]),
+        shippedEvidence: z.array(z.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
+        coverageGap: z.boolean().optional().describe("True when current artefacts cannot justify the next step. On create, defaults to true when trigger is gap. On update, omit to keep the stored value."),
+        coverageGapNote: z.string().max(2000).optional(),
+        knownFlaws: z.string().max(4000).optional(),
+        alternatives: z.string().max(4000).optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async (input) => toolResult(async () => recordSignal(input.repositoryPath, input)),
+  );
+
+  server.registerTool(
+    "taste_part_state",
+    {
+      title: "Derive Taste part activity",
+      description: "Derive Conformance or Expression per Decision from status, shipped evidence, and coverage gap. Conformance means accepted, shipped evidence present, and coverage gap false. Everything else is Expression for that part. An empty Pack is Expression. Does not write a mode field, does not flip the Pack, and does not decide who initiates a change. User intent can still route into Expression.",
+      inputSchema: {
+        repositoryPath,
+        scope: z.string().min(1).max(200).optional().describe("Optional part name or decision id to filter."),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ repositoryPath: root, scope }) => toolResult(async () => readPartState(root, scope)),
   );
 
   server.registerTool(

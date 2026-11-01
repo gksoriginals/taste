@@ -1,25 +1,25 @@
 ---
 name: taste-pack
-description: Use when maintaining a product Taste Pack or reviewing candidate guidance. For first-time setup use taste-setup; for a visual product discovery pass use taste-sweep.
+description: Maintain a product Taste Pack. Use when inspecting, validating, or editing taste/ Decisions, reviewing candidate guidance, or checking Pack structure. For first-time setup use taste-setup. For a visual sweep of shipped UI use taste-sweep. For interviews, new requirements, gaps, and corrections use taste-expression.
 ---
 
-# Build and maintain a product Pack
+# Maintain one Pack
 
-The existing harness coding agent performs the analysis. Use Taste tools for Pack inspection, file operations, and structural validation; use judgment to interpret product evidence.
+The harness coding agent interprets evidence. Taste tools read and write files inside the product repository's `taste/` directory.
 
-## Discover guidance
+## Where judgment lives
 
-1. For first-time setup or a product discovery pass, follow `taste-setup` or `taste-sweep`; source-only inspection does not complete a visual sweep.
-2. Ask the harness to obtain access to the running product, browser/computer tools, Git history, reviews, design files, or production data when needed. Do not assume access or invent evidence.
-3. Collect rendered screens, screenshots or equivalent records, links, and implementation examples before drafting rules. Separate observed product facts, inferred decisions, known flaws, counterexamples, and evidence gaps.
-4. Ask: “What repeated decision is currently in someone's head that an agent needs to find?” Capture the reasoning, scope, exceptions, and examples with each candidate.
-5. Place accepted product knowledge in shared, Conformance, or Expression references according to its meaning. Keep examples and known flaws beside related guidance. Keep transient/private corrections in harness or plugin working memory until reviewed.
+Decisions are Markdown files in `skills/product-design/references/decisions/`, written with `taste_record_signal`. Derived activity comes from `status`, `shipped`, and `coverage_gap`. There is no mode field. `supportedModes` on old manifests is deprecated and is not product truth.
 
-## Initialize or update
+Legacy Packs may still have `references/conformance/` and `references/expression/`. Keep reading them. Put new and updated signals in `decisions/` rather than growing the split trees.
 
-- Initialize only when the user asks or agrees. `taste_pack_initialize` creates a starter under the target repository's `taste/` directory, fails if that directory already exists, and does not edit the repository's `AGENTS.md` or harness configuration.
-- Inspect and validate the Pack before and after edits. Use `taste_pack_write` or the harness's repository editor to create/update files only within `taste/`. Keep the entry Skill focused on mode selection and routing; put product decisions in linked references.
-- Do not promote a candidate to accepted product guidance or add a Gate without product-owner review. Put deterministic checks only around rules with explicit, reliable outcomes; keep product judgment in Skills and human review.
-- Preserve uncertainty. Do not infer a universal rule from a single screenshot, component, or comment.
+## Update rules
 
-For evaluation fixtures and with/without-Skill comparisons, use `taste-evaluate`.
+- Initialize only when the user asks. `taste_pack_initialize` creates `taste/` and fails if that directory exists. It does not edit harness instructions.
+- Inspect and validate before and after edits. `taste_pack_write` is the escape hatch for notes, facts, and fixtures inside `taste/`. Expression and Sweep should prefer `taste_record_signal` so part state stays derivable.
+- Do not mark a Decision `accepted` without the user confirming the statement. A sweep stays `proposed`.
+- A correction updates the same Decision id with trigger `gap` or `rejected_pass`. It does not create a second Pack.
+- Preserve uncertainty. One screenshot is not a universal rule.
+- `taste_part_state` reports per-part activity. It does not decide who initiates a change, and it does not flip the Pack.
+
+For evaluation fixtures, use `taste-evaluate`. Fixture lanes named conformance and expression are storage paths, not Pack modes.

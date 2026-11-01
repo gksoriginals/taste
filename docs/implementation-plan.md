@@ -1,58 +1,50 @@
-# Taste plugin v1 implementation plan
+# Taste plugin v1 plumbing
 
-This plan describes a usable first version of Taste as a plugin for an existing coding harness. The harness remains the coding agent and owns models, mode reasoning, repository access, execution, and subagent delegation. Taste provides portable product Skills, Pack operations, and evaluation data tools. The architecture can change when dogfooding shows that a product intent is not being met.
+This note describes the first plugin slice: Skills and MCP tools a coding harness can call. The harness remains the coding agent and owns models, repository access, execution, and subagent delegation. Calling a milestone "plumbing" means the code path exists and is tested. It does not mean the product goal — a mergeable first UI pass from a real Pack — is done.
 
-## Milestones and acceptance
+## What this slice includes
 
-### 1. Portable harness plugin — complete
+### Portable harness plugin
 
-- Package Skills and a local MCP server using the Agent Plugins root format for Codex and Cursor.
-- Provide Claude Code native compatibility metadata over the same Skills/server.
-- Validate manifests and document local development. Do not configure or host an agent.
+- Skills and a local stdio MCP server in the Agent Plugins root format for Codex and Cursor.
+- Claude Code native compatibility metadata over the same Skills and server.
+- Manifest checks and local development docs. No daemon and no hosted agent.
 
-### 2. Product Taste Pack — complete
+### One product Pack
 
-- Initialize a non-overwriting `taste/` Pack with shared, Conformance, and Expression knowledge, product authority, and eval rubric/fixture locations.
-- Product entry Skill explains mode selection and transitions from task intent and product-specific triggers.
-- Keep transient working memory in harness/plugin storage; version product-wide reviewed knowledge in the product's `taste/` directory.
+- `taste_pack_initialize` creates a non-overwriting `taste/` Pack with a shared `references/decisions/` home, product facts, authority, and a rubric.
+- It does not create separate Conformance and Expression trees and it does not write `supportedModes`.
+- Older Packs that still have those trees, including `examples/product-pack/`, still validate. New signals belong in `decisions/`.
+- Reviewed product knowledge is committed under the product repo's `taste/`. Scratch notes can stay in harness memory.
 
-### 3. Pack discovery and upkeep — complete
+### Pack read and write
 
-- Inspect, read, validate, and safely update files in the product Pack.
-- The Taste Pack Skill guides evidence gathering from shipped examples, Git/review history, and product sources; asks the harness/user for access when needed; distinguishes observation, inference, flaw, and accepted decision.
-- Acceptance: a host agent can inspect an existing Pack, draft a scoped skill/reference from evidence, write it under `taste/`, and validate it without Taste editing harness instructions. The MCP Pack write operation is confined to the Pack, rejects symlink parents, and has a size limit.
+- Inspect, read, validate, and write files inside `taste/`.
+- `taste_record_signal` writes one Decision (Expression interview, Sweep proposal, coverage gap, or rejected pass).
+- `taste_part_state` derives Conformance or Expression from status, shipped evidence, and coverage gap. It does not decide who initiates a change.
+- Writes stay inside the Pack, reject symlink parents, and cap size at 256 KiB.
 
-### 4. Paired evaluation and Judge workflow — complete
+### Evaluation packets
 
-- Store shipped-example fixtures as task + before/after states, mode guidance, and a Rubric. Include holdouts whose expected changes are absent from generator context.
-- Compare with-Skill and without-Skill generation from equivalent isolated starting states; record loaded guidance and retrieval traces.
-- Delegate judging to a higher-capacity harness subagent in a fresh context after generation. Score user-facing quality, product-rule application, and similarity to shipped work separately; treat known flaws as counterevidence. Human review calibrates and adjudicates.
-- Acceptance: the generator packet contains no expected-after state; each Judge packet contains task, one generated output, expected state, and Rubric. The evaluation Skill defines the paired-run and result-record fields to retain in harness/plugin working memory outside the portable Pack. A synthetic smoke run used independent generator contexts and a fresh higher-capacity Judge context.
+- Fixtures store task, before, and after. The generator packet omits the expected after. The Judge packet includes one output, the expected after, and the rubric.
+- Fixture lanes are still directory names `conformance` and `expression`. Those names are storage, not Pack modes.
+- The synthetic smoke run in [validation-results.md](validation-results.md) checked the packet split. It is not evidence that Taste improves a real product.
 
-### 5. End-to-end verification — complete for v1
+### Harness workflows
 
-- Test Pack initialization, upkeep, path safety, both modes, eval fixture separation, MCP stdio, and plugin manifests.
-- Verify supported harnesses where installed; distinguish schema/protocol validation from a live IDE acceptance test.
-- Acceptance: repeatable code and protocol checks cover plugin manifests, MCP loading, Pack initialization/upkeep, both modes, paired fixture packets, and Judge handoff. The synthetic smoke evaluation confirmed the separate-context workflow and produced actionable rubric feedback. Harness-specific installation UI checks remain limited to the installed tools described in `docs/plugin-development.md`.
+- `taste-setup`, `taste-sweep`, `taste-design`, `taste-conformance`, `taste-expression`, `taste-pack`, and `taste-evaluate` describe when the harness should call which tool.
+- Expression interviews in the harness conversation and must call `taste_record_signal` before the turn ends.
+- Sweep requires rendered evidence and writes `proposed` Decisions. A code-only pass is not a finished sweep.
+- `taste_mode_resolve` is still registered and tested. It is a deprecated helper and is not the ∞ rule.
 
-### 6. Setup, sweep, interviews, and mode routing — complete for v1
+## Explicitly out of this slice
 
-- Make a live browser/computer product sweep a required part of Conformance knowledge discovery; capture page, flow, screenshot/rendered state, date, and viewport evidence, plus source/history corroboration.
-- Ask Expression questions through the existing coding harness, summarize user intent, and require confirmation before recording an accepted direction.
-- Define named workflows and their manual/automatic triggers across harnesses.
-- Resolve the coding agent's structured intent signal through deterministic mode-transition logic. Do not classify raw language in Taste code.
-- Acceptance: setup creates both mode routes; the sweep Skill requires screenshots and marks missing access/evidence incomplete; Expression questions go through the harness and need confirmation before recording accepted direction; ambiguous intent returns a focused harness question; the deterministic resolver maps LLM-selected structured signals without classifying raw language.
+- Hard CI gates, a Gate runner, or a required check on pull requests.
+- A daemon, or Taste hosting the Critic or Eval Judge. The harness does that when it can.
+- Ally-specific dogfood as a blocker. Any product repo is enough for the harness test in the README.
+- An answer to who initiates an ∞ change, what "shipped" means, who approves, whether to implement before acceptance, or how known flaws sit with "shipped wins". Those stay open in [prd.md](prd.md).
+- A live install proof inside Cursor, Claude Code, or Codex. Automated tests cover the MCP process and Pack files. A person still has to run the harness script once.
 
-## First-version boundaries
+## Checks that exist
 
-Taste does not implement an agent runtime, provider-specific subagent protocol, automatic access to production data/Git history, a universal eval runner, or an evaluation database. Skills instruct the harness coding agent; the MCP tools provide deterministic Pack and fixture operations; the harness delegates to its own higher-capacity model and stores transient run records in its own working memory. A host lacking the required delegation must report that limitation rather than silently substitute same-context judging.
-
-## Delivered v1 capabilities
-
-- Root Agent Plugins package, Codex repo marketplace catalog, and Claude Code native compatibility metadata.
-- Seven plugin Skills: UI task routing, Pack upkeep, setup, visual sweep, Conformance, Expression, and evaluation.
-- Nine MCP tools: mode resolution; Pack initialize, inspect, read, write, validate; fixture listing; generator input; and one-output Judge packet.
-- Starter and synthetic example Packs with shared, Conformance, and Expression references, authority notes, Rubric, and fixtures for each mode.
-- Path and symlink confinement, non-overwriting initialization, bounded reads/writes and fixture states, manifest validation, tests, and local development instructions.
-
-The synthetic two-arm smoke test is demonstration of harness flow only. The expected product result and product guidance are fabricated examples, so its scores cannot be used to claim that Taste improves real product work.
+`npm test` builds `dist/server.js` and covers manifest schema, Pack init, path confinement, legacy Pack validation, Decision write and derived part state, eval packet separation, and a stdio MCP client. `npm run validate:package` checks the Agent Plugins manifests, the Codex marketplace entry, Claude Code compatibility, and Skill frontmatter. Neither check installs the plugin into a GUI harness.

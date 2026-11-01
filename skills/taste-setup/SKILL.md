@@ -1,17 +1,18 @@
 ---
 name: taste-setup
-description: Set up Taste for a product repository, create its Pack and product-specific mode Skill, and establish an evidence-backed first surface. Use when the user explicitly asks to install, initialize, or prepare Taste for a product.
+description: Set up Taste in a product repository. Use when the user asks to install Taste, initialize a Pack, create a taste/ directory, or prepare design judgment for a codebase. Creates one shared Pack. For an existing UI, continue into taste-sweep; for greenfield or missing judgment, continue into taste-expression. Does not start a daemon or add a CI gate.
 ---
 
-# Set up Taste for a product
+# Set up a Taste Pack
 
-The existing harness coding agent performs setup. Taste is already the installed plugin; do not configure or host another agent.
+The harness coding agent performs setup. This plugin is already the Taste install. Do not configure or host another agent, daemon, or CI gate.
 
-1. Identify the target product repository and inspect whether `taste/` already exists. If it does, inspect and continue it; never overwrite it. If absent, initialize only in response to this setup request.
-2. Ask which first product surface to capture when the repository and product context do not make it clear. Prefer a surface with repeated decisions and useful shipped examples, not the broadest possible sweep.
-3. Explain the evidence needed. A Conformance-ready first surface requires inspection of the running product with the harness's available browser or computer-use tools: open relevant product pages, follow the important user flow, inspect visible states and interactions, and capture screenshots. Also inspect relevant source and, where available, Git history and reviews. Record what was actually inspected, URLs or screenshot paths, date/viewport, observations, inferences, known flaws, and gaps. Ask the user/harness for access or screenshots if those tools or product environments are unavailable; do not report a code-only pass as a complete visual sweep.
-4. Build both Conformance and Expression routes in the product entry Skill before declaring setup ready. Ground Conformance guidance in observed product evidence. Ask the user through the harness whether they want to establish Expression intent during setup; if yes, use `taste-expression` and ask only context-relevant questions. If they defer or have no new direction, keep the Expression route available but label its product direction unestablished; do not invent one to fill the Pack.
-5. Draft mode triggers, focused product guidance, and nearby examples. Separate observed facts, inferred rules, proposed guidance, accepted decisions, known flaws, and evidence gaps. Ask the product owner to review candidates before treating them as accepted product-wide guidance.
-6. Validate the Pack and summarize what is ready, proposed, missing, and which harness tools or permissions would complete the survey.
+1. Identify the target product repository. Inspect `taste/`. If it exists, call `taste_pack_inspect` and continue it. Never overwrite it. If it is absent, call `taste_pack_initialize` with the repository path and product name. Initialization creates one shared Pack with `references/decisions/`. It does not create separate Conformance and Expression trees, and it does not edit `AGENTS.md` or harness config.
+2. Ask which part to capture first when the repo does not make that obvious. Prefer a narrow surface over a whole-product sweep.
+3. Branch on what already exists. Do not fabricate taste to look finished.
+   - The product already has UI for this part: follow `taste-sweep` and record proposed Decisions with trigger `sweep`.
+   - The part is greenfield, or the user wants to state taste directly: follow `taste-expression` and record signals with trigger `interview`.
+4. Call `taste_pack_validate`, then `taste_part_state`. Summarize what is proposed, what is accepted, what is missing, and which parts still derive to Expression.
+5. Tell the user the Pack lives in their product repo at `taste/`, not in the Taste plugin repo.
 
-Use `taste_pack_initialize`, `taste_pack_inspect`, `taste_pack_write`, and `taste_pack_validate` when available. Keep ephemeral notes and private captures in the harness/plugin's working store; put reviewed product guidance and shareable source references in the target repository's `taste/` Pack.
+A new Pack with no Decisions derives to Expression. That is expected. Do not mark the Pack Conformance because the starter files exist. Do not author a `supportedModes` field. Legacy Packs that still have split reference folders remain readable; new work goes into `references/decisions/`.

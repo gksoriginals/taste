@@ -2,6 +2,6 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "taste",
   "version": "0.1.0",
-  "description": "Product-specific design Skills and tools for coding agents",
-  "keywords": ["design", "frontend", "skills", "mcp"]
+  "description": "Harness plugin that sets up a product taste/ Pack, sweeps or interviews design judgment into it, loads that Pack for UI work, and records new signals through Expression.",
+  "keywords": ["design", "frontend", "skills", "mcp", "taste", "pack"]
 }
