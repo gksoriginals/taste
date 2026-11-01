@@ -37597,7 +37597,7 @@ function createTasteServer() {
         path: external_exports.string().min(1).max(300).describe("Pack-relative destination path."),
         content: external_exports.string().max(256 * 1024).describe("UTF-8 file contents, up to 256 KiB.")
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ repositoryPath: root, path: relativePath, content }) => toolResult(async () => writePackFile(root, relativePath, content))
   );
@@ -37631,7 +37631,7 @@ function createTasteServer() {
         knownFlaws: external_exports.string().max(4e3).optional(),
         alternatives: external_exports.string().max(4e3).optional()
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
     async (input2) => toolResult(async () => recordSignal(input2.repositoryPath, input2))
   );

@@ -109,7 +109,7 @@ export function createTasteServer(): McpServer {
         path: z.string().min(1).max(300).describe("Pack-relative destination path."),
         content: z.string().max(256 * 1024).describe("UTF-8 file contents, up to 256 KiB."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ repositoryPath: root, path: relativePath, content }) => toolResult(async () => writePackFile(root, relativePath, content)),
   );
@@ -145,7 +145,7 @@ export function createTasteServer(): McpServer {
         knownFlaws: z.string().max(4000).optional(),
         alternatives: z.string().max(4000).optional(),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async (input) => toolResult(async () => recordSignal(input.repositoryPath, input)),
   );

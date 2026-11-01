@@ -35,6 +35,8 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
         "taste_record_signal",
       ].sort(),
     );
+    assert.equal(tools.find((tool) => tool.name === "taste_pack_write")?.annotations?.destructiveHint, true);
+    assert.equal(tools.find((tool) => tool.name === "taste_record_signal")?.annotations?.destructiveHint, true);
 
     const initialized = await client.callTool({
       name: "taste_pack_initialize",
