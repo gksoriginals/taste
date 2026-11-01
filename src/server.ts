@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { resolveTasteMode } from "./core/mode.js";
+import { logDiagnostic } from "./core/diagnostics.js";
 import {
   getEvaluationGeneratorCase,
   getEvaluationJudgePacket,
@@ -31,10 +32,19 @@ function failure(error: unknown) {
   return { isError: true, content: [{ type: "text" as const, text: message }] };
 }
 
-async function toolResult<T extends object>(operation: () => Promise<T>) {
+async function toolResult<T extends object>(toolName: string, operation: () => Promise<T> | T) {
+  const startedAt = Date.now();
+  logDiagnostic("debug", "tool_started", { tool: toolName });
   try {
-    return success(await operation());
+    const result = success(await operation());
+    logDiagnostic("debug", "tool_completed", { tool: toolName, durationMs: Date.now() - startedAt });
+    return result;
   } catch (error) {
+    logDiagnostic("error", "tool_failed", {
+      tool: toolName,
+      durationMs: Date.now() - startedAt,
+      errorCode: error instanceof TasteError ? error.code : "unexpected_error",
+    });
     return failure(error);
   }
 }
@@ -61,7 +71,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async (input) => success(resolveTasteMode(input)),
+    async (input) => toolResult("taste_mode_resolve", () => resolveTasteMode(input)),
   );
 
   server.registerTool(
@@ -77,7 +87,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult(async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint)),
+    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint)),
   );
 
   server.registerTool(
@@ -88,7 +98,7 @@ export function createTasteServer(): McpServer {
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root }) => toolResult(async () => inspectPack(root)),
+    async ({ repositoryPath: root }) => toolResult("taste_pack_inspect", async () => inspectPack(root)),
   );
 
   server.registerTool(
@@ -102,7 +112,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, path: relativePath }) => toolResult(async () => readPackFile(root, relativePath)),
+    async ({ repositoryPath: root, path: relativePath }) => toolResult("taste_pack_read", async () => readPackFile(root, relativePath)),
   );
 
   server.registerTool(
@@ -117,7 +127,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, path: relativePath, content }) => toolResult(async () => writePackFile(root, relativePath, content)),
+    async ({ repositoryPath: root, path: relativePath, content }) => toolResult("taste_pack_write", async () => writePackFile(root, relativePath, content)),
   );
 
   server.registerTool(
@@ -128,7 +138,7 @@ export function createTasteServer(): McpServer {
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root }) => toolResult(async () => validatePack(root)),
+    async ({ repositoryPath: root }) => toolResult("taste_pack_validate", async () => validatePack(root)),
   );
 
   server.registerTool(
@@ -156,7 +166,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async (input) => toolResult(async () => recordSignal(input.repositoryPath, input)),
+    async (input) => toolResult("taste_record_signal", async () => recordSignal(input.repositoryPath, input)),
   );
 
   server.registerTool(
@@ -171,7 +181,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, scope, taskIntent }) => toolResult(async () => readPartState(root, scope, taskIntent)),
+    async ({ repositoryPath: root, scope, taskIntent }) => toolResult("taste_part_state", async () => readPartState(root, scope, taskIntent)),
   );
 
   server.registerTool(
@@ -182,7 +192,7 @@ export function createTasteServer(): McpServer {
       inputSchema: { repositoryPath, mode },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, mode: selectedMode }) => toolResult(async () => ({ mode: selectedMode, fixtureIds: await listEvaluationFixtures(root, selectedMode as TasteMode) })),
+    async ({ repositoryPath: root, mode: selectedMode }) => toolResult("taste_eval_list_fixtures", async () => ({ mode: selectedMode, fixtureIds: await listEvaluationFixtures(root, selectedMode as TasteMode) })),
   );
 
   server.registerTool(
@@ -197,7 +207,7 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, mode: selectedMode, fixtureId }) => toolResult(async () => getEvaluationGeneratorCase(root, selectedMode as TasteMode, fixtureId)),
+    async ({ repositoryPath: root, mode: selectedMode, fixtureId }) => toolResult("taste_eval_get_generator_case", async () => getEvaluationGeneratorCase(root, selectedMode as TasteMode, fixtureId)),
   );
 
   server.registerTool(
@@ -216,11 +226,12 @@ export function createTasteServer(): McpServer {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repositoryPath: root, mode: selectedMode, fixtureId, generatedOutput }) => toolResult(async () => getEvaluationJudgePacket(root, selectedMode as TasteMode, fixtureId, generatedOutput)),
+    async ({ repositoryPath: root, mode: selectedMode, fixtureId, generatedOutput }) => toolResult("taste_eval_get_judge_packet", async () => getEvaluationJudgePacket(root, selectedMode as TasteMode, fixtureId, generatedOutput)),
   );
 
   return server;
 }
 
 const server = createTasteServer();
+logDiagnostic("debug", "server_starting", { version: "0.1.0", transport: "stdio" });
 await server.connect(new StdioServerTransport());

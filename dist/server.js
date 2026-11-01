@@ -36547,7 +36547,7 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
-import process from "node:process";
+import process2 from "node:process";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var STDIO_DEFAULT_MAX_BUFFER_SIZE = 10 * 1024 * 1024;
@@ -36588,7 +36588,7 @@ function serializeMessage(message) {
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
-  constructor(_stdin = process.stdin, _stdout = process.stdout, options) {
+  constructor(_stdin = process2.stdin, _stdout = process2.stdout, options) {
     this._stdin = _stdin;
     this._stdout = _stdout;
     this._started = false;
@@ -36692,6 +36692,25 @@ function resolveTasteMode(input2) {
   }
   const transition = input2.currentMode === void 0 ? "start" : input2.currentMode === mode2 ? "stay" : "switch";
   return { status: "selected", mode: mode2, transition, rationale };
+}
+
+// src/core/diagnostics.ts
+var configuredLevel = process.env.TASTE_LOG_LEVEL?.toLowerCase();
+var logLevel = configuredLevel === "off" || configuredLevel === "debug" ? configuredLevel : "error";
+function logDiagnostic(level, event, fields = {}) {
+  if (logLevel === "off" || level === "debug" && logLevel !== "debug") return;
+  const line = JSON.stringify({
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    component: "taste-mcp",
+    level,
+    event,
+    ...fields
+  });
+  try {
+    process.stderr.write(`${line}
+`);
+  } catch {
+  }
 }
 
 // src/core/pack.ts
@@ -37619,10 +37638,19 @@ function failure2(error62) {
   const message = error62 instanceof TasteError ? error62.message : "Taste could not complete this operation. Check the repository path and Pack, then retry.";
   return { isError: true, content: [{ type: "text", text: message }] };
 }
-async function toolResult(operation) {
+async function toolResult(toolName, operation) {
+  const startedAt = Date.now();
+  logDiagnostic("debug", "tool_started", { tool: toolName });
   try {
-    return success2(await operation());
+    const result = success2(await operation());
+    logDiagnostic("debug", "tool_completed", { tool: toolName, durationMs: Date.now() - startedAt });
+    return result;
   } catch (error62) {
+    logDiagnostic("error", "tool_failed", {
+      tool: toolName,
+      durationMs: Date.now() - startedAt,
+      errorCode: error62 instanceof TasteError ? error62.code : "unexpected_error"
+    });
     return failure2(error62);
   }
 }
@@ -37647,7 +37675,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async (input2) => success2(resolveTasteMode(input2))
+    async (input2) => toolResult("taste_mode_resolve", () => resolveTasteMode(input2))
   );
   server2.registerTool(
     "taste_pack_initialize",
@@ -37662,7 +37690,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
-    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult(async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint))
+    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint))
   );
   server2.registerTool(
     "taste_pack_inspect",
@@ -37672,7 +37700,7 @@ function createTasteServer() {
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root }) => toolResult(async () => inspectPack(root))
+    async ({ repositoryPath: root }) => toolResult("taste_pack_inspect", async () => inspectPack(root))
   );
   server2.registerTool(
     "taste_pack_read",
@@ -37685,7 +37713,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, path: relativePath }) => toolResult(async () => readPackFile(root, relativePath))
+    async ({ repositoryPath: root, path: relativePath }) => toolResult("taste_pack_read", async () => readPackFile(root, relativePath))
   );
   server2.registerTool(
     "taste_pack_write",
@@ -37699,7 +37727,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, path: relativePath, content }) => toolResult(async () => writePackFile(root, relativePath, content))
+    async ({ repositoryPath: root, path: relativePath, content }) => toolResult("taste_pack_write", async () => writePackFile(root, relativePath, content))
   );
   server2.registerTool(
     "taste_pack_validate",
@@ -37709,7 +37737,7 @@ function createTasteServer() {
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root }) => toolResult(async () => validatePack(root))
+    async ({ repositoryPath: root }) => toolResult("taste_pack_validate", async () => validatePack(root))
   );
   server2.registerTool(
     "taste_record_signal",
@@ -37736,7 +37764,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
-    async (input2) => toolResult(async () => recordSignal(input2.repositoryPath, input2))
+    async (input2) => toolResult("taste_record_signal", async () => recordSignal(input2.repositoryPath, input2))
   );
   server2.registerTool(
     "taste_part_state",
@@ -37750,7 +37778,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, scope, taskIntent }) => toolResult(async () => readPartState(root, scope, taskIntent))
+    async ({ repositoryPath: root, scope, taskIntent }) => toolResult("taste_part_state", async () => readPartState(root, scope, taskIntent))
   );
   server2.registerTool(
     "taste_eval_list_fixtures",
@@ -37760,7 +37788,7 @@ function createTasteServer() {
       inputSchema: { repositoryPath, mode },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, mode: selectedMode }) => toolResult(async () => ({ mode: selectedMode, fixtureIds: await listEvaluationFixtures(root, selectedMode) }))
+    async ({ repositoryPath: root, mode: selectedMode }) => toolResult("taste_eval_list_fixtures", async () => ({ mode: selectedMode, fixtureIds: await listEvaluationFixtures(root, selectedMode) }))
   );
   server2.registerTool(
     "taste_eval_get_generator_case",
@@ -37774,7 +37802,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, mode: selectedMode, fixtureId }) => toolResult(async () => getEvaluationGeneratorCase(root, selectedMode, fixtureId))
+    async ({ repositoryPath: root, mode: selectedMode, fixtureId }) => toolResult("taste_eval_get_generator_case", async () => getEvaluationGeneratorCase(root, selectedMode, fixtureId))
   );
   server2.registerTool(
     "taste_eval_get_judge_packet",
@@ -37792,11 +37820,12 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, mode: selectedMode, fixtureId, generatedOutput }) => toolResult(async () => getEvaluationJudgePacket(root, selectedMode, fixtureId, generatedOutput))
+    async ({ repositoryPath: root, mode: selectedMode, fixtureId, generatedOutput }) => toolResult("taste_eval_get_judge_packet", async () => getEvaluationJudgePacket(root, selectedMode, fixtureId, generatedOutput))
   );
   return server2;
 }
 var server = createTasteServer();
+logDiagnostic("debug", "server_starting", { version: "0.1.0", transport: "stdio" });
 await server.connect(new StdioServerTransport());
 export {
   createTasteServer

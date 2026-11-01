@@ -36,6 +36,10 @@ Restart Cursor, or run **Developer: Reload Window**. Open **Customize** and conf
 
 The Cursor manifest at `.cursor-plugin/plugin.json` points to `.cursor.mcp.json`, which launches the server using `${CURSOR_PLUGIN_ROOT}`. Node must be on `PATH`.
 
+### Diagnostics
+
+Taste writes structured diagnostic events to the MCP server's stderr, never stdout. The default `error` level records only tool failures and stable error codes. To debug a harness smoke test, add `"env": { "TASTE_LOG_LEVEL": "debug" }` to the Taste server entry in that harness's MCP config. Debug logs include startup, tool names, outcomes, and durations; they never include tool arguments, Pack contents, conversation text, or repository paths. Set the level to `off` to disable diagnostics.
+
 ### Claude Code
 
 From a checkout of this repo:

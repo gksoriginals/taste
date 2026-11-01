@@ -13,8 +13,14 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     command: process.execPath,
     args: [serverPath],
     cwd: path.dirname(serverPath),
+    env: { TASTE_LOG_LEVEL: "debug" },
+    stderr: "pipe",
   });
   const client = new Client({ name: "taste-plugin-test", version: "1.0.0" });
+  let diagnosticOutput = "";
+  transport.stderr?.on("data", (chunk: Buffer) => {
+    diagnosticOutput += chunk.toString();
+  });
 
   try {
     await client.connect(transport);
@@ -262,6 +268,13 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     assert.equal(judgePacket.isError, undefined);
     assert.match(JSON.stringify(judgePacket.structuredContent), /Edit identity/);
     assert.match(JSON.stringify(judgePacket.structuredContent), /generatedOutput/);
+
+    assert.match(diagnosticOutput, /"event":"server_starting"/);
+    assert.match(diagnosticOutput, /"event":"tool_started","tool":"taste_pack_inspect"/);
+    assert.match(diagnosticOutput, /"event":"tool_completed","tool":"taste_pack_inspect","durationMs":\d+/);
+    assert.match(diagnosticOutput, /"event":"tool_failed","tool":"taste_pack_write"[^\n]*"errorCode":"decision_write_requires_promotion"/);
+    assert.doesNotMatch(diagnosticOutput, new RegExp(repositoryPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(diagnosticOutput, /MCP Test Product|After host checks|Add visible progress|generatedOutput/);
   } finally {
     await client.close().catch(() => undefined);
     await rm(repositoryPath, { recursive: true, force: true });
