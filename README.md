@@ -1,11 +1,11 @@
 # Taste
 
-Taste is a plugin for an existing coding harness (Cursor, Codex, or Claude Code). Skills and a local MCP server drive four steps on **the product repository**, not on this repo:
+Taste is a plugin for an existing coding harness (Cursor, Codex, or Claude Code). Skills and a local MCP server drive the workflow on **the product repository**, not on this repo:
 
-1. Set up one Pack at `taste/`.
-2. Load that Pack before UI work. Conformance uses accepted Decisions with host-reported validation and user-approval evidence, shipped evidence, and no coverage gap.
-3. Explore new direction through Expression. The host keeps early reactions and iteration feedback in its active task context.
-4. Record or update a Decision only after the host reports checks passed and the user approves the exact tested artifact and Decision. The host owns checks, review, readiness, and push timing.
+1. For an explicit setup request, create one Pack at `taste/`. For a UI task with no Pack, keep it absent while Expression explores and the host implements, reviews, and checks the design.
+2. When a Pack exists, load it before UI work. Conformance uses accepted Decisions with host-reported validation and user-approval evidence, shipped evidence, and no coverage gap.
+3. Keep new direction, early reactions, and iteration feedback in the host task context.
+4. For a greenfield UI task, create the Pack and record a Decision only after the host reports checks passed and the user approves the exact tested artifact and reusable Decision. An agent's review is not user approval. The host owns checks, review, readiness, and push timing.
 
 Expression is the learner. There is no second Learner module, no daemon, and no hard CI gate in this slice. This repository is the plugin. Packs live in the product repo.
 
@@ -50,7 +50,7 @@ More detail: [docs/plugin-development.md](docs/plugin-development.md).
 
 ## Harness end-to-end check
 
-Use any product repo. A throwaway git repo is enough. It does not need to be Ally. Install the plugin in the harness first, then open the **product** repo (not this plugin repo) in that harness.
+Use any product repo. A throwaway git repo is enough. It does not need to be Ally. Install the plugin in the harness first, then open the **product** repo (not this plugin repo) in that harness. To verify the greenfield approval gate, skip the explicit setup prompt below and start with a design task; `taste/` should remain absent until final approval.
 
 Say these prompts in order. Wait for each one to finish. The Pack must remain unchanged through draft exploration and update only at the final approved-artifact checkpoint.
 

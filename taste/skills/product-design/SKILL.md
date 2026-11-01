@@ -15,7 +15,7 @@ Read Decisions and call `taste_part_state` before UI work. Activity is derived, 
 - **Expression:** anything else — no Decision, a legacy or unapproved Decision, missing promotion evidence, accepted but not shipped, or a coverage gap. The host keeps iteration feedback in its active task and records only a finalized Decision with `taste_record_signal`.
 - **User intent:** a request for new taste, a correction, or greenfield judgment uses Expression for that task, even when other Decisions are Conformance.
 
-The Pack never flips as a whole. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional `decisionPromotionCheckpoint` in `manifest.json` is reminder text only. Do not add another mode or put host workflow inside the Pack. `taste_mode_resolve` is deprecated and is not the product rule.
+The Pack never flips as a whole. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional `decisionPromotionCheckpoint` in the manifest is reminder text only. Do not add another mode or put host workflow inside the Pack. `taste_mode_resolve` is deprecated and is not the product rule.
 
 ## Apply this Pack
 

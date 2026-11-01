@@ -20,11 +20,11 @@ Other parts remain in their current derived activity. Do not flip the Pack or ad
 
 ## Work through the direction
 
-1. Call `taste_pack_inspect` and `taste_part_state`; read relevant Decisions, product facts, and the product entry Skill.
+1. Check whether `<repo>/taste/` exists. If it does, call `taste_pack_inspect` and `taste_part_state`; read relevant Decisions, product facts, and the product entry Skill. If it does not, do not call Pack tools yet; proceed as Expression with transient host-task context.
 2. Ask focused questions in the host conversation. Keep user answers, options, rejected drafts, and feedback in the active host task context while the design is changing. Do not create provisional Decision files or other scratch memory inside `taste/`.
 3. When the user likes a direction, acknowledge that milestone to the host. Continue the product's own implementation and validation workflow. Do not interpret that reaction as approval of the final tested artifact or write to the Pack.
 4. Consult the optional `decisionPromotionCheckpoint` in `taste/manifest.json`. It is only a reminder about when the host should invoke Taste. If absent, use the host's existing workflow point after its relevant checks pass and the user approves the tested artifact and proposed Decision. The host chooses its own checks and whether this point is before or after push.
-5. At that checkpoint, show the user the tested artifact and the concise reusable Decision. Call `taste_record_signal` only after the user approves both. If the user has not approved, continue iteration in the host task and leave the Pack unchanged.
+5. At that checkpoint, show the user the tested artifact and the concise reusable Decision. An agent's review or recommendation is not user approval. If the Pack is absent, call `taste_pack_initialize` only after the user approves both, then call `taste_record_signal`. If the user has not approved, continue iteration in the host task and leave `taste/` absent or unchanged.
 
 ## Record the finalized Decision
 

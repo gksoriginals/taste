@@ -213,9 +213,9 @@ Taste defines explicit, user-invokable workflow Skills and one automatically rel
 
 | Skill | Trigger | Outcome |
 | --- | --- | --- |
-| `taste-setup` | User asks to set up Taste or initialize a Pack | Create or continue one `taste/` Pack. Sweep if UI exists; Expression-interview if the part is greenfield or missing. |
+| `taste-setup` | User explicitly asks to set up Taste or initialize a Pack | Create or continue one `taste/` Pack. For design work with no Pack, defer creation until the user approves the tested artifact and Decision. |
 | `taste-sweep` | User asks to learn, sweep, or refresh taste from shipped UI | Inspect the live product and keep candidate judgments in the host task until the final promotion checkpoint. |
-| `taste-design` | Any UI/UX task | Load the Pack first. Conformance where Decisions qualify; Expression for empty, gapped, or newly requested parts. |
+| `taste-design` | Any UI/UX task | Load an existing Pack. Conformance where Decisions qualify; transient Expression if absent, empty, gapped, or newly requested. Create an absent Pack only after final user approval. |
 | `taste-conformance` | User asks to match shipped taste, or part state derives Conformance | Apply accepted Decisions with complete promotion evidence, shipped evidence, and no coverage gap. |
 | `taste-expression` | Greenfield, new taste, a gap, or a correction; or part state derives Expression | Interview and explore in the host task; persist only after host checks and user approval of the tested artifact and Decision. |
 | `taste-evaluate` | User asks to evaluate guidance or a calibration run is due | Compare with/without-Skill generation and hand judging to the harness. |

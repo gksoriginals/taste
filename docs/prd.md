@@ -33,10 +33,10 @@ Record or update a Decision only after the host reports that its relevant checks
 
 Skills and MCP tools drive four steps. The harness stays in charge.
 
-1. **Setup.** Initialize one Pack under the product repo.
-2. **Explore judgment.** Sweep an existing UI, and/or Expression-interview a greenfield or a gap. Keep candidate judgments in the host task while exploring.
-3. **Design with the Pack.** When the user asks for UI, load the Pack first. Conformance uses Decisions with matching validation and approval evidence, shipped evidence, and no coverage gap.
-4. **Promote through Expression.** After the host reports checks passed and the user approves the tested artifact and Decision, record the accepted Decision in the Pack. The host owns the timing and workflow.
+1. **Setup.** Initialize a Pack immediately for an explicit setup request. For a greenfield design task with no Pack, defer initialization.
+2. **Explore judgment.** Sweep an existing UI, and/or Expression-interview a greenfield part or gap. Keep candidate judgments in the host task while exploring and implementing.
+3. **Design.** Load an existing Pack before UI work. Conformance uses Decisions with matching validation and approval evidence, shipped evidence, and no coverage gap. Without a Pack, use transient Expression.
+4. **Promote through Expression.** After the host reports checks passed and the user approves the exact tested artifact and Decision, initialize the missing Pack if needed and record the accepted Decision. Agent review is not user approval; the host owns the timing and workflow.
 
 Pack state and user intent route work between the existing Expression and Conformance activities. Success for this milestone is that path running end to end on a real product repo. It does not have to be Ally.
 

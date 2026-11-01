@@ -15,7 +15,7 @@ Legacy Packs may still have `references/conformance/` and `references/expression
 
 ## Update rules
 
-- Initialize only when the user asks. `taste_pack_initialize` creates `taste/` and fails if that directory exists. It does not edit harness instructions.
+- `taste_pack_initialize` creates `taste/` and fails if that directory exists. Use it immediately for an explicit setup request; for a design or sweep task with no Pack, wait until the user approves the tested artifact and Decision. It does not edit harness instructions.
 - Inspect and validate before and after Pack maintenance. `taste_pack_write` can edit notes, facts, Skills, and fixtures inside `taste/`, but it cannot write Decision files. `taste_record_signal` is the only Decision write path and requires finalization evidence.
 - Keep interview answers, early positive reactions, corrections, gaps, and rejected versions in the host's active task context. Do not save them as proposed Decisions.
 - When the final tested artifact and Decision are approved, update the same Decision id with the appropriate trigger. Include host-reported validation evidence and exact artifact approval. If artifact changes, revalidate and get approval for that artifact.
