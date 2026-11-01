@@ -19,6 +19,8 @@ export interface PackManifest {
    */
   supportedModes?: TasteMode[];
   surfaces: string[];
+  /** Optional host-defined point at which the host should ask Taste to record a finalized Decision. */
+  decisionPromotionCheckpoint?: string;
 }
 
 export interface ValidationIssue {
@@ -56,35 +58,39 @@ This is the entry point for one Taste Pack. Decisions live under \`references/de
 
 Read Decisions and call \`taste_part_state\` before UI work. Activity is derived, not authored:
 
-- **Conformance:** the Decision is \`accepted\`, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
-- **Expression:** anything else — no Decision, \`proposed\`, \`rejected\`, accepted but not shipped, or a coverage gap. Expression interviews and writes the Decision with \`taste_record_signal\`.
-- **User intent:** a request for new taste, a correction, or greenfield judgment also uses Expression for that part, even when other Decisions are Conformance.
+- **Conformance:** the Decision is \`accepted\`, includes matching host-reported validation and user-approval evidence, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
+- **Expression:** anything else — no Decision, a legacy or unapproved Decision, missing promotion evidence, accepted but not shipped, or a coverage gap. The host keeps iteration feedback in its active task and records only a finalized Decision with \`taste_record_signal\`.
+- **User intent:** a request for new taste, a correction, or greenfield judgment uses Expression for that task, even when other Decisions are Conformance.
 
-The Pack never flips as a whole. Only the Decisions that changed update. Who initiates a move between activities is an open question; do not invent a nudge. \`taste_mode_resolve\` is a deprecated task-local helper and is not the product rule.
+The Pack never flips as a whole. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional \`decisionPromotionCheckpoint\` in the manifest is reminder text only. Do not add another mode or put host workflow inside the Pack. \`taste_mode_resolve\` is deprecated and is not the product rule.
 
 ## Apply this Pack
 
 Read \`references/shared/product-facts.md\` and the Decisions that touch the task. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
 
-For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
+For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When the user likes an early direction, continue the host's workflow without writing to the Pack. Record only after the host reports relevant checks passed and the user approved the exact tested artifact and Decision. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 
-export function createStarterPackFiles(productName: string, surfaces: string[] = []): PackFile[] {
+export function createStarterPackFiles(productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string): PackFile[] {
   const normalizedName = productName.trim();
   if (normalizedName.length < 2 || normalizedName.length > 120) {
     throw new TasteError("Product name must be between 2 and 120 characters.", "invalid_product_name");
+  }
+  if (decisionPromotionCheckpoint !== undefined && (!decisionPromotionCheckpoint.trim() || decisionPromotionCheckpoint.length > 500)) {
+    throw new TasteError("decisionPromotionCheckpoint must be non-empty and no longer than 500 characters.", "invalid_promotion_checkpoint");
   }
 
   const manifest: PackManifest = {
     name: normalizedName,
     version: "0.1.0",
     surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean),
+    ...(decisionPromotionCheckpoint?.trim() ? { decisionPromotionCheckpoint: decisionPromotionCheckpoint.trim() } : {}),
   };
 
   return [
     {
       path: "README.md",
-      content: `# ${normalizedName} Taste Pack\n\nThis directory is the product's one Taste Pack. Read \`skills/product-design/SKILL.md\`, then Decisions under \`skills/product-design/references/decisions/\`.\n\nConformance and Expression are derived activities, not folders. A Decision is Conformance only when it is accepted, has shipped evidence, and has no coverage gap. Expression writes and updates Decisions. The starter is not product knowledge.\n`,
+      content: `# ${normalizedName} Taste Pack\n\nThis directory is the product's one Taste Pack. Read \`skills/product-design/SKILL.md\`, then Decisions under \`skills/product-design/references/decisions/\`.\n\nConformance and Expression are derived activities, not folders. A Decision is Conformance only when it is accepted, has shipped evidence, has no coverage gap, and records host-reported validation and user approval for the same artifact. Expression keeps provisional feedback in the host's active task context; it does not write draft Decisions to the Pack. The starter is not product knowledge.\n`,
     },
     { path: "manifest.json", content: `${JSON.stringify(manifest, null, 2)}\n` },
     { path: ENTRY_SKILL, content: starterEntrySkill(normalizedName) },
@@ -94,7 +100,7 @@ export function createStarterPackFiles(productName: string, surfaces: string[] =
     },
     {
       path: "skills/product-design/references/decisions/README.md",
-      content: `# Decisions\n\nOne Pack. Each other file in this directory is one Decision written by \`taste_record_signal\`. Do not author a mode field.\n\nDerived activity for a Decision:\n\n- **Conformance** when \`status\` is \`accepted\`, \`shipped\` is true, and \`coverage_gap\` is false.\n- **Expression** otherwise: no Decision yet, \`proposed\`, \`rejected\`, accepted without shipped evidence, or a coverage gap.\n\nExpression is the learner: interviews, greenfield signals, coverage gaps, and corrections (\`rejected_pass\`) all write here. Sweep writes \`proposed\` Decisions with trigger \`sweep\`. The Pack does not flip as a whole. Who initiates a move between activities is an open question; do not invent a nudge.\n`,
+      content: `# Decisions\n\nOne Pack. Each other file in this directory is one Decision written by \`taste_record_signal\`. Do not author a mode field.\n\nA Decision can be recorded only after the host reports a final artifact, its relevant validation evidence, and the user's approval of that same artifact and Decision. Taste stores the host's report; it does not run or judge checks or user review.\n\nDerived activity for a Decision:\n\n- **Conformance** when \`status\` is \`accepted\`, shipped evidence is present, there is no coverage gap, and promotion evidence is complete.\n- **Expression** otherwise, including accepted but unshipped or Decisions missing promotion evidence.\n\nDuring Expression, interviews, alternatives, corrections, and design feedback remain in the host's active task context. The host follows its own workflow, then records the finalized Decision at the optional \`decisionPromotionCheckpoint\` in \`manifest.json\`, if configured. The Pack does not flip as a whole.\n`,
     },
     {
       path: "metadata/authority.md",
@@ -239,8 +245,20 @@ export async function readPackFile(repositoryPath: string, relativePath: string)
 }
 
 export async function writePackFile(repositoryPath: string, relativePath: string, content: string): Promise<PackFile> {
+  return writePackFileInternal(repositoryPath, relativePath, content, false);
+}
+
+export async function writeDecisionFile(repositoryPath: string, relativePath: string, content: string): Promise<PackFile> {
+  return writePackFileInternal(repositoryPath, relativePath, content, true);
+}
+
+async function writePackFileInternal(repositoryPath: string, relativePath: string, content: string, allowDecisionWrite: boolean): Promise<PackFile> {
   const { packRoot } = await resolvePackRoot(repositoryPath);
   const normalized = normalizePackRelativePath(relativePath);
+  const decisionsPrefix = path.join("skills", "product-design", "references", "decisions") + path.sep;
+  if (!allowDecisionWrite && normalized.startsWith(decisionsPrefix)) {
+    throw new TasteError("Decision files can only be written through taste_record_signal after final validation and user approval.", "decision_write_requires_promotion");
+  }
   if (!/\.(md|json|html|css|js|jsx|ts|tsx|svg|txt)$/i.test(normalized)) {
     throw new TasteError("Pack files must use a supported text format (Markdown, JSON, HTML, CSS, JavaScript, TypeScript, SVG, or text).", "unsupported_pack_file");
   }
@@ -435,6 +453,9 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
     if (record.surfaces !== undefined && (!Array.isArray(record.surfaces) || !record.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
     }
+    if (record.decisionPromotionCheckpoint !== undefined && (typeof record.decisionPromotionCheckpoint !== "string" || record.decisionPromotionCheckpoint.trim().length === 0 || record.decisionPromotionCheckpoint.length > 500)) {
+      issues.push({ path: "manifest.json", message: "decisionPromotionCheckpoint must be a non-empty string of at most 500 characters when present." });
+    }
   }
 
   try {
@@ -459,7 +480,7 @@ export async function validatePack(repositoryPath: string): Promise<PackValidati
   return validatePackAt(packRoot);
 }
 
-export async function initializePack(repositoryPath: string, productName: string, surfaces: string[] = []): Promise<{ packPath: string; filesCreated: string[] }> {
+export async function initializePack(repositoryPath: string, productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string): Promise<{ packPath: string; filesCreated: string[] }> {
   const repositoryRoot = await resolveRepositoryRoot(repositoryPath);
   const packRoot = path.join(repositoryRoot, PACK_DIRECTORY);
   try {
@@ -470,7 +491,7 @@ export async function initializePack(repositoryPath: string, productName: string
     // A missing path is the expected starting state.
   }
 
-  const files = createStarterPackFiles(productName, surfaces);
+  const files = createStarterPackFiles(productName, surfaces, decisionPromotionCheckpoint);
   await mkdir(packRoot, { recursive: false });
   try {
     for (const file of files) {

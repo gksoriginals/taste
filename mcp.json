@@ -4,8 +4,8 @@
     "taste": {
       "type": "stdio",
       "command": "node",
-      "args": ["./dist/server.js"],
-      "cwd": "./"
+      "args": ["${PLUGIN_ROOT}/dist/server.js"],
+      "cwd": "${PLUGIN_ROOT}"
     }
   }
 }

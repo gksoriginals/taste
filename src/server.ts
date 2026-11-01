@@ -68,10 +68,11 @@ export function createTasteServer(): McpServer {
         repositoryPath,
         productName: z.string().min(2).max(120).describe("Product name for the starter Pack."),
         surfaces: z.array(z.string().min(1).max(100)).max(30).optional().describe("Known product surfaces to record in the Pack manifest."),
+        decisionPromotionCheckpoint: z.string().trim().min(1).max(500).optional().describe("Optional plain-language checkpoint for when the host should ask Taste to record a finalized Decision. Guidance only: the host owns checks, user approval, and push workflow."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ repositoryPath: root, productName, surfaces }) => toolResult(async () => initializePack(root, productName, surfaces)),
+    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult(async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint)),
   );
 
   server.registerTool(
@@ -103,7 +104,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions or files outside the Pack. Use for product knowledge and evaluation fixtures; product judgment and acceptance remain with the host agent and user.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or Decision files under skills/product-design/references/decisions/. Use for product facts and evaluation fixtures; finalized Decisions must use taste_record_signal after the host reports validation and user approval.",
       inputSchema: {
         repositoryPath,
         path: z.string().min(1).max(300).describe("Pack-relative destination path."),
@@ -129,7 +130,7 @@ export function createTasteServer(): McpServer {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Expression and Sweep write path. Create or update one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place. Omitted optional fields keep the stored rationale, scope, shipped evidence, coverage gap, known flaws, and alternatives.",
+      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact and the Decision statement. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
       inputSchema: {
         repositoryPath,
         id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
@@ -137,11 +138,14 @@ export function createTasteServer(): McpServer {
         statement: z.string().min(1).max(8000).describe("The judgment, in the user's terms."),
         rationale: z.string().max(8000).optional(),
         scope: z.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
-        status: z.enum(["proposed", "accepted", "rejected"]),
+        status: z.literal("accepted").describe("Only record after the tested artifact and this Decision are approved by the user."),
         trigger: z.enum(["interview", "sweep", "gap", "rejected_pass"]),
+        validatedArtifact: z.string().trim().min(1).max(1000).describe("Stable reference to the exact final artifact the host's workflow validated, such as a commit, release candidate, or inspected deployed version."),
+        validationEvidence: z.array(z.string().trim().min(1).max(1000)).min(1).max(30).describe("Host-reported results and evidence for relevant product-specific checks. The host chooses these; Taste does not run or judge them."),
+        userApprovedArtifact: z.string().trim().min(1).max(1000).describe("Must identify the same final artifact as validatedArtifact."),
+        userApprovalEvidence: z.string().trim().min(1).max(1000).describe("Brief host-reported evidence that the user approved this tested artifact and Decision statement."),
         shippedEvidence: z.array(z.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
-        coverageGap: z.boolean().optional().describe("True when current artefacts cannot justify the next step. On create, defaults to true when trigger is gap. On update, omit to keep the stored value."),
-        coverageGapNote: z.string().max(2000).optional(),
+        coverageGap: z.literal(false).default(false).describe("An unresolved coverage gap cannot be promoted to the Pack."),
         knownFlaws: z.string().max(4000).optional(),
         alternatives: z.string().max(4000).optional(),
       },
@@ -154,7 +158,7 @@ export function createTasteServer(): McpServer {
     "taste_part_state",
     {
       title: "Derive Taste part activity",
-      description: "Derive Conformance or Expression per Decision from status, shipped evidence, and coverage gap. Conformance means accepted, shipped evidence present, and coverage gap false. Everything else is Expression for that part. An empty Pack is Expression. Does not write a mode field, does not flip the Pack, and does not decide who initiates a change. User intent can still route into Expression.",
+      description: "Derive Conformance or Expression per Decision from acceptance, matching host-reported validation and user-approval evidence, shipped evidence, and coverage gap. Conformance requires all of these; accepted but unshipped or legacy Decisions without promotion evidence remain Expression. An empty Pack is Expression. This tool does not run or judge checks, write a mode field, flip the Pack, or decide who initiates a change. User intent can still route a task into Expression.",
       inputSchema: {
         repositoryPath,
         scope: z.string().min(1).max(200).optional().describe("Optional part name or decision id to filter."),

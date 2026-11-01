@@ -1,23 +1,17 @@
 ---
 name: taste-sweep
-description: Sweep an existing product's shipped UI into the Taste Pack. Use when the user asks to learn, sweep, extract, or refresh design taste from a product that already has interface. Writes proposed Decisions with taste_record_signal trigger sweep. A code-only pass is not a finished visual sweep.
+description: Inspect an existing product's shipped UI to find candidate design judgments. Keep candidates in the host's active task until the product owner approves the final Decision and the host reports relevant validation evidence; only then update the Taste Pack.
 ---
 
-# Sweep shipped UI into Decisions
+# Sweep shipped UI into approved Decisions
 
-The harness coding agent gathers evidence. Taste does not ship a browser and does not invent observations.
+The host gathers and evaluates evidence. Taste provides the Pack and records finalized Decisions. A sweep does not write candidate Decisions to the Pack.
 
-1. If `taste/` is missing, follow `taste-setup` first. Then call `taste_pack_inspect` and `taste_part_state` so you update the part you are sweeping instead of flipping the Pack.
-2. Inspect one focused flow in the running product with the harness's browser or computer-use tools. Open the pages, follow the primary path and important alternates, and capture screenshots. Note URL or page, date, viewport, state, and what each capture shows. Include empty, loading, error, and success states when they belong to the flow.
-3. Correlate with source, Git history, reviews, and design references when the user has made them available. If access or screenshots are missing, ask and mark the sweep incomplete. Never claim a screen was seen if it was not. Do not store private production data without authorization.
-4. For each candidate judgment, call `taste_record_signal`:
-   - `trigger`: `sweep`
-   - `status`: `proposed`
-   - `shippedEvidence`: the screenshot path, URL, or source you actually inspected
-   - `scope`: the part this judgment belongs to
-   - `statement`, `rationale`, and `knownFlaws` when the shipped UI looks accidental or wrong
-   - `coverageGap` true only for a step the artefacts cannot justify; say why in `coverageGapNote`
-5. Do not set `status` to `accepted` during a sweep. Acceptance is a review by the product owner. Do not write a mode field. Do not create `references/conformance/` or `references/expression/` for a new Pack.
-6. Call `taste_pack_validate` and `taste_part_state`. Report proposed Decisions, known flaws, and gaps. Parts stay Expression until a Decision is accepted, has shipped evidence, and has no coverage gap.
+1. If `taste/` is missing, follow `taste-setup`. Call `taste_pack_inspect` and `taste_part_state` before work.
+2. Inspect a focused flow in the running product with the host's browser or computer-use tools. Open the pages, follow the primary path and relevant alternates, and capture screenshots. Note URL or page, date, viewport, state, and what each capture shows. Include empty, loading, error, and success states when relevant.
+3. Correlate with source, Git history, reviews, and design references when available. If evidence is missing, report the gap and keep the candidate in the host task context. Never claim a screen was seen if it was not. Do not store private production data without authorization.
+4. Draft concise candidate judgments in the host task. Show them to the product owner. Do not create `proposed` Decision files during a sweep.
+5. After the owner approves the Decision and the host reports its applicable validation of the inspected artifact, call `taste_record_signal` with `status: accepted`, the exact validated and user-approved artifact reference, host-reported validation evidence, and the approval evidence. Include `shippedEvidence` only for UI actually inspected as shipped. Taste does not decide which checks apply or run them.
+6. Read `decisionPromotionCheckpoint` in the Pack manifest if configured. It guides when the host calls Taste; it does not configure test execution, review, or push behavior. Validate the Pack and call `taste_part_state` after the update.
 
-Who reviews a proposed Decision into acceptance is an open question. Record the proposal and stop there unless the user explicitly accepts the statement in this conversation. If they do, update the same `id` to `accepted` and keep the shipped evidence.
+Conformance still requires an accepted Decision, complete matching promotion evidence, inspected shipped evidence, and no coverage gap. Other parts remain in their existing derived activity.

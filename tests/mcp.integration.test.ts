@@ -40,7 +40,11 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
 
     const initialized = await client.callTool({
       name: "taste_pack_initialize",
-      arguments: { repositoryPath, productName: "MCP Test Product" },
+      arguments: {
+        repositoryPath,
+        productName: "MCP Test Product",
+        decisionPromotionCheckpoint: "After host checks and user approval, before push.",
+      },
     });
     assert.equal(initialized.isError, undefined);
 
@@ -50,13 +54,31 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     });
     assert.equal(inspection.isError, undefined);
     assert.match(JSON.stringify(inspection.structuredContent), /MCP Test Product/);
+    assert.match(JSON.stringify(inspection.structuredContent), /After host checks and user approval, before push/);
 
     const skill = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
     assert.match(skill, /Conformance/);
     assert.match(skill, /Expression/);
     assert.match(skill, /taste_part_state/);
+    assert.match(skill, /keeps iteration feedback in its active task/);
 
-    const recorded = await client.callTool({
+    const early = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "primary-button",
+        title: "One filled primary button",
+        statement: "Each screen has one filled primary button.",
+        status: "proposed",
+        trigger: "interview",
+        scope: "settings",
+      },
+    });
+    assert.equal(early.isError, true);
+    let inspected = await client.callTool({ name: "taste_pack_inspect", arguments: { repositoryPath } });
+    assert.match(JSON.stringify(inspected.structuredContent), /"decisionCount":0/);
+
+    const ready = await client.callTool({
       name: "taste_record_signal",
       arguments: {
         repositoryPath,
@@ -65,13 +87,54 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
         statement: "Each screen has one filled primary button.",
         status: "accepted",
         trigger: "interview",
-        shippedEvidence: ["settings screen shipped 2026-11-01"],
         scope: "settings",
+        validatedArtifact: "commit:abc123",
+        validationEvidence: ["Host reports: settings tests and lint passed at commit abc123."],
+        userApprovedArtifact: "commit:abc123",
+        userApprovalEvidence: "Host reports: user approved commit abc123 and this Decision.",
       },
     });
-    assert.equal(recorded.isError, undefined);
-    assert.match(JSON.stringify(recorded.structuredContent), /conformance/);
-    assert.match(await readFile(path.join(repositoryPath, "taste/skills/product-design/references/decisions/primary-button.md"), "utf8"), /One filled primary button/);
+    assert.equal(ready.isError, undefined);
+    assert.match(JSON.stringify(ready.structuredContent), /accepted_not_shipped/);
+    assert.match(await readFile(path.join(repositoryPath, "taste/skills/product-design/references/decisions/primary-button.md"), "utf8"), /Host reports: settings tests and lint passed/);
+
+    const secondScope = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "profile-heading",
+        title: "Clear profile heading",
+        statement: "Profile settings have a clear page title.",
+        status: "accepted",
+        trigger: "interview",
+        scope: "profile",
+        validatedArtifact: "commit:profile1",
+        validationEvidence: ["Host reports: profile checks passed at commit profile1."],
+        userApprovedArtifact: "commit:profile1",
+        userApprovalEvidence: "Host reports: user approved commit profile1 and this Decision.",
+      },
+    });
+    assert.equal(secondScope.isError, undefined);
+
+    const shipped = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "primary-button",
+        title: "One filled primary button",
+        statement: "Each screen has one filled primary button.",
+        status: "accepted",
+        trigger: "interview",
+        scope: "settings",
+        validatedArtifact: "commit:abc123",
+        validationEvidence: ["Host reports: settings tests and lint passed at commit abc123."],
+        userApprovedArtifact: "commit:abc123",
+        userApprovalEvidence: "Host reports: user approved commit abc123 and this Decision.",
+        shippedEvidence: ["https://example.test/settings — inspected deployed Settings flow"],
+      },
+    });
+    assert.equal(shipped.isError, undefined);
+    assert.match(JSON.stringify(shipped.structuredContent), /accepted_shipped/);
 
     const corrected = await client.callTool({
       name: "taste_record_signal",
@@ -83,19 +146,43 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
         status: "proposed",
         trigger: "rejected_pass",
         scope: "settings",
-        coverageGap: true,
-        coverageGapNote: "Generated settings screen used two primary buttons.",
       },
     });
-    assert.equal(corrected.isError, undefined);
-    assert.match(JSON.stringify(corrected.structuredContent), /expression/);
+    assert.equal(corrected.isError, true);
+
+    const correctedFinal = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "primary-button",
+        title: "One filled primary button",
+        statement: "Each screen has one filled primary button, with a clear success state.",
+        status: "accepted",
+        trigger: "rejected_pass",
+        scope: "settings",
+        validatedArtifact: "commit:abc456",
+        validationEvidence: ["Host reports: corrected settings tests passed at commit abc456."],
+        userApprovedArtifact: "commit:abc456",
+        userApprovalEvidence: "Host reports: user approved the tested correction and Decision at commit abc456.",
+      },
+    });
+    assert.equal(correctedFinal.isError, undefined);
+    assert.match(JSON.stringify(correctedFinal.structuredContent), /accepted_not_shipped/);
+    assert.doesNotMatch(await readFile(path.join(repositoryPath, "taste/skills/product-design/references/decisions/primary-button.md"), "utf8"), /https:\/\/example\.test\/settings/);
 
     const parts = await client.callTool({
       name: "taste_part_state",
       arguments: { repositoryPath, scope: "settings" },
     });
     assert.equal(parts.isError, undefined);
-    assert.match(JSON.stringify(parts.structuredContent), /coverage_gap/);
+    assert.match(JSON.stringify(parts.structuredContent), /accepted_not_shipped/);
+    assert.match(JSON.stringify(parts.structuredContent), /settings/);
+
+    const directDecisionWrite = await client.callTool({
+      name: "taste_pack_write",
+      arguments: { repositoryPath, path: "skills/product-design/references/decisions/early.md", content: "# Early draft\n" },
+    });
+    assert.equal(directDecisionWrite.isError, true);
 
     const mode = await client.callTool({
       name: "taste_mode_resolve",

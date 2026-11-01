@@ -3,9 +3,9 @@
 Taste is a plugin for an existing coding harness (Cursor, Codex, or Claude Code). Skills and a local MCP server drive four steps on **the product repository**, not on this repo:
 
 1. Set up one Pack at `taste/`.
-2. Sweep shipped UI and/or Expression-interview new judgment into Decisions.
-3. Load that Pack before UI work. Conformance uses Decisions that are accepted, have shipped evidence, and have no coverage gap.
-4. Learn through Expression: new requirements, gaps, and corrections are written back into the same Pack.
+2. Load that Pack before UI work. Conformance uses accepted Decisions with host-reported validation and user-approval evidence, shipped evidence, and no coverage gap.
+3. Explore new direction through Expression. The host keeps early reactions and iteration feedback in its active task context.
+4. Record or update a Decision only after the host reports checks passed and the user approves the exact tested artifact and Decision. The host owns checks, review, readiness, and push timing.
 
 Expression is the learner. There is no second Learner module, no daemon, and no hard CI gate in this slice. This repository is the plugin. Packs live in the product repo.
 
@@ -52,7 +52,7 @@ More detail: [docs/plugin-development.md](docs/plugin-development.md).
 
 Use any product repo. A throwaway git repo is enough. It does not need to be Ally. Install the plugin in the harness first, then open the **product** repo (not this plugin repo) in that harness.
 
-Say these prompts in order. Wait for each one to finish, and look at `taste/` in the product repo after steps 2 and 4.
+Say these prompts in order. Wait for each one to finish. The Pack must remain unchanged through draft exploration and update only at the final approved-artifact checkpoint.
 
 1. **Setup**
 
@@ -60,27 +60,27 @@ Say these prompts in order. Wait for each one to finish, and look at `taste/` in
 
    Expect `taste/manifest.json`, `taste/skills/product-design/SKILL.md`, and `taste/skills/product-design/references/decisions/README.md`. No `supportedModes` field. No `references/conformance/` or `references/expression/` trees.
 
-2. **Expression interview**
+2. **Expression exploration**
 
-   > Interview me and record Taste signals in the Pack with taste_record_signal. Three signals: each screen has one filled primary button; field errors sit under the field; spacing is dense but not cramped. Scope them to settings. Leave them proposed until I accept each sentence.
+   > Interview me about the settings screen. I want one filled primary button, field errors under their fields, and spacing that is dense but not cramped. Keep these signals in the host task while we explore; do not write Decisions to the Pack yet.
 
    Answer the questions in chat. Then say:
 
-   > I accept all three statements. Update those Decisions to accepted. There is no shipped UI yet.
+   > I like this direction. Build the first version, but do not update the Pack yet.
 
-   Expect three files under `taste/skills/product-design/references/decisions/`. `status: accepted`, `shipped: false`, `trigger: interview`. `taste_part_state` should still derive Expression (`accepted_not_shipped`), because nothing has shipped.
+   Expect no Decision files. The host should continue implementation and follow the product repository's existing validation and review workflow.
 
 3. **UI from the Pack**
 
-   > Design a settings screen for notification preferences. Load the Taste Pack before you write UI. Use the accepted Decisions. This part is not Conformance yet; follow Expression for anything the Decisions do not justify, and do not mark them shipped unless you inspected a shipped screen.
+   > Design a settings screen for notification preferences. Load the Taste Pack before you write UI. Use the interview direction from this task. Do not add a Decision to the Pack while the version is in progress.
 
    Expect the screen to use one primary button, inline field errors, and dense spacing. Expect no new Conformance claim.
 
-4. **Correction**
+4. **Validate and approve**
 
-   > The settings screen used two primary buttons. That fails the signal. Correct the UI and record the correction on the same Decision with taste_record_signal, trigger rejected_pass, coverage gap true.
+   > The settings screen used two primary buttons. Correct it and rerun the checks this repository uses. Keep the failed version and correction in the host task. Show me the tested final version and a concise Decision for approval.
 
-   Expect the same decision file updated (`trigger: rejected_pass`, `coverage_gap: true`), not a second Pack and not a new mode field. Other Decisions, if you added any, stay as they were.
+   Do not write a Decision for the failed version or unresolved gap. After the user approves the tested final version and Decision, call `taste_record_signal` with the exact artifact reference, host-reported validation results, matching user-approval evidence, `status: accepted`, and `coverageGap: false`. Include shipped evidence only if the host inspected an actually shipped version.
 
 5. **Confirm**
 
@@ -88,7 +88,7 @@ Say these prompts in order. Wait for each one to finish, and look at `taste/` in
 
    You should see the files on disk in the product repo. Chat summaries do not count.
 
-Optional, if the product already has UI: ask for `taste-sweep` on one flow before step 3. Sweep should write `proposed` Decisions with `trigger: sweep` and real screenshot or URL evidence, and should not set `accepted` unless you explicitly accept the statement.
+Optional, if the product already has UI: ask for `taste-sweep` on one flow. Keep candidate judgments in the host task until the owner approves the Decision and the host supplies evidence for the inspected artifact. Do not write `proposed` Decisions during the sweep.
 
 ## Docs
 

@@ -9,9 +9,11 @@ const readJson = async <T>(relativePath: string): Promise<T> => JSON.parse(await
 const issues: string[] = [];
 
 const plugin = await readJson<Record<string, unknown>>("plugin.json");
-const portableMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[] }> }>("mcp.json");
+const portableMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }> }>("mcp.json");
+const codexManifest = await readJson<{ name?: string; version?: string; skills?: string; mcpServers?: string }>(".codex-plugin/plugin.json");
+const codexMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }> }>(".mcp.json");
 const claudeManifest = await readJson<{ name?: string; mcpServers?: string }>(".claude-plugin/plugin.json");
-const claudeMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[] }> }>(".mcp.json");
+const claudeMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[] }> }>(".claude.mcp.json");
 const codexMarketplace = await readJson<{ name?: string; plugins?: Array<{ name?: string; source?: { source?: string; path?: string }; policy?: { installation?: string; authentication?: string }; category?: string }> }>(".agents/plugins/marketplace.json");
 
 const ajv = new Ajv2020({ strict: false });
@@ -20,7 +22,9 @@ const validateMcp = ajv.compile(mcpSchema);
 if (!validatePlugin(plugin)) issues.push(`plugin.json: ${JSON.stringify(validatePlugin.errors)}`);
 if (!validateMcp(portableMcp)) issues.push(`mcp.json: ${JSON.stringify(validateMcp.errors)}`);
 if (claudeManifest.name !== plugin.name) issues.push("Claude Code and portable plugin names must match.");
-if (claudeManifest.mcpServers !== "./.mcp.json") issues.push("Claude Code manifest must point to the native .mcp.json file.");
+if (claudeManifest.mcpServers !== "./.claude.mcp.json") issues.push("Claude Code manifest must point to its native MCP config.");
+if (codexManifest.name !== plugin.name || codexManifest.version !== plugin.version) issues.push("Codex and portable plugin identity/version must match.");
+if (codexManifest.skills !== "./skills/" || codexManifest.mcpServers !== "./.mcp.json") issues.push("Codex compatibility manifest must point to the root Skills and Codex MCP config.");
 const codexEntry = codexMarketplace.plugins?.find((entry) => entry.name === plugin.name);
 if (codexEntry?.source?.path !== "./" || codexEntry.source.source !== "local") issues.push("Codex marketplace must point at the root portable plugin using a local path.");
 if (codexMarketplace.name !== "taste-local" || !codexEntry?.policy?.installation || !codexEntry.policy.authentication || !codexEntry.category) {
@@ -28,8 +32,22 @@ if (codexMarketplace.name !== "taste-local" || !codexEntry?.policy?.installation
 }
 
 const portableServer = portableMcp.mcpServers?.taste;
-if (portableServer?.command !== "node" || portableServer.args?.[0] !== "./dist/server.js") {
-  issues.push("Portable MCP config must run the bundled server relative to the plugin root.");
+if (
+  portableServer?.type !== "stdio" ||
+  portableServer.command !== "node" ||
+  portableServer.args?.[0] !== "${PLUGIN_ROOT}/dist/server.js" ||
+  portableServer.cwd !== "${PLUGIN_ROOT}"
+) {
+  issues.push("Portable MCP config must run the bundled server from PLUGIN_ROOT.");
+}
+const codexServer = codexMcp.mcpServers?.taste;
+if (
+  codexServer?.type !== "stdio" ||
+  codexServer.command !== "node" ||
+  codexServer.args?.[0] !== "./dist/server.js" ||
+  codexServer.cwd !== "./"
+) {
+  issues.push("Codex MCP config must run the bundled server from PLUGIN_ROOT.");
 }
 const claudeServer = claudeMcp.mcpServers?.taste;
 if (claudeServer?.command !== "node" || claudeServer.args?.[0] !== "${CLAUDE_PLUGIN_ROOT}/dist/server.js") {

@@ -8,19 +8,19 @@ Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). Th
 
 ## Source of truth
 
-- Product: the [Google Doc](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is the source of truth. [docs/prd.md](docs/prd.md) mirrors the Doc and the decisions Gopi and North locked: the five ∞ rules, the expanded open questions, and the Nov 1 harness UX (Expression is the learner; one Pack; no hard CI gate for this milestone). If the Doc and the PRD diverge, the Doc wins. Do not invent product locks beyond those.
-- Engineering: [docs/engineering.md](docs/engineering.md) uses LangChain Content Studio's knowledge layers and Anthropic's on-demand Skills as the organizing starting point, with Vercel's in-repo Pack, review, and evals as implementation references. If it and the Doc disagree about the product, the Doc wins.
+- Product: [docs/prd.md](docs/prd.md) records the current implementation direction. The [Google Doc](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is retained as a reference and has not been updated for the Nov 1 workflow decisions; reconcile or remove it later.
+- Engineering: [docs/engineering.md](docs/engineering.md) uses LangChain Content Studio's knowledge layers and Anthropic's on-demand Skills as the organizing starting point, with Vercel's in-repo Pack, review, and evals as implementation references. Keep it aligned with the local PRD and implementation.
 - North owns product discussion.
 - Dev owns engineering, the repo, and coding.
 
 ## Working rules
 
 - The harness owns the loop and runtime (planning and model included). Taste supplies Skills and tools. Taste is not an agent runtime and not a daemon.
-- One Pack per product repo. Conformance and Expression are derived part activities, not folders and not a `supportedModes` flag. A Decision is Conformance only when it is accepted, has shipped evidence, and has no coverage gap. Otherwise that part is Expression. The Pack never flips as a whole.
-- Expression is the learner. Interviews, greenfield signals, coverage gaps, and rejected passes all write Decisions with `taste_record_signal`. There is no separate Learner module.
-- Who initiates a move between Expression and Conformance stays open. Do not invent a nudge or an approver.
+- One Pack per product repo. Conformance and Expression are derived part activities, not folders and not a `supportedModes` flag. A Decision is Conformance only when it is accepted, has matching host-reported validation and user-approval evidence, has shipped evidence, and has no coverage gap. Otherwise that part is Expression. The Pack never flips as a whole.
+- Expression is the learner, but exploration is transient: keep interviews, early feedback, rejected drafts, and unresolved gaps in the host's active task. Record a Decision only after the host reports checks passed and the user approves the exact tested artifact and Decision. There is no separate Learner module.
+- When the user likes an early direction, Taste's skill nudges the host to continue its own workflow. The host owns implementation, checks, readiness, user review, and push. An optional `decisionPromotionCheckpoint` in the Pack is reminder text; Taste does not observe host events or run those workflows.
 - For UI work, load the Pack first. Use accepted shipped Decisions for Conformance. Route gaps and new taste through Expression.
-- Shipped work is evidence of current behavior, not automatic approval of its flaws. Whether a known flaw sends a part to Expression is an open question. The user's explicit task goal remains the immediate authority for the task in front of them.
+- Shipped work is evidence of current behavior, not automatic approval of its flaws. The user's explicit task goal remains the immediate authority for the task in front of them.
 - Ally and omnipresent are dogfood notes in the one-pager, not a gate for this repo. A harness end-to-end check on any product repo is the milestone.
 - Critique is a review the harness coding agent runs; the harness may delegate it. Taste does not host that agent.
 - Keep transient scratch in harness memory. Signals that should survive the turn go into the product's `taste/` Pack.

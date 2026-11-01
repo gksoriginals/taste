@@ -1,46 +1,48 @@
 ---
 name: taste-expression
-description: Expression is Taste's learner. Use when the user wants new design taste, a greenfield interview, a requirement the Pack does not yet hold, a gap the artefacts cannot justify, or a correction to shipped or generated UI. Interview in the harness and persist each signal with taste_record_signal. Also use when taste_part_state derives Expression for the part being designed.
+description: Use Expression for greenfield UI, new requirements or taste, unsupported decisions, and user corrections. Keep iteration feedback in the host's active task. Record a Decision in the Pack only after the host reports its relevant checks passed and the user approved the exact tested artifact and Decision.
 ---
 
-# Expression writes the Pack
+# Expression explores; the host promotes finalized Decisions
 
-Expression is the only learner. It interviews, walks requirements and corrections, and writes Decisions into the product repository's `taste/` Pack. Corrections on shipped or generated work are this same skill with trigger `gap` or `rejected_pass`. There is no separate Learner product and no mode field.
+Expression is the learning activity for a part whose direction is new, missing, or unsupported by the Pack. It interviews, explores, and iterates in the host conversation. It does not write drafts, early user reactions, or unresolved gaps into the durable Pack. There are only two derived activities: Expression and Conformance.
 
-The harness conversation is the interview. Do not open a separate form, contact anyone else, or treat your assumptions as the user's answers.
+The harness owns the agent loop and product workflow. Taste does not run tests, decide readiness, perform user review, or push changes.
 
-## When this skill applies
+## When Expression applies
 
-Use Expression for a part when any of these are true:
+- The product or part is greenfield, or the Pack has no Decision for it.
+- The user requests a new direction or requirement not justified by an accepted shipped Decision.
+- The current task contains a correction, rejection, or gap, even if an older Decision still derives Conformance for that part.
+- `taste_part_state` reports Expression for the part.
 
-- The product or the part is from scratch, or `taste_part_state` reports `no_decisions`.
-- The user states new taste, a requirement, or a preference that is not already an accepted shipped Decision.
-- `taste_part_state` derives Expression (`proposed`, `rejected`, `accepted_not_shipped`, `coverage_gap`, or `unparsed`).
-- The user corrects shipped or generated UI, or rejects a pass.
-- The loaded Decisions cannot justify the next UI step.
+Other parts remain in their current derived activity. Do not flip the Pack or add another mode.
 
-Other parts of the Pack stay as they are. Do not flip the whole Pack. Who should have started this interview is an open question; do not invent a nudge. If you are in this skill, write the signal.
+## Work through the direction
 
-## Walk the conversation
+1. Call `taste_pack_inspect` and `taste_part_state`; read relevant Decisions, product facts, and the product entry Skill.
+2. Ask focused questions in the host conversation. Keep user answers, options, rejected drafts, and feedback in the active host task context while the design is changing. Do not create provisional Decision files or other scratch memory inside `taste/`.
+3. When the user likes a direction, acknowledge that milestone to the host. Continue the product's own implementation and validation workflow. Do not interpret that reaction as approval of the final tested artifact or write to the Pack.
+4. Consult the optional `decisionPromotionCheckpoint` in `taste/manifest.json`. It is only a reminder about when the host should invoke Taste. If absent, use the host's existing workflow point after its relevant checks pass and the user approves the tested artifact and proposed Decision. The host chooses its own checks and whether this point is before or after push.
+5. At that checkpoint, show the user the tested artifact and the concise reusable Decision. Call `taste_record_signal` only after the user approves both. If the user has not approved, continue iteration in the host task and leave the Pack unchanged.
 
-1. Call `taste_pack_inspect` and `taste_part_state` for the repository. Read Decisions that touch the part. If no Pack exists, run `taste-setup` first.
-2. Ask one focused question at a time about the judgment that would change the UI: who it is for, the outcome, constraints, and what done looks like. Offer a few genuinely different options only when that helps the user choose.
-3. Restate the signal in one sentence and ask the user to accept, revise, or reject it before marking it accepted.
+## Record the finalized Decision
 
-## Persist before you leave the turn
+The host supplies its own evidence; Taste stores the report and does not verify the claims.
 
-Call `taste_record_signal` for every signal you discussed. Chat is not the Pack.
+- `status`: `accepted`
+- `validatedArtifact`: stable reference to the exact artifact that passed the host's relevant checks
+- `validationEvidence`: host-reported checks and evidence chosen by that product's workflow
+- `userApprovedArtifact`: the same artifact reference as `validatedArtifact`
+- `userApprovalEvidence`: brief host-reported evidence that the user approved that artifact and Decision
+- `coverageGap`: `false`
+- `trigger`: `interview`, `gap`, or `rejected_pass`, as appropriate
+- `shippedEvidence`: include only if the host actually inspected the shipped version; omit before push
 
-| Situation | `trigger` | `status` | Notes |
-| --- | --- | --- | --- |
-| Greenfield, new requirement, or interview answer | `interview` | `proposed` until the user accepts; `accepted` only after they confirm; `rejected` if they reject it | Reuse the same `id` when it is the same judgment. |
-| Artefacts cannot justify the next step | `gap` | `proposed` unless the user already accepted a revised statement | Set `coverageGap` true and say what is missing in `coverageGapNote`. |
-| User corrects shipped or generated UI | `rejected_pass` | `proposed` until they accept the revised statement | Update the same `id` for the same judgment. |
+If a Decision is recorded before push, it remains Expression until the host later supplies inspected shipped evidence for the same artifact. If the artifact changes, the host must revalidate and get approval for that version before updating the Decision; prior shipped evidence is cleared when the artifact reference changes.
 
-Leave `shippedEvidence` empty unless you actually inspected shipped UI for this Decision. Do not write a mode field. Do not copy the signal into a separate conformance or expression folder.
+When a gap remains unresolved or the user has not approved the tested artifact and Decision, do not call `taste_record_signal`. Continue using the host's active task context. Do not encode an unresolved gap as Pack knowledge.
 
-A proposed or gapped Decision is not Conformance. After writing, call `taste_part_state` again and tell the user which parts are Expression and which remain Conformance. Conformance is only an accepted Decision with shipped evidence and no coverage gap.
+For UI copy, use targeted clarity edits and preserve facts, constraints, and product voice. A phrase list or scanner match alone is not evidence that copy is wrong and does not authorize a rewrite.
 
-Whether UI for that part may be implemented before the Decision is accepted is an open question. Do not invent a ban, and do not treat implementation as acceptance. Record the status the user actually gave.
-
-Keep rejected alternatives in the Decision's `alternatives` field when the user wants them remembered. Do not claim the Decision applies beyond its `scope`.
+After a successful Pack update, call `taste_part_state` and report which scopes derive Expression or Conformance. Conformance requires accepted status, complete matching validation and approval evidence, shipped evidence, and no coverage gap.

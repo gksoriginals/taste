@@ -1,4 +1,4 @@
-import { listPackMarkdown, readPackFile, TasteError, writePackFile, type PackFile } from "./pack.js";
+import { listPackMarkdown, readPackFile, TasteError, writeDecisionFile, type PackFile } from "./pack.js";
 
 export const DECISION_DIRECTORY = "skills/product-design/references/decisions";
 
@@ -7,6 +7,7 @@ export type SignalTrigger = "interview" | "sweep" | "gap" | "rejected_pass";
 export type PartActivity = "conformance" | "expression";
 export type DecisionReason =
   | "accepted_shipped"
+  | "promotion_evidence_missing"
   | "coverage_gap"
   | "rejected"
   | "proposed"
@@ -22,6 +23,10 @@ export interface SignalInput {
   scope?: string;
   status: DecisionStatus;
   trigger: SignalTrigger;
+  validatedArtifact: string;
+  validationEvidence: string[];
+  userApprovedArtifact: string;
+  userApprovalEvidence: string;
   shippedEvidence?: string[];
   coverageGap?: boolean;
   coverageGapNote?: string;
@@ -38,6 +43,7 @@ export interface ParsedDecision {
   scope: string;
   coverageGap: boolean;
   shipped: boolean;
+  promotionEvidenceComplete: boolean;
   parsed: true;
 }
 
@@ -57,6 +63,7 @@ export interface DerivedDecision {
   status?: DecisionStatus;
   trigger?: SignalTrigger;
   shipped?: boolean;
+  promotionEvidenceComplete?: boolean;
   coverageGap?: boolean;
 }
 
@@ -85,6 +92,7 @@ const NO_GAP_NOTE = "None recorded.";
 
 interface ExistingDecision {
   scope?: string;
+  validatedArtifact?: string;
   coverageGap?: boolean;
   statement?: string;
   rationale?: string;
@@ -109,10 +117,12 @@ export function deriveDecisionActivity(decision: {
   status: DecisionStatus;
   shipped: boolean;
   coverageGap: boolean;
+  promotionEvidenceComplete?: boolean;
 }): { activity: PartActivity; reason: Exclude<DecisionReason, "unparsed" | "no_decisions"> } {
   if (decision.coverageGap) return { activity: "expression", reason: "coverage_gap" };
   if (decision.status === "rejected") return { activity: "expression", reason: "rejected" };
   if (decision.status === "proposed") return { activity: "expression", reason: "proposed" };
+  if (!decision.promotionEvidenceComplete) return { activity: "expression", reason: "promotion_evidence_missing" };
   if (!decision.shipped) return { activity: "expression", reason: "accepted_not_shipped" };
   return { activity: "conformance", reason: "accepted_shipped" };
 }
@@ -123,8 +133,10 @@ export function renderDecision(input: SignalInput): string {
   const scope = oneLine(input.scope?.trim() || "unscoped", "scope");
   const statement = input.statement.trim();
   if (!statement) throw new TasteError("Decision statement is required.", "invalid_decision");
+  validatePromotionEvidence(input);
   const shippedEvidence = (input.shippedEvidence ?? []).map((item) => item.trim()).filter(Boolean);
-  const coverageGap = input.coverageGap ?? input.trigger === "gap";
+  const coverageGap = input.coverageGap ?? false;
+  if (coverageGap) throw new TasteError("Resolve the coverage gap before writing a Decision to the Pack.", "promotion_incomplete");
   const lines = [
     "---",
     `id: ${id}`,
@@ -134,6 +146,8 @@ export function renderDecision(input: SignalInput): string {
     `scope: ${yamlScalar(scope)}`,
     `coverage_gap: ${coverageGap ? "true" : "false"}`,
     `shipped: ${shippedEvidence.length > 0 ? "true" : "false"}`,
+    `validated_artifact: ${yamlScalar(input.validatedArtifact.trim())}`,
+    `user_approved_artifact: ${yamlScalar(input.userApprovedArtifact.trim())}`,
     "---",
     "",
     `# ${title}`,
@@ -149,6 +163,14 @@ export function renderDecision(input: SignalInput): string {
     "## Shipped evidence",
     "",
     shippedEvidence.length > 0 ? shippedEvidence.map((item) => `- ${item}`).join("\n") : "- none",
+    "",
+    "## Validation evidence",
+    "",
+    input.validationEvidence.map((item) => `- ${item.trim()}`).join("\n"),
+    "",
+    "## User approval evidence",
+    "",
+    input.userApprovalEvidence.trim(),
     "",
     "## Coverage gap",
     "",
@@ -177,6 +199,15 @@ export function parseDecision(file: PackFile): ParsedDecision | UnparsedDecision
   if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope || coverageGap === undefined) {
     return { path: file.path, id: fields.id || idFromPath, parsed: false, reason: "unparsed" };
   }
+  const body = file.content.slice(frontmatter[0].length);
+  const sections = sectionMap(body);
+  const validatedArtifact = meaningful(fields.validated_artifact, ["none"]);
+  const userApprovedArtifact = meaningful(fields.user_approved_artifact, ["none"]);
+  const validationEvidence = parseEvidence(sections["Validation evidence"]);
+  const userApprovalEvidence = meaningful(sections["User approval evidence"], [EMPTY_NOTE]);
+  const promotionEvidenceComplete = Boolean(
+    validatedArtifact && validatedArtifact === userApprovedArtifact && validationEvidence.length > 0 && userApprovalEvidence,
+  );
   return {
     path: file.path,
     id: fields.id,
@@ -186,14 +217,22 @@ export function parseDecision(file: PackFile): ParsedDecision | UnparsedDecision
     scope: fields.scope,
     coverageGap,
     shipped: fields.shipped === "true",
+    promotionEvidenceComplete,
     parsed: true,
   };
 }
 
 export async function recordSignal(repositoryPath: string, input: SignalInput): Promise<{ path: string; activity: PartActivity; reason: DecisionReason; content: string }> {
+  validatePromotionEvidence(input);
+  if (input.status !== "accepted") {
+    throw new TasteError("Taste only records finalized, user-approved Decisions. Keep drafts and rejected iterations in the host's active task context.", "promotion_incomplete");
+  }
+  if (input.coverageGap === true) {
+    throw new TasteError("Resolve the coverage gap before writing a Decision to the Pack.", "promotion_incomplete");
+  }
   const existing = await loadExistingDecision(repositoryPath, input.id);
   const content = renderDecision(mergeSignal(existing, input));
-  const written = await writePackFile(repositoryPath, decisionPath(input.id), content);
+  const written = await writeDecisionFile(repositoryPath, decisionPath(input.id), content);
   const parsed = parseDecision(written);
   if (!parsed.parsed) {
     return { path: written.path, activity: "expression", reason: "unparsed", content: written.content };
@@ -230,6 +269,7 @@ export async function readPartState(repositoryPath: string, scope?: string): Pro
       status: parsed.status,
       trigger: parsed.trigger,
       shipped: parsed.shipped,
+      promotionEvidenceComplete: parsed.promotionEvidenceComplete,
       coverageGap: parsed.coverageGap,
     });
   }
@@ -239,7 +279,7 @@ export async function readPartState(repositoryPath: string, scope?: string): Pro
       decisions: [],
       scopes: [{ scope: wanted || "(pack)", activity: "expression", reason: "no_decisions", decisionIds: [] }],
       anyPartNeedsExpression: true,
-      note: "No structured Decision matches. Expression applies for that part until a Decision is accepted, has shipped evidence, and has no coverage gap. This report does not start a mode change.",
+      note: "No structured Decision matches. Expression applies for that part until a Decision has complete matching validation and user-approval evidence, shipped evidence, and no coverage gap. The host owns the workflow; this report only derives part activity.",
     };
   }
 
@@ -264,7 +304,7 @@ export async function readPartState(repositoryPath: string, scope?: string): Pro
     decisions,
     scopes,
     anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
-    note: "Per-part activity only. The Pack does not flip as a whole. Who initiates a move between Expression and Conformance is open; this tool does not decide it.",
+    note: "Per-part activity only. The Pack does not flip as a whole. An early positive reaction nudges the host to continue its workflow; it does not promote a Decision. The host owns checks, readiness, user review, and push.",
   };
 }
 
@@ -286,6 +326,7 @@ function mergeSignal(existing: ExistingDecision | null, input: SignalInput): Sig
     }
     coverageGap = existing.coverageGap;
   }
+  const artifactChanged = existing.validatedArtifact !== input.validatedArtifact.trim();
   return {
     id: input.id,
     title: input.title,
@@ -294,7 +335,11 @@ function mergeSignal(existing: ExistingDecision | null, input: SignalInput): Sig
     trigger: input.trigger,
     rationale: input.rationale !== undefined ? input.rationale : existing.rationale,
     scope: input.scope !== undefined ? input.scope : existing.scope,
-    shippedEvidence: input.shippedEvidence !== undefined ? input.shippedEvidence : existing.shippedEvidence,
+    validatedArtifact: input.validatedArtifact,
+    validationEvidence: input.validationEvidence,
+    userApprovedArtifact: input.userApprovedArtifact,
+    userApprovalEvidence: input.userApprovalEvidence,
+    shippedEvidence: input.shippedEvidence !== undefined ? input.shippedEvidence : artifactChanged ? [] : existing.shippedEvidence,
     coverageGap,
     coverageGapNote: input.coverageGapNote !== undefined ? input.coverageGapNote : existing.coverageGapNote,
     knownFlaws: input.knownFlaws !== undefined ? input.knownFlaws : existing.knownFlaws,
@@ -319,6 +364,7 @@ function parseExistingDecision(content: string): ExistingDecision {
   const sections = sectionMap(body);
   return {
     scope: fields.scope,
+    validatedArtifact: meaningful(fields.validated_artifact, ["none"]),
     coverageGap: booleanField(fields.coverage_gap),
     statement: meaningful(sections.Statement, []),
     rationale: meaningful(sections.Rationale, [EMPTY_NOTE]),
@@ -358,11 +404,33 @@ function meaningful(text: string | undefined, placeholders: string[]): string | 
 }
 
 function oneLine(value: string, label: string): string {
+  return boundedLine(value, label, 200);
+}
+
+function boundedLine(value: string, label: string, maxLength: number): string {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 200 || /[\r\n]/.test(trimmed)) {
-    throw new TasteError(`${label} must be a single line of 1–200 characters.`, "invalid_decision");
+  if (!trimmed || trimmed.length > maxLength || /[\r\n]/.test(trimmed)) {
+    throw new TasteError(`${label} must be a single line of 1–${maxLength} characters.`, "invalid_decision");
   }
   return trimmed;
+}
+
+function validatePromotionEvidence(input: SignalInput): void {
+  const artifact = boundedLine(input.validatedArtifact, "validatedArtifact", 1000);
+  const approvedArtifact = boundedLine(input.userApprovedArtifact, "userApprovedArtifact", 1000);
+  if (artifact !== approvedArtifact) {
+    throw new TasteError("User approval must refer to the exact validated artifact being recorded.", "promotion_incomplete");
+  }
+  if (!input.validationEvidence.length || input.validationEvidence.length > 30) {
+    throw new TasteError("At least one host-reported validation result is required before recording a Decision.", "promotion_incomplete");
+  }
+  for (const [index, evidence] of input.validationEvidence.entries()) {
+    boundedLine(evidence, `validationEvidence[${index}]`, 1000);
+  }
+  boundedLine(input.userApprovalEvidence, "userApprovalEvidence", 1000);
+  if (input.status !== "accepted") {
+    throw new TasteError("Only accepted Decisions can be added to the Pack. Keep unapproved drafts and rejected iterations in the host's active task context.", "promotion_incomplete");
+  }
 }
 
 function yamlScalar(value: string): string {

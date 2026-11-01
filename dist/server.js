@@ -36724,27 +36724,31 @@ This is the entry point for one Taste Pack. Decisions live under \`references/de
 
 Read Decisions and call \`taste_part_state\` before UI work. Activity is derived, not authored:
 
-- **Conformance:** the Decision is \`accepted\`, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
-- **Expression:** anything else \u2014 no Decision, \`proposed\`, \`rejected\`, accepted but not shipped, or a coverage gap. Expression interviews and writes the Decision with \`taste_record_signal\`.
-- **User intent:** a request for new taste, a correction, or greenfield judgment also uses Expression for that part, even when other Decisions are Conformance.
+- **Conformance:** the Decision is \`accepted\`, includes matching host-reported validation and user-approval evidence, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
+- **Expression:** anything else \u2014 no Decision, a legacy or unapproved Decision, missing promotion evidence, accepted but not shipped, or a coverage gap. The host keeps iteration feedback in its active task and records only a finalized Decision with \`taste_record_signal\`.
+- **User intent:** a request for new taste, a correction, or greenfield judgment uses Expression for that task, even when other Decisions are Conformance.
 
-The Pack never flips as a whole. Only the Decisions that changed update. Who initiates a move between activities is an open question; do not invent a nudge. \`taste_mode_resolve\` is a deprecated task-local helper and is not the product rule.
+The Pack never flips as a whole. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional \`decisionPromotionCheckpoint\` in the manifest is reminder text only. Do not add another mode or put host workflow inside the Pack. \`taste_mode_resolve\` is deprecated and is not the product rule.
 
 ## Apply this Pack
 
 Read \`references/shared/product-facts.md\` and the Decisions that touch the task. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
 
-For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
+For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When the user likes an early direction, continue the host's workflow without writing to the Pack. Record only after the host reports relevant checks passed and the user approved the exact tested artifact and Decision. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
-function createStarterPackFiles(productName, surfaces = []) {
+function createStarterPackFiles(productName, surfaces = [], decisionPromotionCheckpoint) {
   const normalizedName = productName.trim();
   if (normalizedName.length < 2 || normalizedName.length > 120) {
     throw new TasteError("Product name must be between 2 and 120 characters.", "invalid_product_name");
   }
+  if (decisionPromotionCheckpoint !== void 0 && (!decisionPromotionCheckpoint.trim() || decisionPromotionCheckpoint.length > 500)) {
+    throw new TasteError("decisionPromotionCheckpoint must be non-empty and no longer than 500 characters.", "invalid_promotion_checkpoint");
+  }
   const manifest = {
     name: normalizedName,
     version: "0.1.0",
-    surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean)
+    surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean),
+    ...decisionPromotionCheckpoint?.trim() ? { decisionPromotionCheckpoint: decisionPromotionCheckpoint.trim() } : {}
   };
   return [
     {
@@ -36753,7 +36757,7 @@ function createStarterPackFiles(productName, surfaces = []) {
 
 This directory is the product's one Taste Pack. Read \`skills/product-design/SKILL.md\`, then Decisions under \`skills/product-design/references/decisions/\`.
 
-Conformance and Expression are derived activities, not folders. A Decision is Conformance only when it is accepted, has shipped evidence, and has no coverage gap. Expression writes and updates Decisions. The starter is not product knowledge.
+Conformance and Expression are derived activities, not folders. A Decision is Conformance only when it is accepted, has shipped evidence, has no coverage gap, and records host-reported validation and user approval for the same artifact. Expression keeps provisional feedback in the host's active task context; it does not write draft Decisions to the Pack. The starter is not product knowledge.
 `
     },
     { path: "manifest.json", content: `${JSON.stringify(manifest, null, 2)}
@@ -36772,12 +36776,14 @@ Record reviewed product facts that apply across parts. Add evidence and source l
 
 One Pack. Each other file in this directory is one Decision written by \`taste_record_signal\`. Do not author a mode field.
 
+A Decision can be recorded only after the host reports a final artifact, its relevant validation evidence, and the user's approval of that same artifact and Decision. Taste stores the host's report; it does not run or judge checks or user review.
+
 Derived activity for a Decision:
 
-- **Conformance** when \`status\` is \`accepted\`, \`shipped\` is true, and \`coverage_gap\` is false.
-- **Expression** otherwise: no Decision yet, \`proposed\`, \`rejected\`, accepted without shipped evidence, or a coverage gap.
+- **Conformance** when \`status\` is \`accepted\`, shipped evidence is present, there is no coverage gap, and promotion evidence is complete.
+- **Expression** otherwise, including accepted but unshipped or Decisions missing promotion evidence.
 
-Expression is the learner: interviews, greenfield signals, coverage gaps, and corrections (\`rejected_pass\`) all write here. Sweep writes \`proposed\` Decisions with trigger \`sweep\`. The Pack does not flip as a whole. Who initiates a move between activities is an open question; do not invent a nudge.
+During Expression, interviews, alternatives, corrections, and design feedback remain in the host's active task context. The host follows its own workflow, then records the finalized Decision at the optional \`decisionPromotionCheckpoint\` in \`manifest.json\`, if configured. The Pack does not flip as a whole.
 `
     },
     {
@@ -36934,8 +36940,18 @@ async function readPackFile(repositoryPath2, relativePath) {
   return { path: normalized.split(path.sep).join("/"), content: await readFile(filePath, "utf8") };
 }
 async function writePackFile(repositoryPath2, relativePath, content) {
+  return writePackFileInternal(repositoryPath2, relativePath, content, false);
+}
+async function writeDecisionFile(repositoryPath2, relativePath, content) {
+  return writePackFileInternal(repositoryPath2, relativePath, content, true);
+}
+async function writePackFileInternal(repositoryPath2, relativePath, content, allowDecisionWrite) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
   const normalized = normalizePackRelativePath(relativePath);
+  const decisionsPrefix = path.join("skills", "product-design", "references", "decisions") + path.sep;
+  if (!allowDecisionWrite && normalized.startsWith(decisionsPrefix)) {
+    throw new TasteError("Decision files can only be written through taste_record_signal after final validation and user approval.", "decision_write_requires_promotion");
+  }
   if (!/\.(md|json|html|css|js|jsx|ts|tsx|svg|txt)$/i.test(normalized)) {
     throw new TasteError("Pack files must use a supported text format (Markdown, JSON, HTML, CSS, JavaScript, TypeScript, SVG, or text).", "unsupported_pack_file");
   }
@@ -37102,6 +37118,9 @@ async function validatePackAt(packRoot) {
     if (record2.surfaces !== void 0 && (!Array.isArray(record2.surfaces) || !record2.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
     }
+    if (record2.decisionPromotionCheckpoint !== void 0 && (typeof record2.decisionPromotionCheckpoint !== "string" || record2.decisionPromotionCheckpoint.trim().length === 0 || record2.decisionPromotionCheckpoint.length > 500)) {
+      issues.push({ path: "manifest.json", message: "decisionPromotionCheckpoint must be a non-empty string of at most 500 characters when present." });
+    }
   }
   try {
     const skillPath = await resolvePackFile(packRoot, ENTRY_SKILL);
@@ -37121,7 +37140,7 @@ async function validatePack(repositoryPath2) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
   return validatePackAt(packRoot);
 }
-async function initializePack(repositoryPath2, productName, surfaces = []) {
+async function initializePack(repositoryPath2, productName, surfaces = [], decisionPromotionCheckpoint) {
   const repositoryRoot = await resolveRepositoryRoot(repositoryPath2);
   const packRoot = path.join(repositoryRoot, PACK_DIRECTORY);
   try {
@@ -37130,7 +37149,7 @@ async function initializePack(repositoryPath2, productName, surfaces = []) {
   } catch (error62) {
     if (error62 instanceof TasteError) throw error62;
   }
-  const files = createStarterPackFiles(productName, surfaces);
+  const files = createStarterPackFiles(productName, surfaces, decisionPromotionCheckpoint);
   await mkdir(packRoot, { recursive: false });
   try {
     for (const file2 of files) {
@@ -37259,6 +37278,7 @@ function deriveDecisionActivity(decision) {
   if (decision.coverageGap) return { activity: "expression", reason: "coverage_gap" };
   if (decision.status === "rejected") return { activity: "expression", reason: "rejected" };
   if (decision.status === "proposed") return { activity: "expression", reason: "proposed" };
+  if (!decision.promotionEvidenceComplete) return { activity: "expression", reason: "promotion_evidence_missing" };
   if (!decision.shipped) return { activity: "expression", reason: "accepted_not_shipped" };
   return { activity: "conformance", reason: "accepted_shipped" };
 }
@@ -37268,8 +37288,10 @@ function renderDecision(input2) {
   const scope = oneLine(input2.scope?.trim() || "unscoped", "scope");
   const statement = input2.statement.trim();
   if (!statement) throw new TasteError("Decision statement is required.", "invalid_decision");
+  validatePromotionEvidence(input2);
   const shippedEvidence = (input2.shippedEvidence ?? []).map((item) => item.trim()).filter(Boolean);
-  const coverageGap = input2.coverageGap ?? input2.trigger === "gap";
+  const coverageGap = input2.coverageGap ?? false;
+  if (coverageGap) throw new TasteError("Resolve the coverage gap before writing a Decision to the Pack.", "promotion_incomplete");
   const lines = [
     "---",
     `id: ${id}`,
@@ -37279,6 +37301,8 @@ function renderDecision(input2) {
     `scope: ${yamlScalar(scope)}`,
     `coverage_gap: ${coverageGap ? "true" : "false"}`,
     `shipped: ${shippedEvidence.length > 0 ? "true" : "false"}`,
+    `validated_artifact: ${yamlScalar(input2.validatedArtifact.trim())}`,
+    `user_approved_artifact: ${yamlScalar(input2.userApprovedArtifact.trim())}`,
     "---",
     "",
     `# ${title}`,
@@ -37294,6 +37318,14 @@ function renderDecision(input2) {
     "## Shipped evidence",
     "",
     shippedEvidence.length > 0 ? shippedEvidence.map((item) => `- ${item}`).join("\n") : "- none",
+    "",
+    "## Validation evidence",
+    "",
+    input2.validationEvidence.map((item) => `- ${item.trim()}`).join("\n"),
+    "",
+    "## User approval evidence",
+    "",
+    input2.userApprovalEvidence.trim(),
     "",
     "## Coverage gap",
     "",
@@ -37321,6 +37353,15 @@ function parseDecision(file2) {
   if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope || coverageGap === void 0) {
     return { path: file2.path, id: fields.id || idFromPath, parsed: false, reason: "unparsed" };
   }
+  const body = file2.content.slice(frontmatter[0].length);
+  const sections = sectionMap(body);
+  const validatedArtifact = meaningful(fields.validated_artifact, ["none"]);
+  const userApprovedArtifact = meaningful(fields.user_approved_artifact, ["none"]);
+  const validationEvidence = parseEvidence(sections["Validation evidence"]);
+  const userApprovalEvidence = meaningful(sections["User approval evidence"], [EMPTY_NOTE]);
+  const promotionEvidenceComplete = Boolean(
+    validatedArtifact && validatedArtifact === userApprovedArtifact && validationEvidence.length > 0 && userApprovalEvidence
+  );
   return {
     path: file2.path,
     id: fields.id,
@@ -37330,13 +37371,21 @@ function parseDecision(file2) {
     scope: fields.scope,
     coverageGap,
     shipped: fields.shipped === "true",
+    promotionEvidenceComplete,
     parsed: true
   };
 }
 async function recordSignal(repositoryPath2, input2) {
+  validatePromotionEvidence(input2);
+  if (input2.status !== "accepted") {
+    throw new TasteError("Taste only records finalized, user-approved Decisions. Keep drafts and rejected iterations in the host's active task context.", "promotion_incomplete");
+  }
+  if (input2.coverageGap === true) {
+    throw new TasteError("Resolve the coverage gap before writing a Decision to the Pack.", "promotion_incomplete");
+  }
   const existing = await loadExistingDecision(repositoryPath2, input2.id);
   const content = renderDecision(mergeSignal(existing, input2));
-  const written = await writePackFile(repositoryPath2, decisionPath(input2.id), content);
+  const written = await writeDecisionFile(repositoryPath2, decisionPath(input2.id), content);
   const parsed = parseDecision(written);
   if (!parsed.parsed) {
     return { path: written.path, activity: "expression", reason: "unparsed", content: written.content };
@@ -37372,6 +37421,7 @@ async function readPartState(repositoryPath2, scope) {
       status: parsed.status,
       trigger: parsed.trigger,
       shipped: parsed.shipped,
+      promotionEvidenceComplete: parsed.promotionEvidenceComplete,
       coverageGap: parsed.coverageGap
     });
   }
@@ -37380,7 +37430,7 @@ async function readPartState(repositoryPath2, scope) {
       decisions: [],
       scopes: [{ scope: wanted || "(pack)", activity: "expression", reason: "no_decisions", decisionIds: [] }],
       anyPartNeedsExpression: true,
-      note: "No structured Decision matches. Expression applies for that part until a Decision is accepted, has shipped evidence, and has no coverage gap. This report does not start a mode change."
+      note: "No structured Decision matches. Expression applies for that part until a Decision has complete matching validation and user-approval evidence, shipped evidence, and no coverage gap. The host owns the workflow; this report only derives part activity."
     };
   }
   const byScope = /* @__PURE__ */ new Map();
@@ -37402,7 +37452,7 @@ async function readPartState(repositoryPath2, scope) {
     decisions,
     scopes,
     anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
-    note: "Per-part activity only. The Pack does not flip as a whole. Who initiates a move between Expression and Conformance is open; this tool does not decide it."
+    note: "Per-part activity only. The Pack does not flip as a whole. An early positive reaction nudges the host to continue its workflow; it does not promote a Decision. The host owns checks, readiness, user review, and push."
   };
 }
 function booleanField(value) {
@@ -37422,6 +37472,7 @@ function mergeSignal(existing, input2) {
     }
     coverageGap = existing.coverageGap;
   }
+  const artifactChanged = existing.validatedArtifact !== input2.validatedArtifact.trim();
   return {
     id: input2.id,
     title: input2.title,
@@ -37430,7 +37481,11 @@ function mergeSignal(existing, input2) {
     trigger: input2.trigger,
     rationale: input2.rationale !== void 0 ? input2.rationale : existing.rationale,
     scope: input2.scope !== void 0 ? input2.scope : existing.scope,
-    shippedEvidence: input2.shippedEvidence !== void 0 ? input2.shippedEvidence : existing.shippedEvidence,
+    validatedArtifact: input2.validatedArtifact,
+    validationEvidence: input2.validationEvidence,
+    userApprovedArtifact: input2.userApprovedArtifact,
+    userApprovalEvidence: input2.userApprovalEvidence,
+    shippedEvidence: input2.shippedEvidence !== void 0 ? input2.shippedEvidence : artifactChanged ? [] : existing.shippedEvidence,
     coverageGap,
     coverageGapNote: input2.coverageGapNote !== void 0 ? input2.coverageGapNote : existing.coverageGapNote,
     knownFlaws: input2.knownFlaws !== void 0 ? input2.knownFlaws : existing.knownFlaws,
@@ -37453,6 +37508,7 @@ function parseExistingDecision(content) {
   const sections = sectionMap(body);
   return {
     scope: fields.scope,
+    validatedArtifact: meaningful(fields.validated_artifact, ["none"]),
     coverageGap: booleanField(fields.coverage_gap),
     statement: meaningful(sections.Statement, []),
     rationale: meaningful(sections.Rationale, [EMPTY_NOTE]),
@@ -37484,11 +37540,31 @@ function meaningful(text, placeholders) {
   return trimmed;
 }
 function oneLine(value, label) {
+  return boundedLine(value, label, 200);
+}
+function boundedLine(value, label, maxLength) {
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 200 || /[\r\n]/.test(trimmed)) {
-    throw new TasteError(`${label} must be a single line of 1\u2013200 characters.`, "invalid_decision");
+  if (!trimmed || trimmed.length > maxLength || /[\r\n]/.test(trimmed)) {
+    throw new TasteError(`${label} must be a single line of 1\u2013${maxLength} characters.`, "invalid_decision");
   }
   return trimmed;
+}
+function validatePromotionEvidence(input2) {
+  const artifact = boundedLine(input2.validatedArtifact, "validatedArtifact", 1e3);
+  const approvedArtifact = boundedLine(input2.userApprovedArtifact, "userApprovedArtifact", 1e3);
+  if (artifact !== approvedArtifact) {
+    throw new TasteError("User approval must refer to the exact validated artifact being recorded.", "promotion_incomplete");
+  }
+  if (!input2.validationEvidence.length || input2.validationEvidence.length > 30) {
+    throw new TasteError("At least one host-reported validation result is required before recording a Decision.", "promotion_incomplete");
+  }
+  for (const [index, evidence] of input2.validationEvidence.entries()) {
+    boundedLine(evidence, `validationEvidence[${index}]`, 1e3);
+  }
+  boundedLine(input2.userApprovalEvidence, "userApprovalEvidence", 1e3);
+  if (input2.status !== "accepted") {
+    throw new TasteError("Only accepted Decisions can be added to the Pack. Keep unapproved drafts and rejected iterations in the host's active task context.", "promotion_incomplete");
+  }
 }
 function yamlScalar(value) {
   if (/[:#"'&*!|>%@`[\],{}]/.test(value) || value !== value.trim()) {
@@ -37558,11 +37634,12 @@ function createTasteServer() {
       inputSchema: {
         repositoryPath,
         productName: external_exports.string().min(2).max(120).describe("Product name for the starter Pack."),
-        surfaces: external_exports.array(external_exports.string().min(1).max(100)).max(30).optional().describe("Known product surfaces to record in the Pack manifest.")
+        surfaces: external_exports.array(external_exports.string().min(1).max(100)).max(30).optional().describe("Known product surfaces to record in the Pack manifest."),
+        decisionPromotionCheckpoint: external_exports.string().trim().min(1).max(500).optional().describe("Optional plain-language checkpoint for when the host should ask Taste to record a finalized Decision. Guidance only: the host owns checks, user approval, and push workflow.")
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
-    async ({ repositoryPath: root, productName, surfaces }) => toolResult(async () => initializePack(root, productName, surfaces))
+    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult(async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint))
   );
   server2.registerTool(
     "taste_pack_inspect",
@@ -37591,7 +37668,7 @@ function createTasteServer() {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions or files outside the Pack. Use for product knowledge and evaluation fixtures; product judgment and acceptance remain with the host agent and user.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or Decision files under skills/product-design/references/decisions/. Use for product facts and evaluation fixtures; finalized Decisions must use taste_record_signal after the host reports validation and user approval.",
       inputSchema: {
         repositoryPath,
         path: external_exports.string().min(1).max(300).describe("Pack-relative destination path."),
@@ -37615,7 +37692,7 @@ function createTasteServer() {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Expression and Sweep write path. Create or update one Decision under taste/skills/product-design/references/decisions/. Use trigger interview for greenfield or new requirements, sweep for shipped-UI extraction, gap when artefacts cannot justify the next step, and rejected_pass for a correction on shipped or generated work. status stays proposed until the user accepts or rejects the statement. There is no mode field. Same id updates that Decision in place. Omitted optional fields keep the stored rationale, scope, shipped evidence, coverage gap, known flaws, and alternatives.",
+      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact and the Decision statement. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
       inputSchema: {
         repositoryPath,
         id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
@@ -37623,11 +37700,14 @@ function createTasteServer() {
         statement: external_exports.string().min(1).max(8e3).describe("The judgment, in the user's terms."),
         rationale: external_exports.string().max(8e3).optional(),
         scope: external_exports.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
-        status: external_exports.enum(["proposed", "accepted", "rejected"]),
+        status: external_exports.literal("accepted").describe("Only record after the tested artifact and this Decision are approved by the user."),
         trigger: external_exports.enum(["interview", "sweep", "gap", "rejected_pass"]),
+        validatedArtifact: external_exports.string().trim().min(1).max(1e3).describe("Stable reference to the exact final artifact the host's workflow validated, such as a commit, release candidate, or inspected deployed version."),
+        validationEvidence: external_exports.array(external_exports.string().trim().min(1).max(1e3)).min(1).max(30).describe("Host-reported results and evidence for relevant product-specific checks. The host chooses these; Taste does not run or judge them."),
+        userApprovedArtifact: external_exports.string().trim().min(1).max(1e3).describe("Must identify the same final artifact as validatedArtifact."),
+        userApprovalEvidence: external_exports.string().trim().min(1).max(1e3).describe("Brief host-reported evidence that the user approved this tested artifact and Decision statement."),
         shippedEvidence: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
-        coverageGap: external_exports.boolean().optional().describe("True when current artefacts cannot justify the next step. On create, defaults to true when trigger is gap. On update, omit to keep the stored value."),
-        coverageGapNote: external_exports.string().max(2e3).optional(),
+        coverageGap: external_exports.literal(false).default(false).describe("An unresolved coverage gap cannot be promoted to the Pack."),
         knownFlaws: external_exports.string().max(4e3).optional(),
         alternatives: external_exports.string().max(4e3).optional()
       },
@@ -37639,7 +37719,7 @@ function createTasteServer() {
     "taste_part_state",
     {
       title: "Derive Taste part activity",
-      description: "Derive Conformance or Expression per Decision from status, shipped evidence, and coverage gap. Conformance means accepted, shipped evidence present, and coverage gap false. Everything else is Expression for that part. An empty Pack is Expression. Does not write a mode field, does not flip the Pack, and does not decide who initiates a change. User intent can still route into Expression.",
+      description: "Derive Conformance or Expression per Decision from acceptance, matching host-reported validation and user-approval evidence, shipped evidence, and coverage gap. Conformance requires all of these; accepted but unshipped or legacy Decisions without promotion evidence remain Expression. An empty Pack is Expression. This tool does not run or judge checks, write a mode field, flip the Pack, or decide who initiates a change. User intent can still route a task into Expression.",
       inputSchema: {
         repositoryPath,
         scope: external_exports.string().min(1).max(200).optional().describe("Optional part name or decision id to filter.")

@@ -10,7 +10,8 @@ The repository root is a portable Agent Plugins package:
 - `skills/` contains the plugin workflows loaded by the host agent.
 - `mcp.json` starts the bundled stdio MCP server using a package-relative path.
 - `.agents/plugins/marketplace.json` makes the root package discoverable from this repository in Codex's local plugin marketplace.
-- `.claude-plugin/plugin.json` and `.mcp.json` are Claude Code's native compatibility files. They point at the same Skills and server.
+- `.codex-plugin/plugin.json` and `.mcp.json` provide the Codex CLI compatibility path for clients that do not load the portable root MCP manifest.
+- `.claude-plugin/plugin.json` and `.claude.mcp.json` provide Claude Code's native compatibility path. The Claude manifest points at its MCP config, which launches the same bundled server.
 
 Codex and Cursor can consume the Agent Plugins package. Claude Code currently uses its native plugin format. These are adapters around one implementation, not separate Taste products. The agent plugin standard and each harness evolve; verify the linked official documentation before changing manifests or install instructions.
 
@@ -28,9 +29,11 @@ claude --plugin-dir /absolute/path/to/taste
 
 The root Agent Plugins manifests are the portable package format for Codex and Cursor. Cursor's plugin manager can load the package from its repository or release source. Do not copy Taste Skills into provider-specific project folders; the harness should load the plugin and the Pack should remain in the product repository.
 
-When a product repository has a Pack at `taste/`, the plugin tools take its absolute repository path from the host harness. `taste_pack_initialize` creates one shared Pack and never edits `AGENTS.md`, `CLAUDE.md`, or other harness instructions. Expression and Sweep persist Decisions with `taste_record_signal`. `taste_pack_write` remains for other files inside `taste/`; it rejects symlink parents and limits writes to 256 KiB. Starter files are not product knowledge.
+When a product repository has a Pack at `taste/`, the plugin tools take its absolute repository path from the host harness. `taste_pack_initialize` creates one shared Pack and never edits `AGENTS.md`, `CLAUDE.md`, or other harness instructions. Expression and Sweep keep provisional feedback in the host's active task; only `taste_record_signal` can write a finalized Decision, after the host reports relevant checks and user approval for the same artifact. The tool stores those reports without running or judging the checks. `taste_pack_write` cannot write Decision files; it remains for other files inside `taste/`, rejects symlink parents, and limits writes to 256 KiB. Starter files are not product knowledge.
 
-The portable `mcp.json` runs `node ./dist/server.js` with `cwd` `./`, which the Agent Plugins schema treats as the plugin root. Cursor also expands `${CURSOR_PLUGIN_ROOT}` in MCP config, but this package keeps the relative path so Codex and the schema check stay on one command. Claude Code uses `.mcp.json` and `${CLAUDE_PLUGIN_ROOT}`. The committed `dist/server.js` is what an install runs; rebuild it after TypeScript changes.
+An optional `decisionPromotionCheckpoint` may be stored in `taste/manifest.json` as plain-language reminder text for when the host should invoke Taste. It does not observe test results or configure/execute host checks, user review, readiness, or push timing. The host follows its existing product workflow and chooses before/after-push timing.
+
+The portable `mcp.json` uses the host-provided `${PLUGIN_ROOT}` in both the launch path and working directory. The Codex CLI compatibility `.mcp.json` uses package-relative `./` paths because Codex 0.144.1 resolves `cwd` relative to the installed plugin root but does not expand `${PLUGIN_ROOT}` in that legacy config. Both resolve to the installed copy without a machine-specific path. Claude Code uses `.claude.mcp.json` and `${CLAUDE_PLUGIN_ROOT}`. The committed `dist/server.js` is what an install runs; rebuild it after TypeScript changes.
 
 ## Development checks
 

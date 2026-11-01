@@ -37,11 +37,21 @@ test("initializes one shared Pack without touching repository instructions", asy
     assert.equal(result.filesCreated.some((file) => file.includes("/conformance/") || file.includes("/expression/")), false);
     assert.equal(inspection.manifest?.name, "Example Product");
     assert.equal(inspection.manifest?.supportedModes, undefined);
+    assert.equal(inspection.manifest?.decisionPromotionCheckpoint, undefined);
     assert.equal(inspection.layout, "shared");
     assert.equal(inspection.supportedModesDeprecated, false);
     assert.equal(inspection.validation.valid, true);
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
+  });
+});
+
+test("initialization can record a host-defined Decision promotion checkpoint", async () => {
+  await withRepository(async (repositoryPath) => {
+    await initializePack(repositoryPath, "Example Product", [], "After product checks and user approval, before push.");
+    const inspection = await inspectPack(repositoryPath);
+    assert.equal(inspection.manifest?.decisionPromotionCheckpoint, "After product checks and user approval, before push.");
+    assert.equal(inspection.validation.valid, true);
   });
 });
 
@@ -89,6 +99,10 @@ test("Pack writes create or replace supported files only inside taste/", async (
     assert.equal(written.content, "# Button decisions\n");
     await writePackFile(repositoryPath, "skills/product-design/references/conformance/buttons.md", "# Updated decisions\n");
     assert.equal((await readPackFile(repositoryPath, written.path)).content, "# Updated decisions\n");
+    await assert.rejects(
+      () => writePackFile(repositoryPath, "skills/product-design/references/decisions/early.md", "# Draft\n"),
+      /only be written through taste_record_signal/,
+    );
     await assert.rejects(() => writePackFile(repositoryPath, "../AGENTS.md", "override"), /relative path inside the Taste Pack/);
     await assert.rejects(() => writePackFile(repositoryPath, "private.bin", "binary"), /supported text format/);
 

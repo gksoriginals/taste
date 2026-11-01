@@ -10,21 +10,51 @@ const root = process.cwd();
 
 test("portable root manifests conform to the vendored Agent Plugins 1.0 schemas", async () => {
   const plugin = JSON.parse(await readFile(path.join(root, "plugin.json"), "utf8")) as unknown;
-  const mcp = JSON.parse(await readFile(path.join(root, "mcp.json"), "utf8")) as unknown;
+  const mcp = JSON.parse(await readFile(path.join(root, "mcp.json"), "utf8")) as {
+    mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }>;
+  };
   const ajv = new Ajv2020({ strict: false });
   const validatePlugin = ajv.compile(pluginSchema);
   const validateMcp = ajv.compile(mcpSchema);
 
   assert.equal(validatePlugin(plugin), true, JSON.stringify(validatePlugin.errors));
   assert.equal(validateMcp(mcp), true, JSON.stringify(validateMcp.errors));
+  assert.deepEqual(mcp.mcpServers?.taste, {
+    type: "stdio",
+    command: "node",
+    args: ["${PLUGIN_ROOT}/dist/server.js"],
+    cwd: "${PLUGIN_ROOT}",
+  });
 });
 
 test("Claude Code compatibility manifest points to the shared MCP package", async () => {
   const manifest = JSON.parse(await readFile(path.join(root, ".claude-plugin/plugin.json"), "utf8")) as { name?: string; mcpServers?: string };
-  const mcp = JSON.parse(await readFile(path.join(root, ".mcp.json"), "utf8")) as { mcpServers?: Record<string, { args?: string[] }> };
+  const mcp = JSON.parse(await readFile(path.join(root, ".claude.mcp.json"), "utf8")) as { mcpServers?: Record<string, { args?: string[] }> };
   assert.equal(manifest.name, "taste");
-  assert.equal(manifest.mcpServers, "./.mcp.json");
+  assert.equal(manifest.mcpServers, "./.claude.mcp.json");
   assert.deepEqual(mcp.mcpServers?.taste?.args, ["${CLAUDE_PLUGIN_ROOT}/dist/server.js"]);
+});
+
+test("Codex compatibility manifest routes to its plugin-root MCP config and Skills", async () => {
+  const manifest = JSON.parse(await readFile(path.join(root, ".codex-plugin/plugin.json"), "utf8")) as {
+    name?: string;
+    version?: string;
+    skills?: string;
+    mcpServers?: string;
+  };
+  const mcp = JSON.parse(await readFile(path.join(root, ".mcp.json"), "utf8")) as {
+    mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }>;
+  };
+  assert.equal(manifest.name, "taste");
+  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.skills, "./skills/");
+  assert.equal(manifest.mcpServers, "./.mcp.json");
+  assert.deepEqual(mcp.mcpServers?.taste, {
+    type: "stdio",
+    command: "node",
+    args: ["./dist/server.js"],
+    cwd: "./",
+  });
 });
 
 test("Codex repo marketplace points to the root portable package", async () => {
