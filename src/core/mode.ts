@@ -24,8 +24,11 @@ export interface ModeResolution {
 }
 
 /**
- * Resolves an LLM-interpreted product intent signal into a task mode.
- * This function never interprets raw user language; the product Skill does.
+ * Deprecated task-local helper. Maps an already-interpreted signal to a word
+ * the agent can say. It does not read the Pack, does not derive part activity,
+ * and does not decide who initiates a change between Expression and Conformance.
+ * Product truth is Decision status + shipped evidence + coverage gap
+ * (`readPartState`). This function never interprets raw user language.
  */
 export function resolveTasteMode(input: ModeResolutionInput): ModeResolution {
   const rationale = input.rationale.trim();

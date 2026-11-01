@@ -5,7 +5,7 @@ description: Apply Example Product's design direction when implementing or revie
 
 # Example Product design
 
-This example is synthetic. Its conventions demonstrate organization only; they are not reusable prescriptions.
+This example is synthetic. Its split Conformance and Expression folders are a legacy layout. New Packs keep one `references/decisions/` tree and derive part activity from Decision status, shipped evidence, and coverage gap. There is no authored mode field. `taste_mode_resolve` does not decide who initiates a change.
 
 ## Choose and switch the task mode
 

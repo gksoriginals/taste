@@ -23,7 +23,7 @@ async function withRepository(run: (repositoryPath: string) => Promise<void>): P
   }
 }
 
-test("initializes a complete two-mode Pack without touching repository instructions", async () => {
+test("initializes one shared Pack without touching repository instructions", async () => {
   await withRepository(async (repositoryPath) => {
     const originalInstructions = "Use the existing repository workflow.\n";
     await writeFile(path.join(repositoryPath, "AGENTS.md"), originalInstructions);
@@ -33,8 +33,12 @@ test("initializes a complete two-mode Pack without touching repository instructi
 
     assert.equal(result.packPath, "taste");
     assert.ok(result.filesCreated.includes("skills/product-design/SKILL.md"));
+    assert.ok(result.filesCreated.includes("skills/product-design/references/decisions/README.md"));
+    assert.equal(result.filesCreated.some((file) => file.includes("/conformance/") || file.includes("/expression/")), false);
     assert.equal(inspection.manifest?.name, "Example Product");
-    assert.deepEqual(inspection.manifest?.supportedModes, ["conformance", "expression"]);
+    assert.equal(inspection.manifest?.supportedModes, undefined);
+    assert.equal(inspection.layout, "shared");
+    assert.equal(inspection.supportedModesDeprecated, false);
     assert.equal(inspection.validation.valid, true);
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
@@ -95,14 +99,20 @@ test("Pack writes create or replace supported files only inside taste/", async (
   });
 });
 
-test("validation catches unsupported or missing mode guidance", async () => {
+test("validation accepts a legacy split Pack and rejects a Pack with no decision home", async () => {
   await withRepository(async (repositoryPath) => {
     await initializePack(repositoryPath, "Example Product");
-    await rm(path.join(repositoryPath, "taste/skills/product-design/references/expression/README.md"));
-    const validation = await validatePack(repositoryPath);
-    assert.equal(validation.valid, false);
-    assert.ok(validation.issues.some((issue) => issue.path.includes("expression")));
+    await rm(path.join(repositoryPath, "taste/skills/product-design/references/decisions/README.md"));
+    const missing = await validatePack(repositoryPath);
+    assert.equal(missing.valid, false);
+    assert.ok(missing.issues.some((issue) => issue.path.includes("decisions/README.md")));
   });
+
+  const legacy = await validatePack(path.resolve("examples/product-pack"));
+  assert.equal(legacy.valid, true, JSON.stringify(legacy.issues));
+  const inspection = await inspectPack(path.resolve("examples/product-pack"));
+  assert.equal(inspection.layout, "legacy-split");
+  assert.equal(inspection.supportedModesDeprecated, true);
 });
 
 test("generator and Judge fixture tools receive separate data", async () => {

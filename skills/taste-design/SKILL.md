@@ -1,16 +1,18 @@
 ---
 name: taste-design
-description: Use for UI/UX implementation or review when the Taste plugin is installed. Apply the repository's Taste Pack when present; if absent, offer setup instead of inventing product guidance.
+description: Use for any UI, UX, screen, component, layout, or frontend design task when Taste is installed. Always load the product repository's taste/ Pack before designing. Follow Conformance only where taste_part_state says the Decision is accepted, shipped, and not a coverage gap; otherwise use taste-expression for that part. If no Pack exists, use taste-setup instead of inventing taste.
 ---
 
-# Apply product taste
+# Design with the Pack
 
-Use the existing coding harness and its coding agent. Taste does not start or configure an agent.
+The coding harness owns the loop. Taste does not start an agent. Do not design product UI from memory when a Pack can be loaded.
 
-1. Locate and inspect the repository's `taste/` Pack. Load the product-design entry Skill and only task-relevant references.
-2. Interpret the request using the product's triggers, then call `taste_mode_resolve` with that structured signal. The tool resolves the signal deterministically; it does not inspect raw language. Ask through the harness if intent is unclear or a direction needs user acceptance.
-3. For Conformance, follow `taste-conformance`; for Expression, follow `taste-expression`. Load shared product facts and only the selected mode's relevant references. Treat shipped work as evidence, not permission to copy known flaws. Honor the explicit task goal and surface conflicts with accepted Pack guidance.
-4. Implement or review within scope. Use the harness's browser, computer-use, and rendered-preview tools when visual or interaction evidence matters. Invoke only applicable mechanical Gates.
-5. Report the active mode and rationale, guidance and evidence used, rendered states actually inspected, checks performed, and unresolved product questions.
+1. Resolve the product repository path from the harness. Call `taste_pack_inspect`. If there is no Pack, stop and follow `taste-setup`. Do not invent taste to fill the gap.
+2. Call `taste_part_state`. Read `skills/product-design/SKILL.md`, `references/shared/product-facts.md`, and every Decision under `references/decisions/` that touches the task. On a legacy Pack with split folders, read those references too, and still treat only structured Decisions as derived Conformance.
+3. Choose the path per part, not for the whole Pack:
+   - **Conformance** for a part whose Decisions are accepted, have shipped evidence, and have `coverage_gap: false`. Follow `taste-conformance` and use those Decisions.
+   - **Expression** when the user asks for new taste, the part has no Decision, or `taste_part_state` derives Expression. Follow `taste-expression` and persist with `taste_record_signal` before implementation that depends on the new judgment.
+4. Implement or review only the requested scope. Use the harness browser, computer-use, or rendered preview when visual evidence matters. Run only mechanical checks that already exist in the product repo.
+5. Report which Decisions you loaded, the derived activity per part, what you inspected, and any signal you wrote.
 
-If no Pack exists, do not invent product taste. Offer `taste-setup`; for evidence gathering use `taste-sweep`, for new direction use `taste-expression`, and for controlled comparisons use `taste-evaluate`.
+`taste_mode_resolve` is a deprecated helper. It does not read the Pack and it does not decide who initiates Expression. Prefer `taste_part_state` plus the user's request.

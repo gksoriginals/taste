@@ -1,22 +1,23 @@
 ---
 name: taste-sweep
-description: Inspect a running product and its implementation to discover evidence-backed Conformance guidance. Use when the user asks to sweep, learn, or refresh a product's design taste; do not treat source-code inspection alone as a completed visual sweep.
+description: Sweep an existing product's shipped UI into the Taste Pack. Use when the user asks to learn, sweep, extract, or refresh design taste from a product that already has interface. Writes proposed Decisions with taste_record_signal trigger sweep. A code-only pass is not a finished visual sweep.
 ---
 
-# Sweep a product surface
+# Sweep shipped UI into Decisions
 
-The existing coding agent gathers and interprets evidence. Use the product's real browser or computer-use tools when available; Taste does not provide a browser or invent observations.
+The harness coding agent gathers evidence. Taste does not ship a browser and does not invent observations.
 
-Inspect a focused flow in the running product: open the relevant pages, follow primary and important alternate paths, examine interaction states, and capture screenshots. Note URL/page, date, viewport, state/action, screenshot path/link, and what each capture demonstrates. Include responsive, empty, loading, validation, error, or success states when they are part of the selected flow. Then inspect corresponding source and available Git history, pull requests, reviews, design references, and corrections to distinguish current behavior from accepted rationale.
+1. If `taste/` is missing, follow `taste-setup` first. Then call `taste_pack_inspect` and `taste_part_state` so you update the part you are sweeping instead of flipping the Pack.
+2. Inspect one focused flow in the running product with the harness's browser or computer-use tools. Open the pages, follow the primary path and important alternates, and capture screenshots. Note URL or page, date, viewport, state, and what each capture shows. Include empty, loading, error, and success states when they belong to the flow.
+3. Correlate with source, Git history, reviews, and design references when the user has made them available. If access or screenshots are missing, ask and mark the sweep incomplete. Never claim a screen was seen if it was not. Do not store private production data without authorization.
+4. For each candidate judgment, call `taste_record_signal`:
+   - `trigger`: `sweep`
+   - `status`: `proposed`
+   - `shippedEvidence`: the screenshot path, URL, or source you actually inspected
+   - `scope`: the part this judgment belongs to
+   - `statement`, `rationale`, and `knownFlaws` when the shipped UI looks accidental or wrong
+   - `coverageGap` true only for a step the artefacts cannot justify; say why in `coverageGapNote`
+5. Do not set `status` to `accepted` during a sweep. Acceptance is a review by the product owner. Do not write a mode field. Do not create `references/conformance/` or `references/expression/` for a new Pack.
+6. Call `taste_pack_validate` and `taste_part_state`. Report proposed Decisions, known flaws, and gaps. Parts stay Expression until a Decision is accepted, has shipped evidence, and has no coverage gap.
 
-If product access, authentication, screenshot capture, or browser/computer tools are missing, ask the user/harness for the needed access or screenshots and mark the sweep incomplete until visual evidence is available. Never claim a page or state was inspected if it was not. Do not extract or store private production data without the user's authorization.
-
-Draft only decisions supported by evidence. For each candidate, record:
-
-- the decision and why it matters for the user;
-- scope, triggering context, exceptions, and counterexamples;
-- evidence links (screenshots/rendered states and code/review sources) with date/viewport where relevant;
-- whether it is observed behavior, an inference, a known flaw, or an accepted product decision;
-- confidence and evidence gaps.
-
-Keep examples and known flaws beside the related product guidance. Ask the product owner to review inferred candidates before marking them accepted. Use `taste_pack_write` or the harness repository editor to update only the target `taste/` Pack, then validate it. Keep raw/private captures in the harness/plugin working store unless the user approves committing them.
+Who reviews a proposed Decision into acceptance is an open question. Record the proposal and stop there unless the user explicitly accepts the statement in this conversation. If they do, update the same `id` to `accepted` and keep the shipped evidence.

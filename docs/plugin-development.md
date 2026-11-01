@@ -28,7 +28,9 @@ claude --plugin-dir /absolute/path/to/taste
 
 The root Agent Plugins manifests are the portable package format for Codex and Cursor. Cursor's plugin manager can load the package from its repository or release source. Do not copy Taste Skills into provider-specific project folders; the harness should load the plugin and the Pack should remain in the product repository.
 
-When a product repository has a Pack at `taste/`, the plugin tools take its absolute repository path from the host harness. To create a starter Pack, invoke `taste_pack_initialize` with that path and the product name. Initialization only creates `taste/` and never edits the repository's `AGENTS.md`, `CLAUDE.md`, or other harness instructions. The coding agent can use `taste_pack_write` to update Pack files; this tool confines paths to `taste/`, rejects symlink parents, and limits writes to 256 KiB. The coding agent should review and replace starter prompts with product evidence before relying on them.
+When a product repository has a Pack at `taste/`, the plugin tools take its absolute repository path from the host harness. `taste_pack_initialize` creates one shared Pack and never edits `AGENTS.md`, `CLAUDE.md`, or other harness instructions. Expression and Sweep persist Decisions with `taste_record_signal`. `taste_pack_write` remains for other files inside `taste/`; it rejects symlink parents and limits writes to 256 KiB. Starter files are not product knowledge.
+
+The portable `mcp.json` runs `node ./dist/server.js` with `cwd` `./`, which the Agent Plugins schema treats as the plugin root. Cursor also expands `${CURSOR_PLUGIN_ROOT}` in MCP config, but this package keeps the relative path so Codex and the schema check stay on one command. Claude Code uses `.mcp.json` and `${CLAUDE_PLUGIN_ROOT}`. The committed `dist/server.js` is what an install runs; rebuild it after TypeScript changes.
 
 ## Development checks
 
@@ -39,9 +41,9 @@ npm test
 npm run validate:package
 ```
 
-`npm test` bundles the server and exercises Pack safety, the two-mode Pack, generator/Judge context separation, manifest schemas, and a real MCP stdio client/server exchange. `claude plugin validate .` checks Claude's native package metadata. Package validation is static and does not prove that every installed harness version can load the plugin.
+`npm test` bundles the server and exercises Pack safety, shared-Pack init, legacy split-Pack validation, Decision writes, derived part state, generator/Judge context separation, manifest schemas, and a real MCP stdio client/server exchange. `claude plugin validate .` checks Claude's native package metadata when the Claude CLI is installed. Package validation does not prove a GUI harness loaded the plugin.
 
-Use the named portable workflow Skills when explicitly invoking setup, sweep, Conformance, Expression, or evaluation. `taste-design` is the auto-relevant entry for UI/UX work when a Pack exists. See [plugin-workflows.md](plugin-workflows.md) for exact triggers and outcomes. Skills are the portable workflow definitions; Cursor-specific command files are not duplicated in this package.
+`taste-design` is the skill to select for UI work. It loads the Pack before designing. See [plugin-workflows.md](plugin-workflows.md). The harness end-to-end script is in the [README](../README.md).
 
 Evaluation tools deliberately return different packets. The generator gets task instructions and the before state; the Judge packet gets the task, rubric, and expected after state. The host harness is responsible for running a higher-capacity Judge in a separate context. This separation limits answer leakage in the workflow; it is not a security boundary against a harness that ignores instructions.
 

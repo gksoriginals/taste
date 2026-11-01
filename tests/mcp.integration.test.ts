@@ -31,6 +31,8 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
         "taste_pack_validate",
         "taste_pack_write",
         "taste_mode_resolve",
+        "taste_part_state",
+        "taste_record_signal",
       ].sort(),
     );
 
@@ -50,6 +52,48 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     const skill = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
     assert.match(skill, /Conformance/);
     assert.match(skill, /Expression/);
+    assert.match(skill, /taste_part_state/);
+
+    const recorded = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "primary-button",
+        title: "One filled primary button",
+        statement: "Each screen has one filled primary button.",
+        status: "accepted",
+        trigger: "interview",
+        shippedEvidence: ["settings screen shipped 2026-11-01"],
+        scope: "settings",
+      },
+    });
+    assert.equal(recorded.isError, undefined);
+    assert.match(JSON.stringify(recorded.structuredContent), /conformance/);
+    assert.match(await readFile(path.join(repositoryPath, "taste/skills/product-design/references/decisions/primary-button.md"), "utf8"), /One filled primary button/);
+
+    const corrected = await client.callTool({
+      name: "taste_record_signal",
+      arguments: {
+        repositoryPath,
+        id: "primary-button",
+        title: "One filled primary button",
+        statement: "Each screen has one filled primary button. Two primaries failed review.",
+        status: "proposed",
+        trigger: "rejected_pass",
+        scope: "settings",
+        coverageGap: true,
+        coverageGapNote: "Generated settings screen used two primary buttons.",
+      },
+    });
+    assert.equal(corrected.isError, undefined);
+    assert.match(JSON.stringify(corrected.structuredContent), /expression/);
+
+    const parts = await client.callTool({
+      name: "taste_part_state",
+      arguments: { repositoryPath, scope: "settings" },
+    });
+    assert.equal(parts.isError, undefined);
+    assert.match(JSON.stringify(parts.structuredContent), /coverage_gap/);
 
     const mode = await client.callTool({
       name: "taste_mode_resolve",
