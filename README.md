@@ -50,6 +50,22 @@ The plugin loads an existing Pack before UI work. It writes a Decision only afte
 
 If the artifact changes after that, the old approval does not carry over. The host rechecks the new version, and you approve it, before its Decision is updated.
 
+## Composing the Pack
+
+Taste does not crawl the product repository into `taste/`. The folder starts without design judgments and grows one Decision at a time.
+
+**Scaffold.** When you ask to set up Taste, the `taste-setup` skill calls `taste_pack_initialize`. That creates an empty Pack in the product repository: `manifest.json`, the product-design skill, `product-facts.md`, an empty `decisions/` directory, and stubs for source authority and evaluation. No judgments yet. Initialization fails if `taste/` is already there.
+
+**Sweep.** `taste-sweep` is a skill the harness agent runs when you ask it to learn from UI that is already shipping. It:
+
+1. Checks for an existing Pack. It does not create one just to sweep.
+2. Inspects one focused flow in the running UI with the harness’s browser or computer-use tools, including screenshots and the states it opened.
+3. Correlates that with source, git history, reviews, and design references when they are available.
+4. Keeps candidate judgments in the task. They are not written to disk.
+5. After you approve and the host reports validation, initializes the Pack if it is missing and calls `taste_record_signal`. That writes one Decision under `taste/skills/product-design/references/decisions/`.
+
+The Pack is the set of Decisions recorded from approved, validated artifacts. It is not a bulk extract of the repo.
+
 ## Try it
 
 Install Taste in your coding harness, open a **product repository**, and ask for a UI task in natural language. For example:
