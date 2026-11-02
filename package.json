@@ -1,9 +1,13 @@
 {
   "name": "taste-plugin",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "A portable product-design plugin for existing coding harnesses",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gksoriginals/taste.git"
+  },
   "engines": {
     "node": ">=20"
   },

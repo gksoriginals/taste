@@ -38,7 +38,7 @@ Install Taste in your coding harness, open a **product repository**, and ask for
 
 > Use Taste while simplifying the settings screen. Keep exploratory feedback out of the Pack. After the implementation passes this repository’s checks, show me the tested version; when I approve it, record the reusable decision.
 
-The harness should load an existing `taste/` Pack before UI work. If no Pack exists, a design task starts with transient Expression; setup is deferred until the tested artifact is approved. For a step-by-step check of both greenfield and existing-Pack workflows, see the [harness smoke-test guide](docs/harness-smoke-test.md).
+The harness should load an existing `taste/` Pack before UI work. If no Pack exists, a design task starts with transient Expression; setup is deferred until the tested artifact is approved. For a step-by-step check of both greenfield and existing-Pack workflows, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until someone fills it from a real host run.
 
 ## Install
 
@@ -117,7 +117,7 @@ npm test
 npm run validate:package
 ```
 
-`npm test` builds the bundled server and exercises Pack safety, Decision promotion, derived routing, and an MCP stdio client/server exchange. Package checks verify the portable manifests and host adapters. They do not prove that a GUI harness loaded the plugin; use the [smoke-test guide](docs/harness-smoke-test.md) in each host you plan to support.
+`npm test` builds the bundled server and exercises Pack safety, Decision promotion, derived routing, and an MCP stdio client/server exchange. Package checks verify the portable manifests and host adapters. They do not prove that a GUI harness loaded the plugin; use the [smoke-test guide](docs/harness-smoke-test.md) in each host you plan to support, and record the run in the [smoke-results template](docs/harness-smoke-results.md). Local setup and pull-request checks are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project docs
 
@@ -127,5 +127,13 @@ npm run validate:package
 - [Workflow and skill routing](docs/plugin-workflows.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Synthetic evaluation results](docs/validation-results.md)
+- [Harness smoke-test guide](docs/harness-smoke-test.md)
+- [Harness smoke results](docs/harness-smoke-results.md) (unverified until filled)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
 
 Taste is still plumbing toward the larger goal: helping coding agents produce UI that reflects a product’s approved design judgment. Synthetic evaluations and package tests are not evidence that it improves real product outcomes; validate it in your actual harness and product repository.
+
+## License
+
+[MIT](LICENSE) © 2026 Gopikrishnan Sasikumar

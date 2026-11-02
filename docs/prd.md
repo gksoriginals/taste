@@ -2,18 +2,18 @@
 
 **Draft · Nov 2026 IST · workflow update Nov 1**
 
-The [Google Doc](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) (*Taste: One-Pager*, Gopi · Draft · Oct 2026) is retained as a reference and has not been updated for the Nov 1 workflow decisions. This local PRD records the current implementation direction; reconcile or remove the external document later.
+This document is the product source of truth. An earlier author-private draft is optional, not maintained, and not required reading. It does not override this PRD.
 
 ## Hard goal
 
 From what's shipped, extract the product's taste across every design angle (style, fonts and typography, themes and tokens, UX, interaction, flow, copy, and more), so any coding harness, given a PRD and the Taste pack, first-passes UI you'd merge. No long design prompts. No re-teaching each screen. Experiments will find the abstract set of angles.
 
-Ambition bar (North manifesto): agents carry and extend a specific product's design judgment across harnesses and model upgrades. Altitude: outcome over task. Depth: expert methods on raw material, outside judges. Range: multiple fields, verbs not nouns.
+Ambition: agents carry and extend a specific product's design judgment across harnesses and model upgrades. Altitude: outcome over task. Depth: expert methods on raw material, outside judges. Range: multiple fields, verbs not nouns.
 
 ## Why now
 
 - Good designs rarely land on the first pass without heavy nudging.
-- On existing products, agents miss parts of the established design: on Ally, UX and interaction nuances; in other harnesses, existing style and format such as fonts and typography.
+- On existing products, agents miss parts of the established design: UX and interaction nuances on some products, and existing style and format such as fonts and typography on others.
 
 ## What Taste is / isn't
 
@@ -21,7 +21,7 @@ Ambition bar (North manifesto): agents carry and extend a specific product's des
 - Isn't an agent runtime, and isn't a daemon. The harness owns the loop, planning, and model. Taste supplies context, tools, and checks.
 - Isn't a component library, and won't become a design system product.
 - Isn't a hard CI gate. Gates are out of scope for the current milestone.
-- Who for now: Gopi dogfooding on any software-product UI repo. Ally is a historical dogfood surface, not a blocker.
+- Who for now: anyone trying Taste on a software-product UI repository. No particular product is required.
 
 ## Current harness promotion flow (Nov 1 update)
 
@@ -40,7 +40,7 @@ Skills and MCP tools drive four steps. The harness stays in charge.
 3. **Design.** Load an existing Pack before UI work. Conformance uses Decisions with matching validation and approval evidence, shipped evidence, and no coverage gap. Without a Pack, use transient Expression.
 4. **Promote through Expression.** After the host reports checks passed and the user approves the exact tested artifact and Decision, initialize the missing Pack if needed and record the accepted Decision. Agent review is not user approval; the host owns the timing and workflow.
 
-Pack state and user intent route work between the existing Expression and Conformance activities. Success for this milestone is that path running end to end on a real product repo. It does not have to be Ally.
+Pack state and user intent route work between the existing Expression and Conformance activities. Success for this milestone is that path running end to end on a real product repo.
 
 ## Baseline architecture
 
@@ -72,7 +72,7 @@ Engineering derives per-part activity from Decision status, matching validation 
 
 **Conformance** uses accepted, shipped taste for UI work. **Expression** elicits and writes the Pack for gaps, greenfield, and new judgment.
 
-HelloAlly ally-platform remains a conformance dogfood surface in the one-pager (flow and interaction first pain). Omnipresent stays a greenfield Expression surface in that note. Neither is required for this milestone. Product thinking stays harness- and product-agnostic.
+No particular product is required for this milestone. Product thinking stays harness- and product-agnostic.
 
 ## How taste gets in and is checked
 
@@ -84,23 +84,23 @@ Shipped is the source of truth: when stated preferences conflict with what's shi
 
 ## First experiments
 
-- Conformance on HelloAlly ally-platform, as recorded in the one-pager.
-- Expression on omnipresent (greenfield start); Expression pockets anywhere the artefacts cannot justify the next step.
+- Conformance on an existing product surface where shipped UI already exists.
+- Expression on a greenfield start; Expression pockets anywhere the artefacts cannot justify the next step.
 - Dual-track discovery: Sweep to historical replay is not locked as the only path.
-- This milestone: the plugin, installed in a coding harness, runs setup → Expression or Sweep → UI with the Pack → host checks and user approval → finalized Decision recorded, on a product repo that need not be Ally. No daemon. No hard CI gate.
+- This milestone: the plugin, installed in a coding harness, runs setup → Expression or Sweep → UI with the Pack → host checks and user approval → finalized Decision recorded, on any product repo. No daemon. No hard CI gate.
 
 Success signals:
 
 - The first pass is mergeable.
 - No long design prompts needed.
 - No re-teaching per screen.
-- Suggested: track gate pass rate and a with/without-pack comparison on past Ally UI changes, as one optional path, not the only one.
+- Suggested: track gate pass rate and a with/without-pack comparison on past UI changes in a real product, as one optional path, not the only one.
 
 ## Non-goals
 
 - Not an agent runtime and not a daemon.
 - Not a component library or design system product.
-- Not OpenSignal: OpenSignal doesn't own design judgment.
+- Not a separate product that owns design judgment. Design judgment stays with the product.
 - Not separate Expression vs Conformance artefact sets — one Pack.
 - Not a separate Learner product. Expression is the learner.
 - Not a hard CI gate for this milestone.
