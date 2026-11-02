@@ -7,37 +7,48 @@
 </p>
 <p align="center"><a href="#install">Install</a> · <a href="docs/prd.md">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="docs/harness-smoke-test.md">Smoke test</a></p>
 
-Taste helps a coding harness carry a product’s approved UI decisions across screens, tasks, and sessions. Product knowledge lives in a versioned `taste/` Pack inside the product repository.
+Taste teaches coding agents a product’s design taste: style, UX, interaction, copy, and the other choices that make the UI feel like that product. The point is a first pass that stays consistent across screens, tasks, and harnesses, without a long design prompt for every screen.
 
-Taste is an early-stage plugin for [Codex](https://developers.openai.com/codex), [Cursor](https://cursor.com/), and [Claude Code](https://code.claude.com/). It provides reusable Skills and a local MCP server; the host harness remains responsible for implementation, tests, review, and shipping.
+It is an early-stage plugin for [Cursor](https://cursor.com/), [Codex](https://developers.openai.com/codex), and [Claude Code](https://code.claude.com/). Skills and a local MCP server load into the harness you already use. The harness still implements, tests, reviews, and ships.
 
-## What Taste does
+## Architecture
 
-- **Keeps product decisions with the product.** A Pack is committed alongside the code it describes and can be read by different supported harnesses.
-- **Applies established direction.** Conformance uses accepted Decisions that have matching validation and user-approval evidence, inspected shipped evidence, and no unresolved coverage gap.
-- **Explores requested changes.** Expression handles greenfield work, new directions, corrections, and gaps. Exploratory feedback stays in the host’s active task while the design is changing.
-- **Learns at the right time.** After the host’s relevant checks pass and the user approves the exact tested artifact, the host automatically records a concise reusable Decision. There is no separate confirmation to write the Pack.
+Taste has three parts.
 
-The Pack is not updated from an early “I like this direction” reaction. Taste does not run tests, decide readiness, review the design on the user’s behalf, or push changes.
-
-## How it works
+- **Pack.** One `taste/` directory in the product repository. It holds that product’s approved design decisions and is committed next to the code.
+- **Plugin.** This repository. Its Skills and local MCP server are installed into the coding harness. They read the Pack and, when allowed, write a Decision back.
+- **Host.** Cursor, Codex, or Claude Code. The host implements the UI, runs checks, handles review, and ships. Taste does not.
 
 ```text
-User request
-    ↓
-Host loads the Taste Pack and routes the task per UI part
-    ↓
-Conformance applies accepted shipped Decisions
-Expression explores new direction or corrections; feedback stays task-local
-    ↓
-Host implements and runs its own checks
-    ↓
-User approves the exact tested artifact
-    ↓
-Host records the reusable Decision in taste/
+product repository                      coding harness
+taste/  Pack of Decisions    ←→    Taste plugin (Skills + local MCP)
+                                           ↑
+                                 Cursor, Codex, or Claude Code
+                                 implements, tests, reviews, ships
 ```
 
-When a user asks to change an existing UI, the host passes that intent to Taste. `taste_part_state` returns a task-local Expression route even if the Pack still derives to Conformance. The Pack’s durable state is left untouched during exploration.
+The plugin loads an existing Pack before UI work. It writes a Decision only after the host’s checks pass and you approve the exact tested artifact.
+
+## Core principles
+
+- **Judgment stays with the product.** The Pack is committed beside the code it describes.
+- **Harnesses follow the Pack.** Cursor, Codex, and Claude Code read the same decisions.
+- **One Pack per product.**
+- **Taste does not run tests or ship for you.** The host owns implementation, checks, review, and push.
+- **Recording waits for an approved artifact.** A reusable Decision is written when the host reports that its checks passed and you approve that exact version. An early “I like this direction” does not update the Pack. There is no second step just to confirm the Pack write.
+- **Exploration stays in the task.** Drafts, rejected directions, and in-progress feedback stay in the host’s current task. They are not written into the Pack while the design is still changing.
+
+## How a task runs
+
+1. You ask for UI work in a product repository.
+2. The host loads `taste/` when a Pack is already there.
+3. When the Pack already covers that UI, the host applies those decisions.
+4. When you ask for a new direction or a change, the host explores in the current task and leaves the Pack unchanged.
+5. The host implements and runs the product repository’s own checks.
+6. You approve the exact tested artifact.
+7. The host records a short reusable Decision in `taste/`. If the repository had no Pack, it creates one here.
+
+If the artifact changes after that, the old approval does not carry over. The host rechecks the new version, and you approve it, before its Decision is updated.
 
 ## Try it
 
@@ -45,7 +56,7 @@ Install Taste in your coding harness, open a **product repository**, and ask for
 
 > Use Taste while simplifying the settings screen. Keep exploratory feedback out of the Pack. After the implementation passes this repository’s checks, show me the tested version; when I approve it, record the reusable decision.
 
-The harness should load an existing `taste/` Pack before UI work. If no Pack exists, a design task starts with transient Expression; setup is deferred until the tested artifact is approved. For a step-by-step check of both greenfield and existing-Pack workflows, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until someone fills it from a real host run.
+The harness should load an existing `taste/` Pack before UI work. If none exists, the task stays in the conversation until you approve the tested artifact; the Pack is created then. For a step-by-step check of a new Pack and an existing Pack, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until someone fills it from a real host run.
 
 ## Install
 
@@ -109,7 +120,7 @@ taste/
     └── decisions/
 ```
 
-Decisions are scoped to product parts. Conformance and Expression are derived activities, not folders or a Pack-wide switch. If an approved artifact changes, the host must revalidate it and get approval for that version before updating its Decision; a changed artifact does not inherit the previous version’s shipped evidence.
+Decisions are scoped to parts of the product, not one switch for the whole Pack. If an approved artifact changes, the host must revalidate it and get approval for that version before updating its Decision. A changed artifact does not keep the previous version’s shipped evidence.
 
 ## Diagnostics
 
@@ -124,7 +135,7 @@ npm test
 npm run validate:package
 ```
 
-`npm test` builds the bundled server and exercises Pack safety, Decision promotion, derived routing, and an MCP stdio client/server exchange. Package checks verify the portable manifests and host adapters. They do not prove that a GUI harness loaded the plugin; use the [smoke-test guide](docs/harness-smoke-test.md) in each host you plan to support, and record the run in the [smoke-results template](docs/harness-smoke-results.md). Local setup and pull-request checks are in [CONTRIBUTING.md](CONTRIBUTING.md).
+`npm test` builds the bundled server and exercises Pack safety, recording Decisions, task routing, and an MCP stdio client/server exchange. Package checks verify the portable manifests and host adapters. They do not prove that a GUI harness loaded the plugin; use the [smoke-test guide](docs/harness-smoke-test.md) in each host you plan to support, and record the run in the [smoke-results template](docs/harness-smoke-results.md). Local setup and pull-request checks are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project docs
 
@@ -139,7 +150,7 @@ npm run validate:package
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
-Taste is still plumbing toward the larger goal: helping coding agents produce UI that reflects a product’s approved design judgment. Synthetic evaluations and package tests are not evidence that it improves real product outcomes; validate it in your actual harness and product repository.
+Package tests and the synthetic evaluation do not show that Taste improves a real product. Try it in your harness and product repository.
 
 ## License
 
