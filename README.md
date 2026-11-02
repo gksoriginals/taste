@@ -1,6 +1,13 @@
-# Taste
+<h1 align="center">Taste</h1>
+<p align="center"><strong>Keep the judgment with the product. Let the harness follow the Pack.</strong></p>
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-355f4c" alt="License: MIT"></a>
+  <a href="docs/prd.md"><img src="https://img.shields.io/badge/status-early_harness_plugin-e8c65a" alt="Status: early harness plugin"></a>
+  <a href="docs/plugin-development.md"><img src="https://img.shields.io/badge/MCP-local_server-355f4c" alt="MCP: local server"></a>
+</p>
+<p align="center"><a href="#install">Install</a> · <a href="docs/prd.md">Docs</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="docs/harness-smoke-test.md">Smoke test</a></p>
 
-**Product design memory for coding agents.** Taste helps a coding harness carry a product’s approved UI decisions across screens, tasks, and sessions. Product knowledge lives in a versioned `taste/` Pack inside the product repository.
+Taste helps a coding harness carry a product’s approved UI decisions across screens, tasks, and sessions. Product knowledge lives in a versioned `taste/` Pack inside the product repository.
 
 Taste is an early-stage plugin for [Codex](https://developers.openai.com/codex), [Cursor](https://cursor.com/), and [Claude Code](https://code.claude.com/). It provides reusable Skills and a local MCP server; the host harness remains responsible for implementation, tests, review, and shipping.
 
