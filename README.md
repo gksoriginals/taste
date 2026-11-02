@@ -1,5 +1,5 @@
 <h1 align="center">Taste</h1>
-<p align="center"><strong>Keep the judgment with the product. Let the harness follow the Pack.</strong></p>
+<p align="center"><strong>Teach agents your product’s design taste. Carry it across screens and harnesses.</strong></p>
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-355f4c" alt="License: MIT"></a>
   <a href="docs/prd.md"><img src="https://img.shields.io/badge/status-early_harness_plugin-e8c65a" alt="Status: early harness plugin"></a>
