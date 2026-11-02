@@ -24,4 +24,4 @@ To enable detailed server diagnostics, set `TASTE_LOG_LEVEL=debug` in the Taste 
 
 ## Record the result
 
-For each host, record its version, install path, whether the Taste Skills appeared, whether the MCP server started, whether both flows routed correctly, and whether the expected Pack files changed. Mark GUI installation and interaction as unverified until you have run them directly in that host.
+For each host, record its version, install path, whether the Taste Skills appeared, whether the MCP server started, whether both flows routed correctly, and whether the expected Pack files changed. Write that in [harness-smoke-results.md](harness-smoke-results.md). Leave every cell `unverified` until you have run the steps directly in that host. Do not copy the expected behavior into the sheet as if it were a result.

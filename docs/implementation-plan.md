@@ -33,15 +33,15 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 ### Harness workflows
 
 - `taste-setup`, `taste-sweep`, `taste-design`, `taste-conformance`, `taste-expression`, `taste-pack`, and `taste-evaluate` describe when the harness should call which tool.
-- Expression interviews in the harness conversation and must call `taste_record_signal` before the turn ends.
-- Sweep requires rendered evidence and writes `proposed` Decisions. A code-only pass is not a finished sweep.
+- Expression interviews in the harness conversation. Early feedback stays in the host task. Call `taste_record_signal` only after the host reports checks passed and the user approves the exact tested artifact.
+- Sweep requires rendered evidence. Candidate judgments stay in the host task until that same promotion checkpoint. A code-only pass is not a finished sweep.
 - `taste_mode_resolve` is still registered and tested. It is a deprecated helper and is not the ∞ rule.
 
 ## Explicitly out of this slice
 
 - Hard CI gates, a Gate runner, or a required check on pull requests.
 - A daemon, or Taste hosting the Critic or Eval Judge. The harness does that when it can.
-- Ally-specific dogfood as a blocker. Any product repo is enough for the harness test in the README.
+- A specific product as a blocker. Any product repo is enough for the harness test in the README.
 - An answer to who initiates an ∞ change, what "shipped" means, who approves, whether to implement before acceptance, or how known flaws sit with "shipped wins". Those stay open in [prd.md](prd.md).
 - A live install proof inside Cursor, Claude Code, or Codex. Automated tests cover the MCP process and Pack files. A person still has to run the harness script once.
 

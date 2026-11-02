@@ -8,7 +8,7 @@ This document describes a possible system design for Taste: its responsibility, 
 
 Taste's ambition remains the one in the [PRD](prd.md): extract the taste in a shipped product so a coding harness, given a PRD and the Taste Pack, can produce a first pass the user would merge. The ambition is the destination, not a requirement to settle every architectural question now.
 
-The [Google Doc one-pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is retained as a reference and has not been updated for the Nov 1 workflow decisions. Align this document with the current local [PRD](prd.md) and implementation; reconcile or remove the external document later.
+Align this document with the current [PRD](prd.md) and implementation. The PRD is the product source of truth. An earlier author-private draft is optional and does not override it.
 
 This repository contains the Taste plugin implementation and documentation. Example product Packs live under `examples/`; real Packs live in their target repositories.
 
@@ -25,9 +25,9 @@ Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). It
 - **Conformance** means using a Decision with matching host-reported validation and user-approval evidence, shipped evidence, and no coverage gap, when the user asks for UI.
 - The **coding harness** owns the agent loop, planning, models, tools, and PR workflow.
 
-Taste does not configure or run an agent. Taste is not a component library or design-system product. Product-specific design judgment belongs to the product, not OpenSignal.
+Taste does not configure or run an agent. Taste is not a component library or design-system product. Product-specific design judgment belongs to the product.
 
-Locked ∞ rules, from the product one-pager:
+Locked ∞ rules, from the [PRD](prd.md):
 
 1. From scratch → Expression.
 2. Defined, agreed, and shipped → Conformance. Same Pack, same artefacts.
@@ -37,7 +37,7 @@ Locked ∞ rules, from the product one-pager:
 
 Per-part activity is derived from Decision `status`, matching promotion evidence, shipped evidence, and `coverage_gap`. There is no authored mode field. `supportedModes` on older manifests is deprecated and is not product truth. When the user likes an early direction, the skill nudges the host to continue its own workflow; the host owns checks and review. Pack state selects Expression for a part, and an explicit user ask for new taste, a correction, or greenfield judgment routes into Expression as well.
 
-HelloAlly's ally-platform and omnipresent remain the one-pager's dogfood notes. They are not a blocker. The milestone succeeds when a harness runs setup, Sweep or Expression, UI-with-Pack, and a correction on any product repo.
+No particular product is a blocker. The milestone succeeds when a harness runs setup, Sweep or Expression, UI-with-Pack, and a correction on any product repo.
 
 Shipped work is evidence of what a product does. It is not automatically a rule worth repeating: known flaws should be recorded so similarity to shipped code is not mistaken for quality. A stated preference that conflicts with the shipped product does not become an accepted conformance rule. The user's explicit goal for the current task remains the immediate authority.
 
@@ -283,7 +283,7 @@ A Sweeper-like capability uses agent intelligence to inspect shipped work and av
 
 Use a three-part intake pattern, adapted from Vercel. The **Collector** gathers raw artifacts and source links without proposing rules. The **Intake Judge** groups related evidence, checks coverage and provenance, and separates verified facts, inferences, and open questions into a review packet. A **human reviewer** decides whether each candidate becomes a Skill/reference, Gate, Exemplar, Eval case, coverage gap, or no change. Keep these as distinct responsibilities even if one model or tool performs more than one step.
 
-Do not infer a universal rule from one screenshot, one file, or one comment. The agent records evidence and uncertainty, and proposes a candidate for review; it does not silently turn a pattern into accepted product policy. The product-specific dogfood begins with the surface named in the PRD. Sweep followed by historical replay is one possible discovery path, not the only one.
+Do not infer a universal rule from one screenshot, one file, or one comment. The agent records evidence and uncertainty, and proposes a candidate for review; it does not silently turn a pattern into accepted product policy. The first dogfood surface is whichever product the user chooses. Sweep followed by historical replay is one possible discovery path, not the only one.
 
 This applies Vercel's first-surface method: start where decisions recur in shipped work and reviews, and turn the reasoning behind those decisions into guidance an agent can find. The agent should make that candidate visible when it encounters a repeated judgment missing from the Pack. It can draft the record; product owners review whether it becomes a shared standard.
 
@@ -493,7 +493,7 @@ Not built, and not claimed:
 - Automatic observation of host checks, user approval, readiness, or push; the host reports completed validation and approval of the exact artifact, which authorizes its reusable Decision to be recorded.
 - A definition of "shipped" beyond the evidence strings stored on the Decision.
 - Detection of "artefacts can't justify" beyond the `coverage_gap` flag the agent sets when it records a gap.
-- Ally-specific dogfood, live IDE install proofs, or a with/without-Pack study on real product history. `docs/validation-results.md` is a synthetic smoke run.
+- A named-product dogfood study, live IDE install proofs, or a with/without-Pack study on real product history. `docs/validation-results.md` is a synthetic smoke run.
 
 `examples/product-pack/` still uses the legacy split folders so existing fixtures load. New Packs from `taste_pack_initialize` do not.
 
@@ -516,7 +516,7 @@ The Pack location is the product repository's `taste/` directory.
 
 ## References
 
-- Product direction: [Taste: One-Pager](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit), mirrored in [docs/prd.md](prd.md).
+- Product direction: [docs/prd.md](prd.md).
 - LangChain: [Building a design agent](https://www.langchain.com/blog/design-agent) and [design-agent repository](https://github.com/langchain-ai/design-agent).
 - Anthropic: [Improving frontend design through Skills](https://claude.com/resources/articles/improving-frontend-design-through-skills).
 - Vercel: [Teaching agents product design at Vercel](https://vercel.com/blog/teaching-agents-product-design-at-vercel).

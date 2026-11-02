@@ -1,6 +1,6 @@
 # Agent notes
 
-Collaboration notes for Cursor and Grok Bot in this repo.
+Working notes for anyone changing this repository.
 
 ## Product
 
@@ -8,10 +8,12 @@ Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). Th
 
 ## Source of truth
 
-- Product: [docs/prd.md](docs/prd.md) records the current implementation direction. The [Google Doc](https://docs.google.com/document/d/1_Gynsn9Q_s66jlS0YJNDlGG2jxNq-XPfvuhUenPU35U/edit) is retained as a reference and has not been updated for the Nov 1 workflow decisions; reconcile or remove it later.
-- Engineering: [docs/engineering.md](docs/engineering.md) uses LangChain Content Studio's knowledge layers and Anthropic's on-demand Skills as the organizing starting point, with Vercel's in-repo Pack, review, and evals as implementation references. Keep it aligned with the local PRD and implementation.
-- North owns product discussion.
-- Dev owns engineering, the repo, and coding.
+- Product: [docs/prd.md](docs/prd.md) is the product source of truth.
+- Engineering: [docs/engineering.md](docs/engineering.md) uses LangChain Content Studio's knowledge layers and Anthropic's on-demand Skills as the organizing starting point, with Vercel's in-repo Pack, review, and evals as implementation references. Keep it aligned with the PRD and implementation.
+- Product discussion covers product direction and is recorded in the PRD.
+- The engineering owner covers engineering, the repo, and coding.
+
+An earlier author-private draft is optional and not maintained. It is not required reading, and it does not override the PRD.
 
 ## Working rules
 
@@ -22,7 +24,7 @@ Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). Th
 - When the user likes an early direction, Taste's skill nudges the host to continue its own workflow. The host owns implementation, checks, readiness, user review, and push. An optional `decisionPromotionCheckpoint` in the Pack is reminder text; Taste does not observe host events or run those workflows.
 - For UI work, load an existing Pack first. Use accepted shipped Decisions for Conformance. If no Pack exists, route through transient Expression and defer initialization until user approval of the tested artifact and Decision.
 - Shipped work is evidence of current behavior, not automatic approval of its flaws. The user's explicit task goal remains the immediate authority for the task in front of them.
-- Ally and omnipresent are dogfood notes in the one-pager, not a gate for this repo. A harness end-to-end check on any product repo is the milestone.
+- No particular product is a gate for this repo. A harness end-to-end check on any product repo is the milestone.
 - Critique is a review the harness coding agent runs; the harness may delegate it. Taste does not host that agent.
 - Keep transient scratch in harness memory. Signals that should survive the turn go into the product's `taste/` Pack.
 - `taste_mode_resolve` is deprecated plumbing. Do not treat it as the product rule.
