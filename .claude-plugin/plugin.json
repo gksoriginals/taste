@@ -1,6 +1,6 @@
 {
   "name": "taste",
   "version": "0.1.0",
-  "description": "Harness plugin that sets up a product taste/ Pack, sweeps or interviews design judgment into it, loads that Pack for UI work, and records new signals through Expression.",
+  "description": "Taste provides an explicit setup command for creating or resuming a product-specific Pack, plus UI guidance and checklist learning for existing Packs.",
   "mcpServers": "./.claude.mcp.json"
 }

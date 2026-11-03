@@ -36,10 +36,11 @@ test("Claude Code compatibility manifest points to the shared MCP package", asyn
 });
 
 test("Cursor compatibility manifest uses Cursor-specific plugin root expansion", async () => {
-  const manifest = JSON.parse(await readFile(path.join(root, ".cursor-plugin/plugin.json"), "utf8")) as { name?: string; skills?: string; mcpServers?: string };
+  const manifest = JSON.parse(await readFile(path.join(root, ".cursor-plugin/plugin.json"), "utf8")) as { name?: string; skills?: string; commands?: string; mcpServers?: string };
   const mcp = JSON.parse(await readFile(path.join(root, ".cursor.mcp.json"), "utf8")) as { mcpServers?: Record<string, { command?: string; args?: string[]; cwd?: string }> };
   assert.equal(manifest.name, "taste");
   assert.equal(manifest.skills, "./skills/");
+  assert.equal(manifest.commands, "./commands/");
   assert.equal(manifest.mcpServers, "./.cursor.mcp.json");
   assert.deepEqual(mcp.mcpServers?.taste, {
     command: "node",
@@ -81,4 +82,23 @@ test("Codex repo marketplace points to the root portable package", async () => {
   assert.equal(taste?.source?.path, "./");
   assert.equal(taste?.policy?.installation, "AVAILABLE");
   assert.equal(taste?.policy?.authentication, "ON_INSTALL");
+});
+
+test("setup creates Packs only from inspected product UI and keeps task routing separate", async () => {
+  const setup = await readFile(path.join(root, "skills/taste-setup/SKILL.md"), "utf8");
+  const sweep = await readFile(path.join(root, "skills/taste-sweep/SKILL.md"), "utf8");
+  const design = await readFile(path.join(root, "skills/taste-design/SKILL.md"), "utf8");
+  const command = await readFile(path.join(root, "commands/taste-setup.md"), "utf8");
+
+  assert.match(setup, /no Pack and no product UI exist, do not initialize/i);
+  assert.match(setup, /finish the bounded rendered UI sweep before calling `taste_pack_initialize`/);
+  assert.match(setup, /multiple products\/apps remain plausible and the choice materially changes the Pack/);
+  assert.match(setup, /existing complete Pack.*mark it incomplete first/i);
+  assert.match(setup, /source-only or otherwise incomplete refresh must remain marked incomplete/i);
+  assert.match(setup, /New product\/surface design can proceed in Expression/i);
+  assert.match(sweep, /if no product UI exists or it cannot be inspected, do not create a generic\/source-only Pack/i);
+  assert.match(design, /A user-requested new direction, correction, or greenfield product\/surface is Expression work and can proceed without setup/);
+  assert.match(design, /If no Pack exists, do not initialize one or start a sweep/);
+  assert.match(command, /finish the rendered UI sweep before creating `taste\/`/);
+  assert.match(command, /If no product UI exists, do not create a Pack/);
 });

@@ -2,19 +2,23 @@
 
 Use this procedure after installing Taste in a host. Run it in a disposable product repository if you do not want to touch a real project. These steps verify tool/Skill routing and Pack writes; they do not certify visual quality.
 
-## Existing product bootstrap
+## Normal UI work and explicit setup
 
-1. Use a product repository with several user-facing routes and no `taste/` directory. Ask the host to set up Taste from the existing UI.
-2. Confirm the host inventories the full surface map and inspects reachable rendered flows/states. If it uses parallel tasks, confirm each worker has a bounded surface and the host reconciles their evidence.
-3. Inspect `taste/manifest.json`, `skills/product-design/SKILL.md`, task/surface references, checklists, and source/coverage metadata. Confirm the Skill routes by request mode and surface and links to canonical sources.
-4. Confirm the host performed its own coverage/evidence self-check, created the Pack without asking for human approval, and called `taste_pack_validate`.
+1. Use a disposable product repository without `taste/`. Ask for a routine UI review/change. Confirm the host continues from repository evidence, does not create or write `taste/`, does not launch a sweep, and offers `/taste-setup` separately.
+2. Invoke `/taste-setup` (or the `taste-setup` Skill in a host without slash commands). Confirm it inspects local instructions, repo/app manifests, product identity, UI surfaces, design systems, and existing Taste files before asking questions or choosing scope.
+3. For one obvious app/surface, confirm the host states its bounded default and proceeds. For a multi-app repo where scope is unclear, confirm it asks which app/product to configure first instead of sweeping everything.
+4. If the full agreed scope is accessible, confirm the host inspects representative rendered UI and source, records evidence, creates useful product-specific guidance, self-checks it, marks `setupStatus: complete`, and calls `taste_pack_validate`. If any part is inaccessible or inspection is source-only, confirm it reports the gap and leaves setup incomplete. Confirm setup changed no product UI.
+5. After the rendered sweep, interrupt setup after initialization or after one guidance file is written. Confirm `setupStatus` remains `incomplete`, files are preserved, validation does not call it complete, and `/taste-setup` resumes without calling initialize over the existing Pack.
+6. In a repository with no user-facing UI, invoke setup and confirm it creates no `taste/` directory. If first-time rendered UI is inaccessible, confirm it stops before initialization and reports the access gap.
+7. In an existing Pack, invoke refresh and confirm it reviews current guidance first, preserves supported content, and updates only evidence-backed items. If some surfaces cannot be inspected, confirm it reports them and does not mark the refresh complete.
+8. For a requested new surface in a repository with no Pack, confirm the host proceeds in Expression without running Setup. A later explicit Setup may sweep that UI once it exists.
 
-## Conversation learning
+## Learning in a normal task
 
-1. Ask the host to make a design choice on an existing surface.
-2. Reject the choice or state a different preference in the conversation. Confirm the host adapts the UI without asking for a separate Pack or Decision approval.
-3. Confirm the host self-checks the change and writes a scoped checklist item with the check, rationale, scope, and source reference.
-4. Give a correction to the checklist item. Confirm the host updates the relevant item in the same conversation and does not require a review/promotion checkpoint.
+1. Start with an existing complete Pack and ask the host to make a design choice on a covered surface.
+2. Reject the choice or state a different preference. Confirm the host adapts and self-checks the requested UI.
+3. If the feedback yields a reusable lesson, confirm the host updates the existing relevant checklist in the same task, without a separate approval step or setup sweep.
+4. Repeat with a repository that has no Pack. Confirm feedback stays task-local and no Pack is created; the host offers explicit `/taste-setup` separately.
 
 ## Diagnostics
 

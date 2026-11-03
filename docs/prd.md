@@ -23,24 +23,24 @@ Ambition: agents carry and extend a specific product's design judgment across ha
 - Isn't a hard CI gate. Gates are out of scope for the current milestone.
 - Who for now: anyone trying Taste on a software-product UI repository. No particular product is required.
 
-## Current host learning flow (Nov 3 update)
+## Current host learning and setup flow (Nov 3 update)
 
-The host harness owns implementation, tests and linters, self-review, and push. Taste does not run or observe those workflows. The host learns directly from the user's corrections, rejections, and disagreements during design, applies the feedback, and records clear reusable lessons as scoped checklist items. Do not require a separate developer or human review or a promotion approval step. Keep unresolved options and one-off feedback in the active task.
+The host harness owns implementation, tests and linters, self-review, and push. Taste does not run or observe those workflows. Repository setup is a separate explicit workflow invoked by `/taste-setup`; ordinary UI requests do not silently create or refresh a Pack. With an existing complete Pack, the host can learn from resolved user corrections/rejections, apply and self-check the change, then record a clear reusable lesson in the relevant checklist without separate approval. Without a Pack, feedback remains task-local.
 
 For Expression tasks that need specialist visual, interaction, UX-flow, or product-decision craft, Taste asks the host to inspect capabilities already available. If none fits, the host explains the gap and asks the user before internet search or installation, presents candidates, and gets approval for the selected install. The host tries approved capabilities and asks whether to keep them; user-approved locks live in the host's product or harness workflow, with identity, version/source, and scope. Taste owns no shortlist, ranking, catalog, or automatic install path. Formal benchmarking is deferred until there are approved locks and measurable evidence.
 
-For first-time setup on a product with existing UI, sweep the whole product, then write a task-and-surface-routed entry Skill, focused references, checklists, and source/coverage metadata after host self-review. The host may delegate bounded surfaces to available tasks or cloud agents and reconciles their work. During later conversations, a resolved user correction, rejection, or disagreement can update a checklist automatically after the host self-checks the result. The user can always correct the host in the ongoing task; no separate Pack or Decision approval is required. `taste_record_signal` remains a legacy structured record path. The optional `decisionPromotionCheckpoint` is not required for the checklist learning loop.
+Setup is an explicit repository-level workflow invoked by `/taste-setup`. It inspects the repository before choosing scope, then sweeps a bounded app/product surface and writes only useful, evidence-backed guidance. Routine UI tasks do not silently create or refresh a Pack. During later UI conversations with an existing complete Pack, a resolved reusable correction, rejection, or disagreement can update its checklist after the host self-checks the result. The user can always correct the host in the ongoing task. Existing-Pack checklist updates need no separate approval; absent a Pack, do not create setup as a side effect. `taste_record_signal` remains a legacy structured record path. The optional `decisionPromotionCheckpoint` is not required for the checklist learning loop.
 
 ## Harness loop
 
 Skills and MCP tools drive four steps. The harness stays in charge.
 
-1. **Setup.** For a product with existing UI, inventory and sweep the whole user-facing product. The host creates and self-reviews a tailored task-and-surface-routed entry Skill, focused references, checklists, and product metadata, then initializes/populates the Pack. For a greenfield design task with no Pack, defer initialization until reusable guidance emerges.
+1. **Setup.** The user explicitly invokes `/taste-setup`. The host inspects repository instructions and structure, selects a bounded scope, and sweeps accessible rendered UI before creating a first Pack. It asks only when multiple plausible products/apps materially change scope. No UI or inaccessible first-time UI means no Pack; new product/surface design may proceed in Expression until UI exists. Existing Packs are reviewed and selectively refreshed. Interrupted Pack writes remain incomplete and resumable. Normal UI work never creates setup.
 2. **Explore judgment.** Sweep existing surfaces or Expression-interview a greenfield part or gap. The host may delegate bounded surface inventories to available tasks or agents, then reconciles the evidence. Apply user feedback in the same conversation and turn clear reusable outcomes into checklist items.
-3. **Design.** Load the product Skill, focused surface references, and checklist before UI work. Apply any relevant legacy structured Decisions too. Without a Pack, sweep existing UI or use transient Expression for a greenfield task.
-4. **Maintain guidance.** After applying user feedback, self-check the changed result and update the relevant checklist when the lesson is reusable. No separate human review or Decision promotion is required.
+3. **Design.** Load the product Skill, focused surface references, and checklist before UI work. Apply any relevant legacy structured Decisions too. Without a Pack, continue from repository evidence and keep learning task-local; offer explicit setup separately. A new direction or correction remains Expression and never triggers Setup by itself.
+4. **Maintain guidance.** After applying user feedback during normal UI work, self-check the result and update a relevant checklist when a complete Pack exists and the lesson is reusable. If no Pack exists, keep it task-local. No separate review/promotion is required for existing Pack checklist updates.
 
-Pack state and user intent route work between the existing Expression and Conformance activities. Success for this milestone is that path running end to end on a real product repo.
+The host routes normal work from the user's task and affected product surface. Conformance and Expression are lightweight labels for how the host approaches that task; neither is persisted as task state in the Pack. `taste_part_state` remains only for legacy structured Decision compatibility and diagnostics.
 
 ## Baseline architecture
 
@@ -54,23 +54,15 @@ LangChain (Content Studio) and Anthropic's frontend-skills article are the v0 ba
 - Rules expire: delete compensating rules after model upgrades.
 - AGENTS.md as a bounded index; growth goes into skills and the wiki.
 
-## Conformance ↔ Expression (∞)
+## Conformance and Expression
 
-Conformance and Expression are two activities over one Pack, not two products and not a one-way deferral. One Pack, same artefacts — never separate Expression vs Conformance artefact sets. The whole Pack does not flip. Parts update.
+Conformance and Expression describe useful host approaches, not persistent Pack states or separate artifact sets. Route by the user's task and affected product surface:
 
-Locked loop:
+- **Conformance** applies established, sourced product guidance.
+- **Expression** explores a new direction, handles an unsupported gap, or responds to a user correction. Existing guidance may still apply while exploring.
+- **Clarify** asks a focused question when repository evidence and the conversation leave a material intent or scope ambiguity.
 
-1. Project from scratch → Expression.
-2. Once defined, agreed, and shipped → Conformance. One Pack, the same artefacts.
-3. When the artefacts cannot justify the next step → Expression again for that part.
-4. Otherwise Conformance keeps looping.
-5. The whole Pack never flips. Parts update.
-
-Legacy per-part activity derives from structured Decision status, validation/approval evidence, shipped evidence, and coverage gaps. Checklist guidance is loaded independently of that state. There is no authored mode field.
-
-**Expression is the learner.** One Expression skill interviews, walks requirements, applies feedback, and updates reusable checklist items in the Pack. Corrections on shipped or generated work use the same path; no separate review or promotion flow.
-
-**Conformance** applies sourced product guidance and scoped checklists. **Expression** elicits direction for gaps, greenfield, and new judgment, then records clear reusable feedback in those checklists.
+After resolving normal UI work, the host may update an existing complete Pack's scoped checklist with a clear reusable lesson after applying and self-checking the result. Keep one-off feedback in the task. `taste_part_state` remains available for legacy structured Decision compatibility or diagnostics; it is not the normal routing authority for checklist-based Packs.
 
 No particular product is required for this milestone. Product thinking stays harness- and product-agnostic.
 
@@ -80,14 +72,14 @@ No particular product is required for this milestone. Product thinking stays har
 - **Sweeper:** inventories the whole existing UI, builds sourced references/checklists, and self-reviews coverage before writing the Pack.
 - **Critic:** a review subagent in the user's harness, on a bigger model with carefully crafted prompts and skills, reviews each design pass. GAN-inspired for now (generator vs critic); may change later.
 
-Shipped UI is evidence, not an absolute rule. The user's explicit correction or preference in the current task takes precedence; the host adapts the work and can update the checklist after self-checking it.
+Shipped UI is evidence, not an absolute rule. The user's explicit correction or preference in the current task takes precedence; the host adapts the work and can update an existing complete Pack checklist after self-checking it.
 
 ## First experiments
 
 - Conformance on an existing product surface where shipped UI already exists.
 - Expression on a greenfield start; Expression pockets anywhere the artefacts cannot justify the next step.
 - Dual-track discovery: Sweep to historical replay is not locked as the only path.
-- This milestone: the plugin, installed in a coding harness, runs whole-product setup → task-and-surface-routed UI work → conversation-driven checklist learning on any product repo. The host may parallelize bounded surface sweeps. No daemon. No hard CI gate.
+- This milestone: the plugin, installed in a coding harness, provides an explicit setup command that inspects the repository, selects a bounded scope, builds/resumes a product-specific Pack, and supports normal UI work without implicit setup. Existing Packs can learn from resolved reusable user feedback. The host may parallelize bounded surface sweeps. No daemon. No hard CI gate.
 
 Success signals:
 
@@ -104,7 +96,7 @@ Success signals:
 - Not separate Expression vs Conformance artefact sets — one Pack.
 - Not a separate Learner product. Expression is the learner.
 - Not a hard CI gate for this milestone.
-- Not a process for who initiates an ∞ change. That question stays open.
+- No persistent per-task mode switch or derived activity is needed for checklist-based Packs.
 
 ## Open questions
 

@@ -43,6 +43,8 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     );
     assert.equal(tools.find((tool) => tool.name === "taste_pack_write")?.annotations?.destructiveHint, true);
     assert.equal(tools.find((tool) => tool.name === "taste_record_signal")?.annotations?.destructiveHint, true);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /bounded sweep has confirmed accessible product UI/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /Do not initialize for a repository with no product UI/i);
 
     const initialized = await client.callTool({
       name: "taste_pack_initialize",
@@ -63,10 +65,14 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     assert.match(JSON.stringify(inspection.structuredContent), /After host checks and user approval, before push/);
 
     const skill = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
-    assert.match(skill, /Conformance/);
-    assert.match(skill, /Expression/);
-    assert.match(skill, /taste_part_state/);
-    assert.match(skill, /keeps iteration feedback in its active task/);
+    assert.match(skill, /starter is incomplete/);
+    assert.match(skill, /Normal UI tasks must not create or refresh this Pack/);
+    const incompleteValidation = await client.callTool({
+      name: "taste_pack_validate",
+      arguments: { repositoryPath },
+    });
+    assert.equal(incompleteValidation.isError, undefined);
+    assert.match(JSON.stringify(incompleteValidation.structuredContent), /setup is incomplete/i);
 
     const early = await client.callTool({
       name: "taste_record_signal",
@@ -238,6 +244,7 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     assert.match(await readFile(path.join(repositoryPath, "taste/skills/product-design/references/conformance/test.md"), "utf8"), /Tool write/);
 
     for (const [fixturePath, content] of [
+      ["evals/rubric.md", "# Evaluation rubric\n\nUser-facing quality matters."],
       ["evals/conformance/fixtures/smoke/task.md", "Add visible progress and allow users to return to earlier answers."],
       ["evals/conformance/fixtures/smoke/before/index.html", "<main><h1>Preferences</h1></main>"],
       ["evals/conformance/fixtures/smoke/after/index.html", "<main><nav>Step 2 of 3 <a href=\"identity.html\">Edit identity</a></nav><h1>Preferences</h1></main>"],

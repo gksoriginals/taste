@@ -23,7 +23,7 @@ async function withRepository(run: (repositoryPath: string) => Promise<void>): P
   }
 }
 
-test("initializes one shared Pack without touching repository instructions", async () => {
+test("initializes an incomplete product-specific Pack shell without touching repository instructions", async () => {
   await withRepository(async (repositoryPath) => {
     const originalInstructions = "Use the existing repository workflow.\n";
     await writeFile(path.join(repositoryPath, "AGENTS.md"), originalInstructions);
@@ -33,14 +33,16 @@ test("initializes one shared Pack without touching repository instructions", asy
 
     assert.equal(result.packPath, "taste");
     assert.ok(result.filesCreated.includes("skills/product-design/SKILL.md"));
-    assert.ok(result.filesCreated.includes("skills/product-design/references/decisions/README.md"));
-    assert.equal(result.filesCreated.some((file) => file.includes("/conformance/") || file.includes("/expression/")), false);
+    assert.equal(result.filesCreated.length, 3);
+    assert.equal(result.filesCreated.some((file) => file.includes("references/")), false);
     assert.equal(inspection.manifest?.name, "Example Product");
     assert.equal(inspection.manifest?.supportedModes, undefined);
     assert.equal(inspection.manifest?.decisionPromotionCheckpoint, undefined);
-    assert.equal(inspection.layout, "shared");
+    assert.equal(inspection.manifest?.setupStatus, "incomplete");
+    assert.equal(inspection.layout, "product-specific");
     assert.equal(inspection.supportedModesDeprecated, false);
-    assert.equal(inspection.validation.valid, true);
+    assert.equal(inspection.validation.valid, false);
+    assert.ok(inspection.validation.issues.some((issue) => /setup is incomplete/.test(issue.message)));
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
   });
@@ -51,7 +53,8 @@ test("initialization can record a host-defined Decision promotion checkpoint", a
     await initializePack(repositoryPath, "Example Product", [], "After product checks and user approval, before push.");
     const inspection = await inspectPack(repositoryPath);
     assert.equal(inspection.manifest?.decisionPromotionCheckpoint, "After product checks and user approval, before push.");
-    assert.equal(inspection.validation.valid, true);
+    assert.equal(inspection.manifest?.setupStatus, "incomplete");
+    assert.equal(inspection.validation.valid, false);
   });
 });
 
@@ -113,13 +116,18 @@ test("Pack writes create or replace supported files only inside taste/", async (
   });
 });
 
-test("validation accepts a legacy split Pack and rejects a Pack with no decision home", async () => {
+test("completed product-specific packs need no decision home and legacy split packs remain valid", async () => {
   await withRepository(async (repositoryPath) => {
     await initializePack(repositoryPath, "Example Product");
-    await rm(path.join(repositoryPath, "taste/skills/product-design/references/decisions/README.md"));
-    const missing = await validatePack(repositoryPath);
-    assert.equal(missing.valid, false);
-    assert.ok(missing.issues.some((issue) => issue.path.includes("decisions/README.md")));
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "complete" }, null, 2) + "\n");
+    await writeFile(path.join(repositoryPath, "taste/README.md"), "# Example Product Taste Pack\n\nScope: checkout. Evidence-based product guidance.\n");
+    await writeFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "---\nname: product-design\ndescription: Example Product UI guidance.\n---\n# Checkout\nUse checkout-specific source guidance.\n");
+    const completed = await validatePack(repositoryPath);
+    assert.equal(completed.valid, true, JSON.stringify(completed.issues));
+    const inspection = await inspectPack(repositoryPath);
+    assert.equal(inspection.layout, "product-specific");
   });
 
   const legacy = await validatePack(path.resolve("examples/product-pack"));
@@ -132,6 +140,13 @@ test("validation accepts a legacy split Pack and rejects a Pack with no decision
 test("generator and Judge fixture tools receive separate data", async () => {
   await withRepository(async (repositoryPath) => {
     await initializePack(repositoryPath, "Example Product");
+    await writeFile(path.join(repositoryPath, "taste/README.md"), "# Example Product Taste Pack\n\nScope: checkout. Evidence-backed product guidance.\n");
+    await writeFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "---\nname: product-design\ndescription: Checkout product guidance.\n---\n# Checkout\nUse the sourced checkout guidance.\n");
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "complete" }, null, 2) + "\n");
+    await mkdir(path.join(repositoryPath, "taste/evals"), { recursive: true });
+    await writeFile(path.join(repositoryPath, "taste/evals/rubric.md"), "# Evaluation rubric\n\nUser-facing quality matters.\n");
     const fixture = path.join(repositoryPath, "taste/evals/conformance/fixtures/button-density");
     await mkdir(path.join(fixture, "before"), { recursive: true });
     await mkdir(path.join(fixture, "after"), { recursive: true });

@@ -27,7 +27,7 @@ taste/  Product Skills + checklists    ←→    Taste plugin (Skills + local MC
                                  implements, tests, reviews, ships
 ```
 
-The plugin loads the product Skill and relevant checklists before UI work. The host updates reusable checklist guidance directly from resolved user feedback in the ongoing conversation.
+Normal UI work loads an existing, complete Pack and relevant guidance. Reusable user feedback can update its scoped checklist after the host applies and self-checks it. Setup is separate and explicit: run `/taste-setup` in Cursor or invoke the `taste-setup` Skill in other hosts.
 
 ## Core principles
 
@@ -41,27 +41,26 @@ The plugin loads the product Skill and relevant checklists before UI work. The h
 ## How a task runs
 
 1. You ask for UI work in a product repository.
-2. The host loads `taste/` when a Pack is already there. On the first UI request without a Pack, it sweeps the existing product, builds and self-checks a tailored Pack, then continues your original task. You do not need a separate setup request.
-3. When the Pack already covers that UI, the host applies those decisions.
-4. When you ask for a new direction or make a correction, the host explores and revises in the current task.
+2. The host loads `taste/` when a completed Pack is already there. If no Pack exists, the host continues the requested UI task from repository evidence without creating setup; invoke `/taste-setup` explicitly when you want a Pack.
+3. The host routes by your task and affected product surface. It applies established sourced guidance (Conformance), explores a new direction, gap, or correction (Expression), or asks a focused question when intent or scope is materially unclear.
+4. When you ask for a new direction or make a correction, the host explores and revises in the current task while still using relevant existing guidance.
 5. The host runs applicable product checks and self-checks the result.
-6. If your feedback expresses a reusable lesson, the host applies it, self-checks the result, and updates the relevant checklist in `taste/` as part of the task. One-off or unresolved reactions stay in the conversation. If no Pack exists yet, it creates and populates one after the whole-product sweep or once reusable guidance emerges.
+6. If your feedback expresses a reusable lesson and a completed Pack exists, the host applies it, self-checks the result, and updates the relevant checklist as part of the task. One-off or unresolved reactions stay in the conversation. If no Pack exists, no setup files are written during this task.
 
 ## Composing the Pack
 
-When you ask to set up Taste for a product with existing UI, the host sweeps the whole user-facing product before initializing the Pack. It inventories routes and surfaces, inspects rendered flows and reachable states, and correlates screenshots with source, Git history, design files, and reviews. The host may split bounded surfaces across its available tasks or agents, then reconciles the findings.
+Run `/taste-setup` (or invoke the `taste-setup` Skill in a host without slash commands) to create or refresh a Pack. Setup inspects the repository first, chooses a bounded scope from evidence, then sweeps representative rendered flows and states before creating a first Pack. It asks which product/app to configure first only when multiple plausible choices materially change scope. If there is no product UI, or the first-time UI cannot be inspected, it does not create a Pack. Existing Packs are reviewed and selectively updated from supporting evidence. Setup reports surfaces it could not inspect and never changes product UI. New product/surface design can proceed as Expression work without setup.
 
-The host turns verified evidence into a tailored `product-design` entry Skill and only the product-specific references, checklists, and metadata that are useful for the product. The entry Skill routes by request mode and surface, then loads the relevant material. The host self-checks coverage, traceability, accuracy, consistency, and usefulness; there is no separate human review or approval stage. The minimal starter files are a scaffold, not a completed Pack. Initialization fails if `taste/` already exists.
-
-Do not treat every repeated pattern as intentional product policy. Mark observed patterns and host inferences distinctly, with sources and confidence. In normal design conversations, user corrections, rejections, and disagreements are direct feedback: the host applies them, then adds clear reusable lessons to scoped checklists without asking for separate Pack or Decision approval. One-off or unresolved preferences stay in the active task. Gaps and uncertain areas remain visible in metadata. Greenfield work continues through transient Expression and gains checklist guidance as the user and host resolve decisions together.
+A new Pack starts with a minimal shell marked `setupStatus: incomplete`. The host marks it complete only after writing and checking repository-specific evidence. If setup is interrupted, the incomplete marker and existing files provide a safe resume path through the same command. Normal UI requests never create or refresh Pack setup. When an existing complete Pack is available, clear reusable feedback can still update its relevant checklist during the normal task without a separate approval step.
+Do not treat every repeated pattern as intentional product policy. Mark observed patterns and host inferences distinctly, with sources and confidence. For an existing complete Pack, normal UI conversations can write a clear reusable lesson from resolved user feedback to the relevant checklist after the host applies and self-checks it. No separate Pack or Decision approval is needed. One-off or unresolved preferences stay in the active task. When no Pack exists, do not create one from a UI request; keep new learning in the active task and offer `/taste-setup`.
 
 ## Try it
 
-Install Taste in your coding harness, open a **product repository**, and ask for a UI task in natural language. For example:
+Install Taste in your coding harness and open a **product repository**. Use `/taste-setup` in Cursor (or invoke the `taste-setup` Skill in another host) when you explicitly want to create or refresh the product Pack. For ordinary UI work, ask for the task in natural language. For example:
 
 > Use Taste while simplifying the settings screen. When I correct the design, revise it and add a reusable checklist item from my feedback after checking the result. Do not ask for a separate Pack update approval.
 
-The harness should load an existing `taste/` Pack before UI work. If none exists, sweep the whole existing product UI and create a tailored Pack after host self-review; for greenfield UI, add reusable checklist guidance as it emerges in the task. For a step-by-step check, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until a real host run fills it.
+The harness should load an existing complete `taste/` Pack before UI work. If none exists, continue the UI task without writing setup and offer `/taste-setup` as a separate workflow. Invoke setup explicitly to inspect the repository and create or resume a tailored Pack. For a step-by-step check, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until a real host run fills it.
 
 ## Install
 
@@ -116,9 +115,9 @@ claude --plugin-dir /absolute/path/to/taste
 
 Each product has one Pack at `taste/`:
 
-A new Pack starts with only a README, `manifest.json`, and a product-design entry Skill. The host derives the rest from the whole-product sweep: it may create a surface map, focused references, checklists, shared facts, examples, or evaluation material when those are useful for this product. There is no fixed reference catalog; avoid empty files and generic categories that do not fit the product.
+An explicit setup starts with only a README, `manifest.json`, and a product-design entry Skill marked `setupStatus: incomplete`. The host inspects the repository, chooses a bounded scope, then derives any additional references, checklists, facts, examples, or evaluation material from that scope. No fixed reference catalog is required. The host marks setup complete only after it writes and self-checks repository-specific guidance.
 
-Checklist guidance is scoped to product surfaces and task types, not one switch for the whole Pack. The host updates a reusable checklist from direct user feedback after applying and self-checking the result. Structured Decision records and their approval evidence remain a legacy format; they are not required for this learning flow.
+Checklist guidance is scoped to product surfaces and task types. During normal UI work, the host may update an existing complete Pack from resolved feedback after applying and self-checking the result. New setup and broad Pack maintenance require explicit `/taste-setup`. Structured Decision records are a legacy format.
 
 ## Diagnostics
 

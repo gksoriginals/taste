@@ -9,16 +9,19 @@ const MAX_EVAL_FILES = 100;
 const MAX_EVAL_BYTES = 1024 * 1024;
 
 export type TasteMode = "conformance" | "expression";
+export type PackSetupStatus = "incomplete" | "complete";
 
 export interface PackManifest {
   name: string;
   version: string;
   /**
-   * Deprecated. Not product truth. Part activity is derived from Decision
-   * status, shipped evidence, and coverage gaps. Kept only so older Packs parse.
+   * Deprecated legacy metadata. Conformance/Expression are host task approaches,
+   * not Pack modes. Kept only so older Packs parse.
    */
   supportedModes?: TasteMode[];
   surfaces: string[];
+  /** Lifecycle marker for explicit setup; legacy Packs without it are treated as pre-existing. */
+  setupStatus?: PackSetupStatus;
   /** Legacy optional reminder for hosts that still record structured Decision promotions. */
   decisionPromotionCheckpoint?: string;
 }
@@ -52,33 +55,29 @@ description: Apply ${productName}'s product-specific design judgment when creati
 
 # Product design guidance for ${productName}
 
-This is the entry point for one Taste Pack. Its references and checklists are selected during the product sweep based on the actual product surfaces and evidence. There is no mode field on a Decision and no separate Conformance or Expression tree.
-
-This generated starter is only a scaffold, not a completed product Skill. Before using it as product-specific guidance, run the host's whole-product Taste setup sweep, inventory the user-facing surfaces, and replace generic text with source-linked product guidance, task-and-surface routing, focused references, and checklists. The host self-reviews its work; update reusable checklist items directly from resolved user corrections without a separate review or promotion step.
+This starter is incomplete until the explicit \`/taste-setup\` workflow inspects the repository, selects a bounded product scope, and replaces this text with sourced product guidance. Normal UI tasks must not create or refresh this Pack. Once setup is complete, the host may update an existing scoped checklist during normal UI work when user feedback resolves into a clear reusable lesson; no separate approval is needed.
 
 ## Apply this Pack
 
-Resolve the request mode from the user's verb and artifact before acting, then identify the product surface from the route, screen, component, or flow. Use the product-specific routing map and load only the Skills, references, and checklists that the sweep found useful for this task. Follow canonical repository sources for component APIs, design tokens, accessibility, and interaction contracts instead of copying them into this Pack.
+First identify the user's task and the affected product surface. Load only the product Skills, references, and checklists relevant to that pair. Then make a small approach choice:
 
-| Request mode | Route and boundary |
-| --- | --- |
-| Shape | Frame the user, job, evidence, outcomes, alternatives, states, and open questions. Do not edit unless asked. |
-| Implement | Make the smallest coherent change within the requested surface and scope. |
-| Review | Inspect source and rendered evidence, report findings, and do not edit unless asked. |
-| Copy | Edit user-facing language and only directly required UI structure; report broader design issues separately. |
-| Harden | Preserve the settled direction while checking reachable states, resilience, accessibility, responsive behavior, and recovery. |
+- **Conformance:** apply relevant, established, sourced product guidance.
+- **Expression:** explore when the request asks for a new direction, identifies a gap, or corrects existing guidance.
+- **Clarify:** ask one focused question when repository evidence and the conversation do not resolve a material intent or scope ambiguity.
 
-During setup, create a routing map from the actual product tasks, surfaces, and evidence. Do not assume every product needs the same reference categories or files. Add a shared reference only when it captures guidance useful across multiple surfaces; otherwise keep guidance scoped to the relevant surface. A URL, screenshot, or component identifies scope; it does not authorize an edit. Skip backend-only work with no user-visible effect, telemetry-only changes, generated files, and tests without shipped UI impact.
+These labels describe how the host handles this task; they are not persisted states or Pack modes. Existing guidance can still inform an Expression task. Keep review tasks report-only unless editing is separately requested. Follow canonical repository sources for component APIs, design tokens, accessibility, and interaction contracts instead of copying them into this Pack.
+
+During setup, build the routing map from the actual product tasks, surfaces, and evidence. Do not assume every product needs the same reference categories or files. Add a shared reference only when it captures guidance useful across multiple surfaces; otherwise keep guidance scoped to the relevant surface. A URL, screenshot, or component identifies scope; it does not authorize an edit. Skip backend-only work with no user-visible effect, telemetry-only changes, generated files, and tests without shipped UI impact.
 
 ## Product-specific routing
 
-Use the manifest and the Pack's own routing map to identify the relevant surface, then load only the references and checklists created for that product and task. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
+Use the manifest and Pack routing map to identify the affected surface, then load only guidance relevant to both the task and surface. The host owns this routing judgment; \`taste_part_state\` is reserved for legacy structured Decision compatibility or diagnostics. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
 
 ## Learn from user feedback
 
 Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review, Decision approval, or promotion checkpoint. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
 
-For initial setup or a discovery refresh, follow \`taste-sweep\` across the whole user-facing product and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
+For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 
 export function createStarterPackFiles(productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string): PackFile[] {
@@ -94,13 +93,14 @@ export function createStarterPackFiles(productName: string, surfaces: string[] =
     name: normalizedName,
     version: "0.1.0",
     surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean),
+    setupStatus: "incomplete",
     ...(decisionPromotionCheckpoint?.trim() ? { decisionPromotionCheckpoint: decisionPromotionCheckpoint.trim() } : {}),
   };
 
   return [
     {
       path: "README.md",
-      content: `# ${normalizedName} Taste Pack\n\nThis is the product's Taste Pack. Its contents should reflect this product's actual user-facing surfaces and verified design evidence. The starter files are only a shell. Complete the whole-product sweep, decide which guidance is useful for this product, then write only those product-specific Skills, references, checklists, and metadata. Self-check coverage, traceability, accuracy, and usefulness.\n`,
+      content: `# ${normalizedName} Taste Pack\n\nSetup status: **incomplete**. This is only a safe-to-resume shell. Run the explicit \`/taste-setup\` workflow to inspect the repository, choose a bounded scope, and write product-specific guidance. Do not report setup complete until the host has finished and self-checked the evidence-backed Pack, then sets \`setupStatus\` to \`complete\` in \`manifest.json\`.\n`,
     },
     { path: "manifest.json", content: `${JSON.stringify(manifest, null, 2)}\n` },
     { path: ENTRY_SKILL, content: starterEntrySkill(normalizedName) },
@@ -293,7 +293,7 @@ async function writePackFileInternal(repositoryPath: string, relativePath: strin
   return { path: normalized.split(path.sep).join("/"), content };
 }
 
-export type PackLayout = "shared" | "legacy-split" | "mixed" | "incomplete";
+export type PackLayout = "product-specific" | "shared" | "legacy-split" | "mixed" | "incomplete";
 
 export async function inspectPack(repositoryPath: string): Promise<{
   packPath: string;
@@ -341,7 +341,8 @@ async function packLayout(packRoot: string): Promise<PackLayout> {
   if (hasDecisions && hasLegacy) return "mixed";
   if (hasDecisions) return "shared";
   if (hasLegacy) return "legacy-split";
-  return "incomplete";
+  const hasBase = await Promise.all(["README.md", "manifest.json", ENTRY_SKILL].map((relative) => exists(path.join(packRoot, relative))));
+  return hasBase.every(Boolean) ? "product-specific" : "incomplete";
 }
 
 async function countDecisionFiles(packRoot: string): Promise<number> {
@@ -431,6 +432,26 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
     }
     if (record.surfaces !== undefined && (!Array.isArray(record.surfaces) || !record.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
+    }
+    if (record.setupStatus !== undefined && record.setupStatus !== "incomplete" && record.setupStatus !== "complete") {
+      issues.push({ path: "manifest.json", message: "setupStatus must be incomplete or complete when present." });
+    }
+    if (record.setupStatus === "incomplete") {
+      issues.push({ path: "manifest.json", message: "Taste setup is incomplete. Resume /taste-setup, then mark complete only after the scoped evidence-backed Pack is written and self-checked." });
+    }
+    if (record.setupStatus === "complete") {
+      const readOptional = async (relative: string) => {
+        try {
+          return await readFile(await resolvePackFile(packRoot, relative), "utf8");
+        } catch {
+          return "";
+        }
+      };
+      const readme = await readOptional("README.md");
+      const entry = await readOptional(ENTRY_SKILL);
+      if (/Setup status:\s*\*\*incomplete\*\*/i.test(readme) || /This starter is incomplete/i.test(entry)) {
+        issues.push({ path: "manifest.json", message: "Pack still contains starter boilerplate. Replace it with scoped, repository-specific guidance before marking setup complete." });
+      }
     }
     if (record.decisionPromotionCheckpoint !== undefined && (typeof record.decisionPromotionCheckpoint !== "string" || record.decisionPromotionCheckpoint.trim().length === 0 || record.decisionPromotionCheckpoint.length > 500)) {
       issues.push({ path: "manifest.json", message: "decisionPromotionCheckpoint must be a non-empty string of at most 500 characters when present." });

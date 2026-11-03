@@ -16,28 +16,19 @@ This repository contains the Taste plugin implementation and documentation. Exam
 
 ### Current host learning flow (Nov 3 update)
 
-The host harness owns implementation, product checks, self-review, and push. Taste does not run or observe those workflows. For an existing product, the host sweeps the whole user-facing UI and builds a task-and-surface-routed Skill, focused references, and reusable checklists. It may delegate bounded surfaces to host-supported tasks or agents, then reconciles and self-checks the result. There is no separate human review or approval checkpoint for Pack content. During normal design work, user corrections, rejections, and disagreements are direct learning signals: the host applies them, checks the result, and updates the relevant checklist without a promotion workflow. `taste_record_signal` remains a legacy structured Decision tool. `decisionPromotionCheckpoint` is not required for the active checklist learning loop.
+The host harness owns implementation, product checks, self-review, and push. Taste does not run or observe those workflows. When the user explicitly invokes `/taste-setup`, the host inspects repository instructions and structure, chooses a bounded scope, then builds a product-specific Pack and self-checks it. Routine UI tasks do not create or refresh setup. With an existing complete Pack, resolved reusable user feedback can still update the relevant checklist after the host applies and self-checks the result. `taste_record_signal` remains a legacy structured Decision tool. `decisionPromotionCheckpoint` is not required for the active checklist learning loop.
 
 Taste is a plugin for existing coding harnesses (Cursor, Codex, Claude Code). It supplies Skills and MCP tools. It does not run a daemon, and this milestone does not add a hard CI gate. The Pack lives in the product repository at `taste/`, not in this plugin repository.
 
-- A **Pack** carries one product's design judgment. Conformance and Expression are activities over that Pack, not two trees and not two products.
-- **Expression is the learner.** It interviews and explores requirements. Unresolved alternatives stay in the host task; resolved reusable feedback becomes a scoped checklist item during the same task.
-- **Conformance** applies the product's sourced guidance and relevant checklists. Legacy structured Decisions remain readable but are not required for routine learning.
+- A **Pack** carries one product's design judgment. Conformance and Expression are host approaches to tasks, not persistent Pack states or separate trees.
+- **Expression** explores new directions, handles gaps, and responds to corrections. Resolved reusable feedback can become a scoped checklist item during the same task.
+- **Conformance** applies the product's sourced guidance and relevant checklists. Legacy structured Decisions remain readable but do not route ordinary checklist-based work.
 - The **coding harness** owns the agent loop, planning, models, tools, and PR workflow.
 
 Taste does not configure or run an agent. Taste is not a component library or design-system product. Product-specific design judgment belongs to the product.
 
-Locked ∞ rules, from the [PRD](prd.md):
-
-1. From scratch → Expression.
-2. Defined, agreed, and shipped → Conformance. Same Pack, same artefacts.
-3. When the artefacts cannot justify the next step → Expression for that part.
-4. Otherwise Conformance.
-5. The Pack never flips as a whole. Parts update.
-
-Legacy per-part activity is derived from structured Decision `status`, promotion evidence, shipped evidence, and `coverage_gap`. There is no authored mode field. `supportedModes` on older manifests is deprecated and is not product truth. The host loads relevant checklist references independently of that state. An explicit ask for new taste, a correction, or greenfield judgment routes the current task through Expression; resolved lessons can update the checklist without a separate review or promotion step.
-
-No particular product is a blocker. The milestone succeeds when a harness runs setup, Sweep or Expression, UI-with-Pack, and a correction on any product repo.
+Route ordinary tasks from the user's request and affected product surface. Apply established sourced guidance (Conformance), explore a new direction/gap/correction (Expression), or ask a focused question when intent or scope remains materially unclear. Existing guidance can still apply during Expression work. `taste_part_state` remains for legacy structured Decision compatibility and diagnostics; it is not the normal routing authority for checklist-based Packs. `supportedModes` on older manifests is deprecated metadata. If no Pack exists, keep guidance task-local until explicit setup.
+No particular product is a blocker. The milestone succeeds when a harness can run the explicit setup command, resume interrupted setup, perform UI work without implicit setup, and learn from a correction in an existing Pack.
 
 Shipped work is evidence of what a product does. The host distinguishes observed patterns from inferred intent and records sources and confidence. Known flaws should be noted so similarity to shipped code is not mistaken for quality. The user's explicit correction in the current task remains the immediate authority and can update a checklist after the host applies and self-checks it.
 
@@ -137,20 +128,20 @@ This uses LangChain's Skills, Wiki, and Gates as Pack knowledge roles, with Verc
 
 The Pack needs a discoverable entry point in the target repo so a coding agent knows when product-design guidance applies. A root `AGENTS.md` can provide a thin trigger for harnesses that read it; it is not Taste itself and is not a universal installation mechanism. Harnesses that do not read `AGENTS.md` need their own adapter or setup. Vercel's example uses repository instructions to trigger an in-repo product-design Skill; its Skill then resolves the task mode and routes to focused references. LangChain's Router is also a Skill with a table mapping job types to specialist Skills. Anthropic describes Skills that the model can autonomously identify and load when the task calls for them.
 
-For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load only the surface references and checklists that apply. The coding agent may call `taste_part_state` with host-interpreted `taskIntent` when working with legacy structured Decisions. It returns legacy Decision state plus a task-local Expression route. The host interprets raw language because the tool cannot access conversation text.
+For Taste, these are model-facing instructions and references. Keep the always-loaded entry small; load only the surface references and checklists that apply. The coding agent routes from the user's task and affected surface. It may call `taste_part_state` to inspect legacy structured Decision state for compatibility or diagnostics; the tool does not route checklist-based work.
 
 ### One Pack
 
 Use Vercel's `product-design` work as the content and workflow baseline: a bounded trigger, an entry Skill, product references, examples, mechanical Gates, and evals. Store the Pack in `taste/` at the product repository root so it is versioned with the product. Do not reproduce every Vercel folder.
 
-New Packs start with only a README, manifest, and entry Skill. The host derives the remaining Pack structure from a whole-product sweep, creating only useful product-specific references, surface guidance, checklists, metadata, exemplars, or eval fixtures supported by evidence. There is no fixed reference catalog; keep the Pack small when that is all the product needs. Conformance and Expression are not directories. Product Skills, focused references, and scoped checklists are the primary knowledge. Structured Decision files remain an optional legacy format; their activity is derived:
+After explicit setup inspects the repository and completes a rendered sweep of accessible product UI, initialization creates a minimal README, manifest, and entry Skill marked incomplete. The host derives the remaining Pack structure from the agreed bounded scope, creating only useful product-specific references, surface guidance, checklists, metadata, exemplars, or eval fixtures supported by evidence. There is no fixed reference catalog; keep the Pack small when that is all the product needs. If there is no UI or first-time UI is inaccessible, do not initialize. Conformance and Expression are not directories or persisted task states. Product Skills, focused references, and scoped checklists are the primary knowledge. Structured Decision files remain an optional legacy format; only those legacy records have mechanically derived activity:
 
 - **Conformance** when status is `accepted`, matching validation and user-approval evidence are present, shipped evidence is present, and `coverage_gap` is false.
 - **Expression** otherwise, including an empty Pack (`no_decisions`).
 
-`taste_pack_initialize` creates the base scaffold and does not write `supportedModes`. The host completes it after whole-product discovery with product-specific routing and checklists. Packs that still have `references/conformance/` and `references/expression/` validate as a legacy layout. The example under `examples/product-pack/` is a legacy layout kept so older fixtures load.
+`taste_pack_initialize` creates the base scaffold after first-time rendered UI inspection and does not write `supportedModes`. The host completes it with product-specific routing and guidance. When refreshing, review the existing Pack before changing it, preserve useful content, and mark it incomplete before the first write. Packs that still have `references/conformance/` and `references/expression/` validate as a legacy layout. The example under `examples/product-pack/` is a legacy layout kept so older fixtures load.
 
-The target repository stores a product-specific Pack under `taste/`. The entry Skill routes to only the references and checklists justified by the product sweep. Optional files are created when they carry useful product evidence; no universal directory tree is required.
+The selected product root stores its Pack under `taste/`. The entry Skill routes to only references and checklists justified by the bounded setup sweep. Optional files are created when they carry useful product evidence; no universal directory tree is required.
 ```text
 target-product-repository/
 └── taste/
@@ -164,7 +155,7 @@ Put rationale, shipped evidence, known flaws, and coverage-gap notes on the Deci
 
 `manifest.json` names the product, version, and surfaces. It does not declare a mode. `supportedModes`, if still present on an older Pack, is ignored as product truth. Metadata docs describe source authority; they do not duplicate Decisions. Keep the root `AGENTS.md` small. Where the harness reads it, it can tell the coding agent to use Taste for UI work and, if Taste is not installed, to install this plugin. This file is only a discovery hint.
 
-The portable Agent Plugins package is the canonical distribution for clients that support that format. Claude Code uses its native `.claude-plugin/plugin.json` and `.mcp.json` compatibility files while sharing the same Skills and server. The repository is the initial install source; a public marketplace URL and release policy can be selected later. After setup, the plugin reads the repository's existing `taste/` Pack, so a clone reuses product knowledge instead of creating a new Pack. Harness-specific plugin loaders point at that same Pack without copying it into provider-specific skill directories.
+The portable Agent Plugins package is the canonical distribution for clients that support that format. Claude Code uses its native `.claude-plugin/plugin.json` and `.mcp.json` compatibility files while sharing the same Skills and server. The repository is the initial install source; a public marketplace URL and release policy can be selected later. After explicit setup, the plugin reads the repository's completed `taste/` Pack, so a clone reuses product knowledge instead of creating a new Pack. Harness-specific plugin loaders point at that same Pack without copying it into provider-specific skill directories.
 
 The eventual repository hint can be as small as:
 
@@ -173,9 +164,9 @@ For product UI work, use the Taste plugin with this repository's `taste/` Pack.
 If Taste is not installed in your harness, ask it to install this repository's
 Agent Plugins package (or its supported Claude Code compatibility package), then
 load the existing Pack.
-Read the product-design entry Skill, identify the request mode and product surface,
-then load the relevant surface references and checklist. Call taste_part_state with
-a required taskIntent when working with legacy structured Decisions. Apply clear
+Read the product-design entry Skill, route from the task and product surface,
+then load the relevant surface references and checklist. Use taste_part_state only
+for legacy structured Decision diagnostics. Apply clear
 user corrections to the current task and update the scoped checklist after a host
 self-check.
 ```
@@ -184,7 +175,7 @@ This is illustrative guidance, not a universal `AGENTS.md` contract. Each harnes
 
 The target repository's existing linter owns Gate implementation; `taste/` explains which product rule a Gate supports. Do not create a Taste-specific component library or replace the target's design system.
 
-The entry Skill follows the routing pattern described in [Vercel's product-design skill](https://vercel.com/blog/teaching-agents-product-design-at-vercel#how-the-skill-routes): resolve the request mode from the user's verb and artifact first, then route by product surface and load focused canonical references. Shape, Implement, Review, Copy, and Harden are useful mode names, but products may use equivalent names. These are task modes, separate from the legacy derived Expression and Conformance activities.
+The entry Skill follows the routing pattern described in [Vercel's product-design skill](https://vercel.com/blog/teaching-agents-product-design-at-vercel#how-the-skill-routes): understand the user's task, route by product surface, and load focused canonical references. Shape, Implement, Review, Copy, and Harden can help organize task work. Conformance and Expression are lightweight approach labels selected by the host, not derived states.
 
 - **Shape:** use agent reasoning to frame the user, job, flow, states, alternatives, and acceptance signals before implementation.
 - **Implement:** apply the requested direction with the smallest coherent product change; resolve meaningful product questions with the user or source evidence.
@@ -194,26 +185,26 @@ The entry Skill follows the routing pattern described in [Vercel's product-desig
 
 The repository-level trigger tells the coding agent when the UI Skill applies and what it excludes. The Skill entry provides scope, request modes, and task-and-surface routing; focused references and checklists carry the product guidance. This prevents unrelated tasks from loading the whole knowledge base.
 
-For initial Pack creation, inventory the whole product UI and inspect every reachable surface, using parallel host-supported tasks for bounded surfaces when useful. The host reconciles the evidence, drafts guidance in the narrowest relevant references, and reviews its own result for coverage, traceability, accuracy, consistency, and usability. There is no separate human review or approval stage. Each checklist item should make the check observable and include why it matters, scope, evidence, exceptions, and useful positive/negative examples. Put known defects next to the example or rule they qualify so the agent learns the intended pattern without reproducing the defect.
+For explicit Pack setup, inspect repository structure before choosing scope. Use a bounded product/app scope; ask which one to configure first only when several materially different choices remain unclear. Inspect representative rendered UI and source, using parallel host-supported tasks for bounded parts when useful. The host reconciles evidence, drafts the narrowest useful guidance, and reviews it for coverage, traceability, accuracy, consistency, and usability. There is no separate human review or approval stage. Each checklist item should make the check observable and include why it matters, scope, evidence, exceptions, and useful positive/negative examples. Put known defects next to the example or rule they qualify so the agent learns the intended pattern without reproducing the defect.
 
-A Sweep is not complete from source code alone. The coding agent should use the harness's available browser or computer-use tools to open the running product, traverse the chosen flow, inspect visible and interactive states, and capture screenshots. Record the page or URL, flow step, state, date, viewport, screenshot path, and what the evidence supports. Correlate this with code, Git history, reviews, and product-owned sources. If access or visual tools are unavailable, ask the harness/user for access or captures and mark the evidence incomplete.
+A bounded setup sweep is not complete from source code alone. The coding agent should use the harness's available browser or computer-use tools to open the running product, traverse representative flows in the chosen scope, inspect visible and interactive states, and capture screenshots. Record the page or URL, flow step, state, date, viewport, screenshot path, and what the evidence supports. Correlate this with code, Git history, reviews, and product-owned sources. If access or visual tools are unavailable, ask the harness/user for access or captures and mark the evidence incomplete.
 
 ### Workflow Skills and commands
 
-Taste defines explicit, user-invokable workflow Skills and one automatically relevant UI entry Skill. In the portable package, Skills are the shared command definitions; harnesses expose them through their own skill picker/invocation syntax. Do not duplicate the workflow body into provider-specific command files unless a harness adapter specifically requires an alias.
+Taste defines user-invokable workflow Skills and one UI entry Skill. The portable `taste-setup` Skill is explicit-only; Cursor also exposes it as `/taste-setup` through a native command file. Other hosts expose the Skill through their own invocation syntax.
 
 | Skill | Trigger | Outcome |
 | --- | --- | --- |
-| `taste-setup` | User explicitly asks to set up Taste or initialize a Pack | For existing UI, inventory and sweep the whole product, build a tailored task-and-surface router with focused references, checklists, and metadata, self-review, then populate the Pack. |
-| `taste-sweep` | User asks to learn, sweep, or refresh taste from shipped UI | Inspect all product surfaces for initial bootstrap; delegate bounded surfaces when useful. Self-check and write sourced checklist guidance. |
-| `taste-design` | Any UI/UX task | Load an existing Pack. If absent, whole-product Sweep for existing UI or transient Expression for greenfield work. |
+| `taste-setup` / `/taste-setup` | User explicitly invokes the setup command/Skill | Inspect repository first. Sweep accessible rendered UI before first initialization; do not create a Pack with no UI or inaccessible first-time UI. Review existing Packs before selective refresh; resume incomplete setup safely. |
+| `taste-sweep` | Invoked by explicit setup/refresh | Inspect the agreed bounded scope; never trigger it from routine UI work. |
+| `taste-design` | Any UI/UX task | Load existing complete Pack. If absent, continue from repository evidence and offer explicit setup without writing setup files. |
 | `taste-conformance` | User asks to match product guidance or task checklists | Load the task-and-surface references and apply their sourced checklist guidance. |
-| `taste-expression` | Greenfield, new taste, a gap, or a correction; or part state derives Expression | Explore and iterate in the host task; apply user feedback and update a reusable checklist after self-checking, with no separate human review or promotion. |
+| `taste-expression` | Greenfield, new taste, a gap, or a correction | Explore in the host task; update an existing complete Pack checklist after self-checking clear reusable feedback, otherwise keep learning task-local. |
 | `taste-evaluate` | User asks to evaluate guidance or a calibration run is due | Compare with/without-Skill generation and hand judging to the harness. |
 
-Setup does not fabricate Decisions to make a Pack look like Conformance. An empty Pack derives to Expression. That is the from-scratch rule, not a missing mode route.
+Setup does not fabricate Decisions to make a Pack look like Conformance. Initial creation follows rendered inspection and begins incomplete. A routine UI task never creates setup; a requested new direction or correction remains Expression regardless of Pack presence, and existing complete Packs still learn from clear reusable feedback.
 
-This creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. When a craft needs specialist guidance, Expression uses the host's detect → ask-install → try → lock flow for capabilities the host discovers; Taste does not grow a catalog of third-party craft Skills.
+Explicit setup creates one entry Skill per product Pack, with focused references organized by job and surface. A reference should contain the product's rule and reasoning, not just generic advice. When a craft needs specialist guidance, Expression uses the host's detect → ask-install → try → lock flow for capabilities the host discovers; Taste does not grow a catalog of third-party craft Skills.
 
 ### Runtime path for a UI task
 
@@ -226,18 +217,16 @@ sequenceDiagram
   participant Agent as Coding agent
   participant Pack as Taste Pack
   participant Tools as Repo / Git / browser / computer tools
-  participant Parts as taste_part_state
   participant Gate as Deterministic Gates
 
   User->>Harness: UI task and constraints
   Harness->>Agent: Start task in existing agent loop
-  Agent->>Pack: Read entry Skill, facts, and Decisions
-  Pack-->>Agent: Decisions for the parts this task touches
-  Agent->>Parts: Ask derived activity for those parts
-  Parts-->>Agent: Conformance or Expression per part, not a pack-wide mode
+  Agent->>Pack: Read entry Skill, facts, and task/surface guidance
+  Pack-->>Agent: Relevant product guidance for the affected surface
+  Agent->>Agent: Choose Conformance, Expression, or focused clarification
   Agent->>Tools: Inspect product behavior and source evidence
   Tools-->>Agent: Screenshots, rendered states, code, and product references
-  Agent->>Agent: Apply Conformance Decisions; Expression writes gaps and new signals
+  Agent->>Agent: Apply guidance or explore the requested direction
   Agent->>Tools: Implement scoped product change
   opt Relevant reliable Gate exists
     Agent->>Gate: Check changed code
@@ -270,13 +259,13 @@ A product Pack lives under the target repository's `taste/` directory. Vercel's 
 
 ### Discover and extract
 
-A Sweeper-like capability uses agent intelligence to inventory the product's user-facing surfaces, inspect shipped work and available review evidence, then surface candidate judgments across relevant design angles. On first-time setup, cover the whole UI; if the product is large, delegate bounded surface inventories to host-supported tasks or agents and reconcile their findings centrally. The coding agent documents repeated decisions, why they matter, scope, exceptions, examples, and evidence in the narrowest useful Pack guidance.
+A Sweeper-like capability uses agent intelligence to inventory the product's user-facing surfaces, inspect shipped work and available review evidence, then surface candidate judgments across relevant design angles. On explicit setup, inspect repository structure first and agree a bounded app/product scope; delegate bounded parts only when useful and reconcile centrally. The coding agent documents repeated decisions, why they matter, scope, exceptions, examples, and evidence in the narrowest useful Pack guidance.
 
 Use a three-part intake pattern, adapted from Vercel. The **Collector** gathers raw artifacts and source links without proposing rules. The **Intake Judge** groups related evidence, checks coverage and provenance, and separates verified facts, inferences, and open questions. The **host agent** self-reviews the complete draft for coverage, accuracy, consistency, and source traceability, then writes the Pack. There is no separate human review or approval stage. Keep collection, judgment, and host self-review distinct even if one model or tool performs more than one step.
 
 Do not infer a universal rule from one screenshot, one file, or one comment. The agent records evidence, provenance, and confidence; checklist items distinguish observed behavior from inferred intent. User corrections and disagreements are direct product evidence and can be generalized after the host applies and self-checks the change. The first dogfood product is whichever one the user chooses.
 
-This adapts Vercel's method to whole-product bootstrap: inventory all shipped surfaces, identify recurring patterns across them, and turn sourced evidence and user corrections into guidance an agent can find. The host self-reviews the draft before using it; no separate approval workflow is needed.
+This adapts Vercel's method to evidence-based setup: inspect the selected product scope, identify useful recurring patterns, and turn sourced evidence into guidance an agent can find. The host self-reviews the draft before using it; no separate approval workflow is needed.
 
 ```mermaid
 flowchart LR
@@ -301,7 +290,7 @@ The destinations are logical roles, not a fixed file tree. Product-context judgm
 
 ### Capture and maintain
 
-Expression is that learner. It is not a second module. During exploration, keep unresolved options in the host's active task. When the user corrects or rejects a direction, apply the feedback, self-check the result, and update a clear reusable item in `skills/product-design/references/checklists/<surface>.md` with `taste_pack_write`. Include the check, when it applies, rationale, exception, confidence, and source reference. Keep one-off reactions private to the task. `taste_record_signal` remains a legacy path for structured Decision records; it is not required for routine learning.
+Expression is that learner. It is not a second module. During exploration, keep unresolved options in the host's active task. When the user corrects or rejects a direction, apply the feedback, self-check the result, and, if a complete Pack exists, update a clear reusable item in its scoped checklist with `taste_pack_write`. Without a complete Pack, keep it task-local until explicit setup. Include the check, when it applies, rationale, exception, confidence, and source reference. Keep one-off reactions private to the task. `taste_record_signal` remains a legacy path for structured Decision records; it is not required for routine learning.
 
 ### Deliver guidance
 
@@ -321,14 +310,14 @@ The MCP server exposes Pack reads and writes to the harness. It does not own pla
 
 Use the coding agent's intelligence for work that needs meaning or product context: interpreting evidence, noticing patterns, deciding which guidance applies, weighing exceptions and tradeoffs, proposing UI, and reviewing whether the result fits the product. Taste should give the agent evidence and reasons so it can exercise that judgment; it should not try to encode the full design decision tree as application logic.
 
-Keep deterministic code for narrow operations whose inputs and outcomes are explicit: locating a Pack file, writing a bounded guidance file, and deriving legacy part activity from structured Decision fields. Derivation is mechanical and is not a keyword classifier:
+Keep deterministic code for narrow operations whose inputs and outcomes are explicit: locating a Pack file, writing a bounded guidance file, and reading legacy structured Decision records. Legacy activity derivation is mechanical and is not a keyword classifier:
 
 - accepted + complete matching promotion evidence + shipped evidence + coverage gap false → Conformance for that Decision
 - anything else → Expression for that Decision
 - no Decisions → Expression (`no_decisions`)
 - a scope is Conformance only when every Decision in it is Conformance
 
-`taste_part_state` requires host-interpreted `taskIntent` and returns legacy structured Decision state plus a task-local Expression route when needed. Checklist guidance is loaded separately, regardless of that state. The tool does not run or observe host checks or push. `taste_mode_resolve` remains deprecated. The host interprets the request and passes task intent, so a correction routes into Expression even when legacy structured state says Conformance.
+`taste_part_state` reports legacy structured Decision state. Its optional task intent only supports legacy diagnostics; it must not be used as the router for checklist-based Packs. The host routes from the current request and affected surface. The tool does not run or observe host checks or push. `taste_mode_resolve` remains deprecated.
 
 This is the intended split, not a claim that every implementation needs a Router or a linter. When a check requires judgment, depends on product context, or produces unreliable flags, keep it in agent guidance and review.
 
@@ -390,23 +379,23 @@ The starting Rubric should track the PRD's mergeable-first-pass goal and its sig
 
 The PRD's success signals remain central: a mergeable first pass, no long design prompt, and no re-teaching on each screen. The with/without-Skill comparison is the starting method for judging Pack effect; Gate pass rate is supplemental, not a proxy for overall UI quality. What establishes a mergeable first pass without hand-labeling remains an open question.
 
-## Part activity, loops, and lifecycle
+## Task routing and learning
 
-Conformance and Expression are activities on parts of one Pack. They share the Pack, the entry Skill, product facts, checklists, the harness, critique, and evaluation. Legacy structured Decisions still derive activity from their stored fields. Expression explores new directions and corrections; the host applies clear user feedback, self-checks the change, and updates scoped checklists without a separate review or promotion step.
+Conformance and Expression are lightweight approaches the host selects for the current task and affected product surface. They share one Pack and its task/surface guidance. Conformance applies established sourced guidance; Expression handles new directions, gaps, and corrections. When intent or scope is materially unclear, the host asks a focused question. Existing guidance can still inform Expression work.
 
-`taste_part_state` reports legacy structured Decision activity. Checklist guidance is used independently. The optional `decisionPromotionCheckpoint` manifest value is legacy reminder text and is not part of routine checklist learning.
+After applying and self-checking a correction, the host can update an existing complete Pack checklist when the lesson is clear and reusable. Otherwise, learning stays in the active task. `taste_part_state` reports legacy structured Decision activity for compatibility or diagnostics only. The optional `decisionPromotionCheckpoint` manifest value is legacy reminder text and is not part of routine checklist learning.
 
 ### Conformance loop
 
 1. Load the entry Skill, relevant references, and scoped checklists. Read structured Decisions as additional legacy evidence where present.
-2. If the request introduces a new direction or correction, route that task through Expression while still applying relevant checklists.
+2. Route from the user's task and affected surface. Use Expression for new directions, gaps, and corrections while still applying relevant checklists; ask when the material intent or scope is unclear.
 3. Implement from the relevant product references and checklists. Shipped UI is evidence, not an instruction to copy a known flaw.
 4. Use mechanical checks only where the product already has a reliable rule. Critique stays with the harness agent.
-5. When a user correction reveals a reusable lesson, Expression updates the checklist after applying and self-checking the result.
+5. When a user correction reveals a reusable lesson, Expression updates an existing complete Pack checklist after applying and self-checking the result; without a Pack, keep it task-local.
 
 ### Expression loop
 
-The host keeps unresolved exploration in task context, applies user feedback as it arrives, runs its available checks, and self-reviews the change. When feedback yields a reusable lesson, it updates the scoped checklist with `taste_pack_write` in the same task. No final-artifact approval, Decision-text approval, or Pack-write confirmation is part of this learning loop. `taste_record_signal` remains available for legacy structured records.
+The host keeps unresolved exploration in task context, applies user feedback as it arrives, runs available checks, and self-reviews the change. When feedback yields a reusable lesson and a complete Pack exists, it updates the scoped checklist with `taste_pack_write` in the same task. Otherwise, learning stays task-local. No final-artifact approval, Decision-text approval, or Pack-write confirmation is part of this learning loop. `taste_record_signal` remains available for legacy structured records.
 
 When Expression needs specialist visual, interaction, UX-flow, or product-decision craft, the host checks what skills/plugins are already installed. If none fits, it asks the user before searching or installing; it presents candidates and gets approval for a chosen install. The host tries approved capabilities, then asks whether to keep them and stores any user-approved lock (identity, version/source, scope) in its own product or harness workflow. Taste owns no catalog, shortlist, ranking, or install behavior. External examples such as OpenAI's frontend skill or Emil Kowalski's aspect Skills are research pointers only, not a Taste-curated recommendation list. Formal benchmarking is deferred until approved locks and measurable evidence exist.
 
@@ -415,7 +404,7 @@ When Expression needs specialist visual, interaction, UX-flow, or product-decisi
 ```mermaid
 flowchart LR
   Pack[One Pack of Skills, references, and checklists]
-  Route[product-design routes by task mode and surface]
+  Route[product-design routes by task and surface]
   Conformance[Apply relevant sourced guidance]
   Expression[Explore in the host task and learn from feedback]
   Pack --> Route
@@ -435,6 +424,7 @@ This repository builds a plugin for existing coding harnesses. It packages Skill
 ```text
 taste-plugin/
 ├── skills/                  # Taste workflows invoked by the host coding agent
+├── commands/                # Cursor-native /taste-setup command
 ├── src/
 │   ├── core/                 # Pack lifecycle, evidence/provenance, review, and eval logic
 │   └── tools/                # MCP server and tool interfaces over core operations
@@ -450,7 +440,7 @@ taste-plugin/
 └── tests/                   # plugin, tool, Pack, and harness integration checks
 ```
 
-The plugin Skills tell the host agent when to sweep, how to route by task and surface, and how to capture resolved user feedback as reusable checklist items. The product's `taste/skills/product-design/SKILL.md` points at focused references and checklists. `core/` discovers and validates the Pack, writes bounded guidance files, and still supports legacy structured Decision records and derived activity. It does not decide product meaning, run or observe host workflows, or verify claims. Evaluation fixtures and Rubrics belong with the product Pack. Codex and standard-compatible hosts use the root Agent Plugins package; Cursor has its own path-expansion adapter; Claude Code's native manifest and MCP config point at the same Skills and server. The harness may delegate whole-product surface sweeps or Eval Judge work to its available agents. This structure is revisable.
+The plugin Skills and explicit setup command tell the host when to inspect a repository, how to choose bounded scope, route UI work, and capture resolved reusable user feedback in an existing Pack. The product's `taste/skills/product-design/SKILL.md` points at focused references and checklists. `core/` discovers and validates the Pack, writes bounded guidance files, and still supports legacy structured Decision records and derived activity. It does not decide product meaning, run or observe host workflows, or verify claims. Evaluation fixtures and Rubrics belong with the product Pack. Codex and standard-compatible hosts use the root Agent Plugins package; Cursor has its own path-expansion adapter; Claude Code's native manifest and MCP config point at the same Skills and server. The harness may delegate bounded setup-scope sweeps or Eval Judge work to its available agents. This structure is revisable.
 
 ## Implementation status
 
@@ -465,7 +455,7 @@ Implemented:
 - `taste_pack_read` / `taste_pack_write` — files confined to `taste/`.
 - `taste_pack_validate` — shared decisions home, or a legacy pair of conformance and expression READMEs.
 - `taste_record_signal` — legacy structured Decision path; requires host-reported validation and approval evidence.
-- `taste_part_state` — derive durable Conformance or Expression per Decision and task-local Expression routing from required host-interpreted task intent.
+- `taste_part_state` — inspect legacy structured Decision activity; compatibility/diagnostics only, not the normal checklist router.
 - `taste_eval_list_fixtures`, `taste_eval_get_generator_case`, `taste_eval_get_judge_packet` — fixture lanes named `conformance` and `expression` are storage paths.
 - `taste_mode_resolve` — deprecated task-local helper. Does not read the Pack. Skills should not treat it as the ∞ rule.
 

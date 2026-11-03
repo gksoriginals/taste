@@ -53,7 +53,7 @@ export function createTasteServer(): McpServer {
   const server = new McpServer(
     { name: "taste", version: "0.1.0" },
     {
-      instructions: "For UI tasks, interpret the current user request before calling taste_part_state and always pass taskIntent plus the affected scope. A requested change or correction uses Expression routing even if the Pack says Conformance; do not infer task mode from Pack state alone. This task-local route does not modify the Pack.",
+      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill, reference, and checklist. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not persistent Pack modes. Use taste_part_state only for legacy structured Decision compatibility or diagnostics; it is not the normal routing authority for checklist-based Packs.",
     },
   );
 
@@ -61,7 +61,7 @@ export function createTasteServer(): McpServer {
     "taste_mode_resolve",
     {
       title: "Resolve the selected Taste mode",
-      description: "Deprecated task-local helper. Maps an already-interpreted signal to the words Conformance or Expression. Does not read the Pack, does not derive part activity, and does not decide who starts Expression. Prefer taste_part_state. Taste does not classify raw user language.",
+      description: "Deprecated legacy helper. Maps an already-interpreted signal to Conformance or Expression. It does not read the Pack or route normal task-and-surface work. Checklist-based UI routing belongs to the host and product Skill; Taste does not classify raw user language.",
       inputSchema: {
         currentMode: mode.optional().describe("Current task-local mode, if one has already been selected."),
         trigger: z.enum(["explicit_mode", "established_direction", "new_direction", "direction_accepted", "unclear"]),
@@ -78,7 +78,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting Taste Pack scaffold under <repositoryPath>/taste after the host has completed whole-product UI discovery and self-reviewed its tailored Pack content (or when explicitly asked for a blank scaffold). Then derive the Pack structure from the product sweep and use taste_pack_write to create only useful, evidence-backed product Skills, references, checklists, and metadata for its actual surfaces. Do not populate a fixed reference catalog or create empty categories. Add exemplars or eval fixtures only when product evidence supports them; the scaffold alone is not a completed product Pack. Routine conversation learning is written as checklist guidance without a separate human review or promotion step. One shared Pack; no separate Conformance and Expression trees, AGENTS.md edits, or harness configuration.",
+      description: "Create a non-overwriting Taste Pack shell only during explicitly invoked /taste-setup, after repository inspection and a bounded sweep has confirmed accessible product UI. Do not initialize for a repository with no product UI or inaccessible first-time UI. It starts with setupStatus=incomplete. The host writes only useful, evidence-backed product guidance, then self-checks and marks complete. If setup is interrupted after initialization, preserve the incomplete Pack so /taste-setup can resume it. Routine UI work must not start setup or create a missing Pack; with an existing complete Pack, resolved reusable user feedback may update its relevant checklist in the same task. Setup never edits product UI, AGENTS.md, or harness configuration.",
       inputSchema: {
         repositoryPath,
         productName: z.string().min(2).max(120).describe("Product name for the starter Pack."),
@@ -94,7 +94,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack: layout (shared decisions home or legacy split folders), decision count, references, evaluation fixtures, and structural validation. supportedModes is reported only as a deprecated field. Reads only taste/.",
+      description: "Summarize the target repository's Taste Pack: product-specific or legacy layout, setupStatus from manifest when present, decision count, references, evaluation fixtures, and validation. A newly initialized Pack marked incomplete is safe to resume; it is not a completed setup. supportedModes is reported only as deprecated. Reads only taste/.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -119,7 +119,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or structured Decision files under skills/product-design/references/decisions/. Use for product-specific Skills, surface references, shared facts, metadata, evaluation fixtures, and reusable checklists derived from resolved user feedback. The host self-checks and updates routine checklist learning in the same task; no separate review or promotion approval is required. taste_record_signal is retained for legacy structured Decision records.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or structured Decision files under skills/product-design/references/decisions/. Use for explicit Pack setup/maintenance, and for a resolved reusable checklist lesson from normal UI work when a complete Pack already exists. Do not use normal UI work to create a missing Pack or refresh setup. The host self-checks checklist learning in the same task; no separate review or promotion approval is required. taste_record_signal is retained for legacy structured Decision records.",
       inputSchema: {
         repositoryPath,
         path: z.string().min(1).max(300).describe("Pack-relative destination path."),
@@ -172,12 +172,12 @@ export function createTasteServer(): McpServer {
   server.registerTool(
     "taste_part_state",
     {
-      title: "Derive Taste part activity",
-      description: "Derive durable Conformance or Expression per Decision from Pack evidence and require a host-interpreted taskIntent. Use apply_existing when following established guidance, inspect_only for setup or Pack maintenance, and new_direction, correction, gap, greenfield, or unclear for Expression work. Expression intents add a task-local routing override while preserving durable Pack-derived state. The host supplies this structured interpretation because the tool cannot read conversation text. This tool does not run or judge checks, write a mode field, or flip the Pack.",
+      title: "Inspect legacy Taste Decision state",
+      description: "Legacy compatibility and diagnostics only. Reports derived activity for structured Decision records and optionally accepts the caller's interpreted taskIntent for legacy taskRouting output. Do not use this tool to route checklist-based Packs; the host routes from the current task and affected surface. It does not read conversation text, run checks, write a mode field, or change the Pack.",
       inputSchema: {
         repositoryPath,
         scope: z.string().min(1).max(200).optional().describe("Optional part name or decision id to filter."),
-        taskIntent: z.enum(["apply_existing", "new_direction", "correction", "gap", "greenfield", "unclear", "inspect_only"]).describe("Required host-interpreted current task intent. Use apply_existing when following established guidance; inspect_only for setup or Pack maintenance; use new_direction, correction, gap, greenfield, or unclear to force a task-local Expression route regardless of durable Pack state."),
+        taskIntent: z.enum(["apply_existing", "new_direction", "correction", "gap", "greenfield", "unclear", "inspect_only"]).optional().describe("Optional legacy diagnostic context. Omit for Pack inspection. This does not route normal checklist-based UI tasks."),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

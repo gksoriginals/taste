@@ -14,7 +14,7 @@ const codexManifest = await readJson<{ name?: string; version?: string; skills?:
 const codexMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }> }>(".mcp.json");
 const claudeManifest = await readJson<{ name?: string; mcpServers?: string }>(".claude-plugin/plugin.json");
 const claudeMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[] }> }>(".claude.mcp.json");
-const cursorManifest = await readJson<{ name?: string; skills?: string; mcpServers?: string }>(".cursor-plugin/plugin.json");
+const cursorManifest = await readJson<{ name?: string; skills?: string; commands?: string; mcpServers?: string }>(".cursor-plugin/plugin.json");
 const cursorMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[]; cwd?: string }> }>(".cursor.mcp.json");
 const codexMarketplace = await readJson<{ name?: string; plugins?: Array<{ name?: string; source?: { source?: string; path?: string }; policy?: { installation?: string; authentication?: string }; category?: string }> }>(".agents/plugins/marketplace.json");
 
@@ -25,8 +25,8 @@ if (!validatePlugin(plugin)) issues.push(`plugin.json: ${JSON.stringify(validate
 if (!validateMcp(portableMcp)) issues.push(`mcp.json: ${JSON.stringify(validateMcp.errors)}`);
 if (claudeManifest.name !== plugin.name) issues.push("Claude Code and portable plugin names must match.");
 if (claudeManifest.mcpServers !== "./.claude.mcp.json") issues.push("Claude Code manifest must point to its native MCP config.");
-if (cursorManifest.name !== plugin.name || cursorManifest.skills !== "./skills/" || cursorManifest.mcpServers !== "./.cursor.mcp.json") {
-  issues.push("Cursor manifest must point to the shared Skills and Cursor-specific MCP config.");
+if (cursorManifest.name !== plugin.name || cursorManifest.skills !== "./skills/" || cursorManifest.commands !== "./commands/" || cursorManifest.mcpServers !== "./.cursor.mcp.json") {
+  issues.push("Cursor manifest must point to shared Skills, explicit commands, and Cursor-specific MCP config.");
 }
 if (codexManifest.name !== plugin.name || codexManifest.version !== plugin.version) issues.push("Codex and portable plugin identity/version must match.");
 if (codexManifest.skills !== "./skills/" || codexManifest.mcpServers !== "./.mcp.json") issues.push("Codex compatibility manifest must point to the root Skills and Codex MCP config.");
@@ -64,6 +64,11 @@ if (cursorServer?.command !== "node" || cursorServer.args?.[0] !== "${CURSOR_PLU
 }
 if (!(await stat(path.join(root, "dist/server.js")).then((item) => item.isFile()).catch(() => false))) {
   issues.push("dist/server.js is missing; run npm run build before packaging the plugin.");
+}
+
+const setupCommand = await readFile(path.join(root, "commands/taste-setup.md"), "utf8").catch(() => null);
+if (!setupCommand || !/^name:\s*taste-setup\s*$/m.test(setupCommand.match(/^---\s*\n([\s\S]*?)\n---/m)?.[1] ?? "")) {
+  issues.push("commands/taste-setup.md must define the explicit Taste setup command.");
 }
 
 const skillDirectories = await readdir(path.join(root, "skills"), { withFileTypes: true });

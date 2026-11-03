@@ -12,7 +12,7 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 
 ### One product Pack
 
-- `taste_pack_initialize` creates a non-overwriting scaffold. The host sweeps the whole existing product UI, then derives and writes only the entry Skill, task/surface references, checklists, facts, metadata, examples, or eval material that are useful for this particular product. No fixed reference catalog is required.
+- `taste_pack_initialize` creates a non-overwriting scaffold only after explicit `/taste-setup` inspects the repository and completes a bounded rendered sweep of accessible product UI. No UI or inaccessible first-time UI means no Pack. The host derives and writes only useful product-specific guidance. Existing Packs are reviewed and selectively refreshed; setup is resumable and normal UI work never starts it implicitly.
 - It does not create separate Conformance and Expression trees and it does not write `supportedModes`.
 - Older Packs that still have those trees, including `examples/product-pack/`, still validate. Routine user feedback learning belongs in scoped checklist files; structured `decisions/` remain for legacy records.
 - Host-self-reviewed product knowledge is written under the product repo's `taste/`. Unresolved options and one-off reactions stay in harness memory.
@@ -21,7 +21,7 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 
 - Inspect, read, validate, and write files inside `taste/`.
 - `taste_record_signal` remains a legacy structured Decision writer. Routine learning is written to scoped checklists with `taste_pack_write`.
-- `taste_part_state` requires a host-interpreted `taskIntent`, derives durable Conformance or Expression from Pack evidence, and returns a task-local Expression override for new directions, corrections, gaps, greenfield work, or unclear requests. It does not parse conversation text or change the Pack.
+- `taste_part_state` remains for legacy structured Decision compatibility and diagnostics. It does not route checklist-based Packs; the host routes from the user's task and affected product surface, choosing Conformance, Expression, or a focused clarification as appropriate.
 - Writes stay inside the Pack, reject symlink parents, and cap size at 256 KiB.
 
 ### Evaluation packets
@@ -34,7 +34,7 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 
 - `taste-setup`, `taste-sweep`, `taste-design`, `taste-conformance`, `taste-expression`, `taste-pack`, and `taste-evaluate` describe when the harness should call which tool.
 - Expression interviews in the harness conversation. Apply direct user corrections and disagreements, self-check the result, then update reusable checklist items without a separate review or promotion step.
-- Initial Sweep inventories the entire user-facing product and requires rendered evidence for visual claims. Parallelize bounded surfaces when useful, then reconcile evidence and self-review coverage before writing the Pack.
+- Explicit setup inspects repository structure first, chooses a bounded scope, and requires rendered evidence for visual claims. Parallelize only bounded parts of that scope when useful, then reconcile evidence and self-review before writing the Pack. Normal UI work never starts setup implicitly.
 - `taste_mode_resolve` is still registered and tested. It is a deprecated helper and is not the ∞ rule.
 
 ## Explicitly out of this slice
