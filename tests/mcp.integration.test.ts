@@ -43,8 +43,9 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     );
     assert.equal(tools.find((tool) => tool.name === "taste_pack_write")?.annotations?.destructiveHint, true);
     assert.equal(tools.find((tool) => tool.name === "taste_record_signal")?.annotations?.destructiveHint, true);
-    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /bounded sweep has confirmed accessible product UI/i);
-    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /Do not initialize for a repository with no product UI/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /rendered inspection of product UI/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /Do not initialize if no product UI exists/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /important auth coverage is blocked.*leave setupStatus=incomplete/i);
 
     const initialized = await client.callTool({
       name: "taste_pack_initialize",
