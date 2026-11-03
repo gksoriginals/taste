@@ -15,64 +15,53 @@ It is an early-stage plugin for [Cursor](https://cursor.com/), [Codex](https://d
 
 Taste has three parts.
 
-- **Pack.** One `taste/` directory in the product repository. It holds that product’s approved design decisions and is committed next to the code.
-- **Plugin.** This repository. Its Skills and local MCP server are installed into the coding harness. They read the Pack and, when allowed, write a Decision back.
-- **Host.** Cursor, Codex, or Claude Code. The host implements the UI, runs checks, handles review, and ships. Taste does not.
+- **Pack.** One `taste/` directory in the product repository. It holds that product’s Skills, sourced references, and evolving design checklists beside the code.
+- **Plugin.** This repository. Its Skills and local MCP server are installed into the coding harness. They read and update product-specific Pack guidance and checklists.
+- **Host.** Cursor, Codex, or Claude Code. The host maps product surfaces, implements UI, runs checks, self-reviews and ships. Taste does not.
 
 ```text
 product repository                      coding harness
-taste/  Pack of Decisions    ←→    Taste plugin (Skills + local MCP)
+taste/  Product Skills + checklists    ←→    Taste plugin (Skills + local MCP)
                                            ↑
                                  Cursor, Codex, or Claude Code
                                  implements, tests, reviews, ships
 ```
 
-The plugin loads an existing Pack before UI work. It writes a Decision only after the host’s checks pass and you approve the exact tested artifact.
+The plugin loads the product Skill and relevant checklists before UI work. The host updates reusable checklist guidance directly from resolved user feedback in the ongoing conversation.
 
 ## Core principles
 
 - **Judgment stays with the product.** The Pack is committed beside the code it describes.
 - **Harnesses follow the Pack.** Cursor, Codex, and Claude Code read the same decisions.
 - **One Pack per product.**
-- **Taste does not run tests or ship for you.** The host owns implementation, checks, review, and push.
-- **Recording waits for an approved artifact.** A reusable Decision is written when the host reports that its checks passed and you approve that exact version. An early “I like this direction” does not update the Pack. There is no second step just to confirm the Pack write.
-- **Exploration stays in the task.** Drafts, rejected directions, and in-progress feedback stay in the host’s current task. They are not written into the Pack while the design is still changing.
+- **Taste does not run tests or ship for you.** The host owns implementation, checks, self-review, and push.
+- **Learn in the conversation.** When you reject a direction or correct a design choice, the host applies the feedback and records a clear reusable checklist item after checking its work. No separate human review or promotion step is required.
+- **Keep unresolved exploration in the task.** Open alternatives and one-off feedback stay in the host's current task; resolved reusable guidance goes into the scoped checklist.
 
 ## How a task runs
 
 1. You ask for UI work in a product repository.
-2. The host loads `taste/` when a Pack is already there.
+2. The host loads `taste/` when a Pack is already there. On the first UI request without a Pack, it sweeps the existing product, builds and self-checks a tailored Pack, then continues your original task. You do not need a separate setup request.
 3. When the Pack already covers that UI, the host applies those decisions.
-4. When you ask for a new direction or a change, the host explores in the current task and leaves the Pack unchanged.
-5. The host implements and runs the product repository’s own checks.
-6. You approve the exact tested artifact.
-7. The host records a short reusable Decision in `taste/`. If the repository had no Pack, it creates one here.
-
-If the artifact changes after that, the old approval does not carry over. The host rechecks the new version, and you approve it, before its Decision is updated.
+4. When you ask for a new direction or make a correction, the host explores and revises in the current task.
+5. The host runs applicable product checks and self-checks the result.
+6. If your feedback expresses a reusable lesson, the host applies it, self-checks the result, and updates the relevant checklist in `taste/` as part of the task. One-off or unresolved reactions stay in the conversation. If no Pack exists yet, it creates and populates one after the whole-product sweep or once reusable guidance emerges.
 
 ## Composing the Pack
 
-Taste does not crawl the product repository into `taste/`. The folder starts without design judgments and grows one Decision at a time.
+When you ask to set up Taste for a product with existing UI, the host sweeps the whole user-facing product before initializing the Pack. It inventories routes and surfaces, inspects rendered flows and reachable states, and correlates screenshots with source, Git history, design files, and reviews. The host may split bounded surfaces across its available tasks or agents, then reconciles the findings.
 
-**Scaffold.** When you ask to set up Taste, the `taste-setup` skill calls `taste_pack_initialize`. That creates an empty Pack in the product repository: `manifest.json`, the product-design skill, `product-facts.md`, an empty `decisions/` directory, and stubs for source authority and evaluation. No judgments yet. Initialization fails if `taste/` is already there.
+The host turns verified evidence into a tailored `product-design` entry Skill and only the product-specific references, checklists, and metadata that are useful for the product. The entry Skill routes by request mode and surface, then loads the relevant material. The host self-checks coverage, traceability, accuracy, consistency, and usefulness; there is no separate human review or approval stage. The minimal starter files are a scaffold, not a completed Pack. Initialization fails if `taste/` already exists.
 
-**Sweep.** `taste-sweep` is a skill the harness agent runs when you ask it to learn from UI that is already shipping. It:
-
-1. Checks for an existing Pack. It does not create one just to sweep.
-2. Inspects one focused flow in the running UI with the harness’s browser or computer-use tools, including screenshots and the states it opened.
-3. Correlates that with source, git history, reviews, and design references when they are available.
-4. Keeps candidate judgments in the task. They are not written to disk.
-5. After you approve and the host reports validation, initializes the Pack if it is missing and calls `taste_record_signal`. That writes one Decision under `taste/skills/product-design/references/decisions/`.
-
-The Pack is the set of Decisions recorded from approved, validated artifacts. It is not a bulk extract of the repo.
+Do not treat every repeated pattern as intentional product policy. Mark observed patterns and host inferences distinctly, with sources and confidence. In normal design conversations, user corrections, rejections, and disagreements are direct feedback: the host applies them, then adds clear reusable lessons to scoped checklists without asking for separate Pack or Decision approval. One-off or unresolved preferences stay in the active task. Gaps and uncertain areas remain visible in metadata. Greenfield work continues through transient Expression and gains checklist guidance as the user and host resolve decisions together.
 
 ## Try it
 
 Install Taste in your coding harness, open a **product repository**, and ask for a UI task in natural language. For example:
 
-> Use Taste while simplifying the settings screen. Keep exploratory feedback out of the Pack. After the implementation passes this repository’s checks, show me the tested version; when I approve it, record the reusable decision.
+> Use Taste while simplifying the settings screen. When I correct the design, revise it and add a reusable checklist item from my feedback after checking the result. Do not ask for a separate Pack update approval.
 
-The harness should load an existing `taste/` Pack before UI work. If none exists, the task stays in the conversation until you approve the tested artifact; the Pack is created then. For a step-by-step check of a new Pack and an existing Pack, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until someone fills it from a real host run.
+The harness should load an existing `taste/` Pack before UI work. If none exists, sweep the whole existing product UI and create a tailored Pack after host self-review; for greenfield UI, add reusable checklist guidance as it emerges in the task. For a step-by-step check, see the [harness smoke-test guide](docs/harness-smoke-test.md). Record what you actually observed in the [smoke-results template](docs/harness-smoke-results.md). That sheet stays unverified until a real host run fills it.
 
 ## Install
 
@@ -127,16 +116,9 @@ claude --plugin-dir /absolute/path/to/taste
 
 Each product has one Pack at `taste/`:
 
-```text
-taste/
-├── manifest.json
-├── skills/product-design/SKILL.md
-└── skills/product-design/references/
-    ├── shared/product-facts.md
-    └── decisions/
-```
+A new Pack starts with only a README, `manifest.json`, and a product-design entry Skill. The host derives the rest from the whole-product sweep: it may create a surface map, focused references, checklists, shared facts, examples, or evaluation material when those are useful for this product. There is no fixed reference catalog; avoid empty files and generic categories that do not fit the product.
 
-Decisions are scoped to parts of the product, not one switch for the whole Pack. If an approved artifact changes, the host must revalidate it and get approval for that version before updating its Decision. A changed artifact does not keep the previous version’s shipped evidence.
+Checklist guidance is scoped to product surfaces and task types, not one switch for the whole Pack. The host updates a reusable checklist from direct user feedback after applying and self-checking the result. Structured Decision records and their approval evidence remain a legacy format; they are not required for this learning flow.
 
 ## Diagnostics
 

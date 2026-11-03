@@ -36737,23 +36737,33 @@ description: Apply ${productName}'s product-specific design judgment when creati
 
 # Product design guidance for ${productName}
 
-This is the entry point for one Taste Pack. Decisions live under \`references/decisions/\`. There is no mode field on a Decision and no separate Conformance or Expression tree.
+This is the entry point for one Taste Pack. Its references and checklists are selected during the product sweep based on the actual product surfaces and evidence. There is no mode field on a Decision and no separate Conformance or Expression tree.
 
-## Derived part activity
-
-Read Decisions and call \`taste_part_state\` before UI work with the affected scope and a required \`taskIntent\`: use \`apply_existing\` to follow established guidance, \`inspect_only\` for setup or Pack maintenance, or \`new_direction\`, \`correction\`, \`gap\`, \`greenfield\`, or \`unclear\` for the corresponding task. The tool reports task-local Expression routing separately from durable Pack state. Activity is derived, not authored:
-
-- **Conformance:** the Decision is \`accepted\`, includes matching host-reported validation and user-approval evidence, has shipped evidence, and \`coverage_gap\` is false. Use that taste for UI.
-- **Expression:** anything else \u2014 no Decision, a legacy or unapproved Decision, missing promotion evidence, accepted but not shipped, or a coverage gap. The host keeps iteration feedback in its active task and records only a finalized Decision with \`taste_record_signal\`.
-- **User intent:** a request for new taste, a correction, or greenfield judgment uses Expression for that task, even when other Decisions are Conformance.
-
-The Pack never flips as a whole. The host interprets the current request and supplies \`taskIntent\`; the tool cannot read conversation text. The task-local route never changes persisted Decisions. The host owns checks, user review, readiness, and push timing. Taste stores host-reported evidence; it does not run or judge checks. The optional \`decisionPromotionCheckpoint\` in the manifest is reminder text only. Do not add another mode or put host workflow inside the Pack. \`taste_mode_resolve\` is deprecated and is not the product rule.
+This generated starter is only a scaffold, not a completed product Skill. Before using it as product-specific guidance, run the host's whole-product Taste setup sweep, inventory the user-facing surfaces, and replace generic text with source-linked product guidance, task-and-surface routing, focused references, and checklists. The host self-reviews its work; update reusable checklist items directly from resolved user corrections without a separate review or promotion step.
 
 ## Apply this Pack
 
-Read \`references/shared/product-facts.md\` and the Decisions that touch the task. Treat shipped work as evidence, not a requirement to copy known flaws. Keep uncertainty visible.
+Resolve the request mode from the user's verb and artifact before acting, then identify the product surface from the route, screen, component, or flow. Use the product-specific routing map and load only the Skills, references, and checklists that the sweep found useful for this task. Follow canonical repository sources for component APIs, design tokens, accessibility, and interaction contracts instead of copying them into this Pack.
 
-For a discovery refresh of an existing UI, follow \`taste-sweep\` and capture screenshots. For a product that does not have the judgment yet, follow \`taste-expression\`. When the user likes an early direction, continue the host's workflow without writing to the Pack. After the host reports relevant checks passed and the user approves the exact tested artifact, derive and record its concise reusable Decision automatically; do not ask for separate Pack-write or Decision-text confirmation. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
+| Request mode | Route and boundary |
+| --- | --- |
+| Shape | Frame the user, job, evidence, outcomes, alternatives, states, and open questions. Do not edit unless asked. |
+| Implement | Make the smallest coherent change within the requested surface and scope. |
+| Review | Inspect source and rendered evidence, report findings, and do not edit unless asked. |
+| Copy | Edit user-facing language and only directly required UI structure; report broader design issues separately. |
+| Harden | Preserve the settled direction while checking reachable states, resilience, accessibility, responsive behavior, and recovery. |
+
+During setup, create a routing map from the actual product tasks, surfaces, and evidence. Do not assume every product needs the same reference categories or files. Add a shared reference only when it captures guidance useful across multiple surfaces; otherwise keep guidance scoped to the relevant surface. A URL, screenshot, or component identifies scope; it does not authorize an edit. Skip backend-only work with no user-visible effect, telemetry-only changes, generated files, and tests without shipped UI impact.
+
+## Product-specific routing
+
+Use the manifest and the Pack's own routing map to identify the relevant surface, then load only the references and checklists created for that product and task. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
+
+## Learn from user feedback
+
+Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review, Decision approval, or promotion checkpoint. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
+
+For initial setup or a discovery refresh, follow \`taste-sweep\` across the whole user-facing product and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 function createStarterPackFiles(productName, surfaces = [], decisionPromotionCheckpoint) {
   const normalizedName = productName.trim();
@@ -36774,69 +36784,12 @@ function createStarterPackFiles(productName, surfaces = [], decisionPromotionChe
       path: "README.md",
       content: `# ${normalizedName} Taste Pack
 
-This directory is the product's one Taste Pack. Read \`skills/product-design/SKILL.md\`, then Decisions under \`skills/product-design/references/decisions/\`.
-
-Conformance and Expression are derived activities, not folders. A Decision is Conformance only when it is accepted, has shipped evidence, has no coverage gap, and records host-reported validation and user approval for the same artifact. Expression keeps provisional feedback in the host's active task context; it does not write draft Decisions to the Pack. The starter is not product knowledge.
+This is the product's Taste Pack. Its contents should reflect this product's actual user-facing surfaces and verified design evidence. The starter files are only a shell. Complete the whole-product sweep, decide which guidance is useful for this product, then write only those product-specific Skills, references, checklists, and metadata. Self-check coverage, traceability, accuracy, and usefulness.
 `
     },
     { path: "manifest.json", content: `${JSON.stringify(manifest, null, 2)}
 ` },
-    { path: ENTRY_SKILL, content: starterEntrySkill(normalizedName) },
-    {
-      path: "skills/product-design/references/shared/product-facts.md",
-      content: `# Shared product facts
-
-Record reviewed product facts that apply across parts. Add evidence and source links. Do not put a mode field here.
-`
-    },
-    {
-      path: "skills/product-design/references/decisions/README.md",
-      content: `# Decisions
-
-One Pack. Each other file in this directory is one Decision written by \`taste_record_signal\`. Do not author a mode field.
-
-A Decision can be recorded after the host reports a final artifact, its relevant validation evidence, and the user's approval of that same artifact. That approval authorizes the host to derive and record the concise reusable Decision; no separate Pack-write or Decision-text confirmation is needed. Taste stores the host's report; it does not run or judge checks or user review.
-
-Derived activity for a Decision:
-
-- **Conformance** when \`status\` is \`accepted\`, shipped evidence is present, there is no coverage gap, and promotion evidence is complete.
-- **Expression** otherwise, including accepted but unshipped or Decisions missing promotion evidence.
-
-During Expression, interviews, alternatives, corrections, and design feedback remain in the host's active task context. The host follows its own workflow, then records the finalized Decision at the optional \`decisionPromotionCheckpoint\` in \`manifest.json\`, if configured. The Pack does not flip as a whole.
-`
-    },
-    {
-      path: "metadata/authority.md",
-      content: `# Product source authority
-
-List the product's canonical sources and explain how to handle conflicts. The current task's explicit user goal remains immediate authority. Shipped work is evidence of behavior, not automatic approval of flaws. Whether a known flaw or a deliberate break sends a part to Expression is an open question.
-`
-    },
-    {
-      path: "evals/rubric.md",
-      content: `# Evaluation rubric
-
-The higher-capacity Eval Judge runs through the coding harness in a fresh context from the generator. Assess each generated output independently before comparing paired arms. Cite concrete evidence from the generated files and expected result.
-
-Score each dimension from 1 to 5 (1 = fails the task or conflicts with supported direction; 3 = partly meets it with material gaps; 5 = meets it strongly without material gaps):
-
-- **User-facing quality:** Does the experience serve the task and user need?
-- **Task completion:** Does the implementation actually deliver the requested behavior, not just its appearance?
-- **Product-rule correctness:** Does it apply the relevant Decisions and shared facts?
-- **Accepted-work alignment:** Where expected shipped work is available, does the result reflect the useful accepted decisions? Similarity must not reward known flaws or omissions.
-
-Call out unverified behavior, missing evidence, and protocol deviations separately. Human review calibrates this Rubric and adjudicates uncertain judgments. Scores are evidence for Pack improvement, not automatic approval of a guidance change.
-
-Fixture lanes under \`evals/conformance/\` and \`evals/expression/\` are historical directories for the eval tools. They are not Pack modes.
-`
-    },
-    {
-      path: "evals/fixtures/README.md",
-      content: `# Evaluation fixtures
-
-Add fixtures as \`evals/<lane>/fixtures/<id>/\` with \`task.md\`, \`before/\`, and \`after/\`. The eval tools still take a lane of \`conformance\` or \`expression\`. That lane is storage for the fixture, not an authored Pack mode. Keep expected edits hidden from generator context for holdouts.
-`
-    }
+    { path: ENTRY_SKILL, content: starterEntrySkill(normalizedName) }
   ];
 }
 async function resolveRepositoryRoot(repositoryPath2) {
@@ -37094,28 +37047,14 @@ async function readablePackFile(packRoot, relative, issues) {
 }
 async function validatePackAt(packRoot) {
   const issues = [];
-  const requiredFiles = [
-    "README.md",
-    "manifest.json",
-    ENTRY_SKILL,
-    "skills/product-design/references/shared/product-facts.md",
-    "metadata/authority.md",
-    "evals/rubric.md"
-  ];
+  const requiredFiles = ["README.md", "manifest.json", ENTRY_SKILL];
   for (const relative of requiredFiles) {
     const state = await readablePackFile(packRoot, relative, issues);
     if (state === "missing") issues.push({ path: relative, message: "Required Pack file is missing or unreadable." });
   }
-  const decisionsHome = await readablePackFile(packRoot, DECISIONS_HOME, issues);
-  const legacyConformance = await readablePackFile(packRoot, LEGACY_CONFORMANCE_HOME, issues);
-  const legacyExpression = await readablePackFile(packRoot, LEGACY_EXPRESSION_HOME, issues);
-  const hasLegacyPair = legacyConformance === "ok" && legacyExpression === "ok";
-  if (decisionsHome !== "ok" && !hasLegacyPair) {
-    issues.push({
-      path: DECISIONS_HOME,
-      message: "Pack needs decisions/README.md, or both legacy conformance and expression reference READMEs. New Packs use the shared decisions home."
-    });
-  }
+  await readablePackFile(packRoot, DECISIONS_HOME, issues);
+  await readablePackFile(packRoot, LEGACY_CONFORMANCE_HOME, issues);
+  await readablePackFile(packRoot, LEGACY_EXPRESSION_HOME, issues);
   let manifest;
   try {
     const manifestPath = await resolvePackFile(packRoot, "manifest.json");
@@ -37681,12 +37620,12 @@ function createTasteServer() {
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting starter Taste Pack under <repositoryPath>/taste. One shared Pack with a decisions/ home. Does not create separate Conformance and Expression trees, does not edit AGENTS.md, and does not configure the harness. Call only after the user requests or agrees to initialization.",
+      description: "Create a non-overwriting Taste Pack scaffold under <repositoryPath>/taste after the host has completed whole-product UI discovery and self-reviewed its tailored Pack content (or when explicitly asked for a blank scaffold). Then derive the Pack structure from the product sweep and use taste_pack_write to create only useful, evidence-backed product Skills, references, checklists, and metadata for its actual surfaces. Do not populate a fixed reference catalog or create empty categories. Add exemplars or eval fixtures only when product evidence supports them; the scaffold alone is not a completed product Pack. Routine conversation learning is written as checklist guidance without a separate human review or promotion step. One shared Pack; no separate Conformance and Expression trees, AGENTS.md edits, or harness configuration.",
       inputSchema: {
         repositoryPath,
         productName: external_exports.string().min(2).max(120).describe("Product name for the starter Pack."),
         surfaces: external_exports.array(external_exports.string().min(1).max(100)).max(30).optional().describe("Known product surfaces to record in the Pack manifest."),
-        decisionPromotionCheckpoint: external_exports.string().trim().min(1).max(500).optional().describe("Optional plain-language checkpoint for when the host should ask Taste to record a finalized Decision. Guidance only: the host owns checks, user approval, and push workflow.")
+        decisionPromotionCheckpoint: external_exports.string().trim().min(1).max(500).optional().describe("Legacy reminder text for hosts that still use structured Decision promotion. Routine checklist learning from product setup and conversation does not require this checkpoint.")
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
@@ -37719,7 +37658,7 @@ function createTasteServer() {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or Decision files under skills/product-design/references/decisions/. Use for product facts and evaluation fixtures; finalized Decisions must use taste_record_signal after the host reports validation and user approval.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or structured Decision files under skills/product-design/references/decisions/. Use for product-specific Skills, surface references, shared facts, metadata, evaluation fixtures, and reusable checklists derived from resolved user feedback. The host self-checks and updates routine checklist learning in the same task; no separate review or promotion approval is required. taste_record_signal is retained for legacy structured Decision records.",
       inputSchema: {
         repositoryPath,
         path: external_exports.string().min(1).max(300).describe("Pack-relative destination path."),
@@ -37743,7 +37682,7 @@ function createTasteServer() {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact. That artifact approval authorizes the host to derive and record the reusable Decision automatically; do not ask for separate Pack-write or Decision-text confirmation. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
+      description: "Legacy structured Decision write path. Routine product learning from user corrections, rejected directions, and resolved design disagreements belongs in scoped checklist files written with taste_pack_write; do not route it through a separate Decision promotion or approval step. The legacy schema still requires matching validation and user-approval evidence. Use it only to maintain an existing structured Decision record, not as the default learning path. Taste stores supplied reports; it does not run or judge checks, observe conversations, or push. Same id updates the legacy Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
       inputSchema: {
         repositoryPath,
         id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),

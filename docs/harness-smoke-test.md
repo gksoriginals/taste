@@ -2,21 +2,19 @@
 
 Use this procedure after installing Taste in a host. Run it in a disposable product repository if you do not want to touch a real project. These steps verify tool/Skill routing and Pack writes; they do not certify visual quality.
 
-## Greenfield flow
+## Existing product bootstrap
 
-1. Start with a product repository that has no `taste/` directory. Ask for a UI task in natural language, such as: “Help me design a settings screen and interview me about the direction. Keep the Pack unchanged while we explore.”
-2. Give feedback and iterate. An early “I like this direction” response should prompt the host to continue implementation and checks; it should not initialize or update the Pack.
-3. Ask the host to finish the UI and run the product repository’s existing checks. Review the tested version.
-4. Approve the exact tested artifact. That approval authorizes the host to initialize the Pack if needed and record the reusable Decision automatically, without a second Pack-write confirmation.
-5. Inspect `taste/manifest.json`, the product entry Skill, and the new Decision. Confirm the Decision references the same artifact the host validated and that its validation and user-approval evidence match.
+1. Use a product repository with several user-facing routes and no `taste/` directory. Ask the host to set up Taste from the existing UI.
+2. Confirm the host inventories the full surface map and inspects reachable rendered flows/states. If it uses parallel tasks, confirm each worker has a bounded surface and the host reconciles their evidence.
+3. Inspect `taste/manifest.json`, `skills/product-design/SKILL.md`, task/surface references, checklists, and source/coverage metadata. Confirm the Skill routes by request mode and surface and links to canonical sources.
+4. Confirm the host performed its own coverage/evidence self-check, created the Pack without asking for human approval, and called `taste_pack_validate`.
 
-## Existing-Pack correction
+## Conversation learning
 
-1. Create or use a product Pack with a Decision that has validation, user-approval, and inspected shipped evidence, so the part currently derives to Conformance.
-2. Ask the host to change that part of the UI, for example: “Make this screen simpler and remove repeated explanations.”
-3. Confirm the host calls `taste_part_state` with the affected scope and `taskIntent: correction`. The result should keep the durable Pack state visible while adding a task-local Expression route.
-4. Iterate and run the product’s existing checks. Confirm the old Decision remains unchanged while the design is in progress.
-5. Approve the exact tested artifact. Confirm the host updates the related Decision automatically. If the artifact reference changed, verify its prior shipped evidence was cleared. Conformance should return only after the updated work is shipped and inspected.
+1. Ask the host to make a design choice on an existing surface.
+2. Reject the choice or state a different preference in the conversation. Confirm the host adapts the UI without asking for a separate Pack or Decision approval.
+3. Confirm the host self-checks the change and writes a scoped checklist item with the check, rationale, scope, and source reference.
+4. Give a correction to the checklist item. Confirm the host updates the relevant item in the same conversation and does not require a review/promotion checkpoint.
 
 ## Diagnostics
 

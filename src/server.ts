@@ -78,12 +78,12 @@ export function createTasteServer(): McpServer {
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting starter Taste Pack under <repositoryPath>/taste. One shared Pack with a decisions/ home. Does not create separate Conformance and Expression trees, does not edit AGENTS.md, and does not configure the harness. Call only after the user requests or agrees to initialization.",
+      description: "Create a non-overwriting Taste Pack scaffold under <repositoryPath>/taste after the host has completed whole-product UI discovery and self-reviewed its tailored Pack content (or when explicitly asked for a blank scaffold). Then derive the Pack structure from the product sweep and use taste_pack_write to create only useful, evidence-backed product Skills, references, checklists, and metadata for its actual surfaces. Do not populate a fixed reference catalog or create empty categories. Add exemplars or eval fixtures only when product evidence supports them; the scaffold alone is not a completed product Pack. Routine conversation learning is written as checklist guidance without a separate human review or promotion step. One shared Pack; no separate Conformance and Expression trees, AGENTS.md edits, or harness configuration.",
       inputSchema: {
         repositoryPath,
         productName: z.string().min(2).max(120).describe("Product name for the starter Pack."),
         surfaces: z.array(z.string().min(1).max(100)).max(30).optional().describe("Known product surfaces to record in the Pack manifest."),
-        decisionPromotionCheckpoint: z.string().trim().min(1).max(500).optional().describe("Optional plain-language checkpoint for when the host should ask Taste to record a finalized Decision. Guidance only: the host owns checks, user approval, and push workflow."),
+        decisionPromotionCheckpoint: z.string().trim().min(1).max(500).optional().describe("Legacy reminder text for hosts that still use structured Decision promotion. Routine checklist learning from product setup and conversation does not require this checkpoint."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -119,7 +119,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or Decision files under skills/product-design/references/decisions/. Use for product facts and evaluation fixtures; finalized Decisions must use taste_record_signal after the host reports validation and user approval.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or structured Decision files under skills/product-design/references/decisions/. Use for product-specific Skills, surface references, shared facts, metadata, evaluation fixtures, and reusable checklists derived from resolved user feedback. The host self-checks and updates routine checklist learning in the same task; no separate review or promotion approval is required. taste_record_signal is retained for legacy structured Decision records.",
       inputSchema: {
         repositoryPath,
         path: z.string().min(1).max(300).describe("Pack-relative destination path."),
@@ -145,7 +145,7 @@ export function createTasteServer(): McpServer {
     "taste_record_signal",
     {
       title: "Record a Taste Decision",
-      description: "Finalized Decision write path. Call only after the host reports that its own relevant checks passed and the user approved the exact tested artifact. That artifact approval authorizes the host to derive and record the reusable Decision automatically; do not ask for separate Pack-write or Decision-text confirmation. Taste records these host reports; it does not run or judge checks, decide readiness, conduct user review, or push. Keep early direction reactions, drafts, corrections, gaps, and rejected iterations in the host's active task context. Then create or update one accepted Decision under taste/skills/product-design/references/decisions/. At least one host-reported validation result is required. validatedArtifact and userApprovedArtifact must identify the same artifact. shippedEvidence is separate and should be included only when the host actually inspected a shipped version. Same id updates the Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
+      description: "Legacy structured Decision write path. Routine product learning from user corrections, rejected directions, and resolved design disagreements belongs in scoped checklist files written with taste_pack_write; do not route it through a separate Decision promotion or approval step. The legacy schema still requires matching validation and user-approval evidence. Use it only to maintain an existing structured Decision record, not as the default learning path. Taste stores supplied reports; it does not run or judge checks, observe conversations, or push. Same id updates the legacy Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
       inputSchema: {
         repositoryPath,
         id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
