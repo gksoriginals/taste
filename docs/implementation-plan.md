@@ -12,7 +12,7 @@ This note describes the first plugin slice: Skills and MCP tools a coding harnes
 
 ### One product Pack
 
-- `taste_pack_initialize` creates a non-overwriting scaffold only after explicit `/taste-setup` inspects the repository and completes a bounded rendered sweep of accessible product UI. No UI or inaccessible first-time UI means no Pack. The host derives and writes only useful product-specific guidance. Existing Packs are reviewed and selectively refreshed; setup is resumable and normal UI work never starts it implicitly.
+- `taste_pack_initialize` creates a non-overwriting scaffold only during explicit `/taste-setup` after repository evidence confirms user-facing UI or UI source. No UI/source means no Pack. Source-reviewed evidence can yield `usable_partial` under the default policy; rendered-flow policy requires a rendered journey. The host derives and writes only useful product-specific guidance. Existing Packs are reviewed and selectively refreshed; setup is resumable and normal UI work never starts it implicitly.
 - It does not create separate Conformance and Expression trees and it does not write `supportedModes`.
 - Older Packs that still have those trees, including `examples/product-pack/`, still validate. Routine user feedback learning belongs in scoped checklist files; structured `decisions/` remain for legacy records.
 - Host-self-reviewed product knowledge is written under the product repo's `taste/`. Unresolved options and one-off reactions stay in harness memory.

@@ -9,7 +9,42 @@ const MAX_EVAL_FILES = 100;
 const MAX_EVAL_BYTES = 1024 * 1024;
 
 export type TasteMode = "conformance" | "expression";
-export type PackSetupStatus = "incomplete" | "complete";
+export type PackSetupStatus = "in_progress" | "usable_partial" | "complete" | "incomplete";
+export type MinimumUsableEvidence = "source_reviewed" | "rendered_flow";
+export type SetupCoverageStatus = "source_reviewed" | "rendered" | "blocked" | "not_inspected";
+export type SetupEvidenceType = "source_reviewed" | "rendered" | "design_reference" | "inference";
+
+export interface SetupPolicy {
+  minimumUsableEvidence: MinimumUsableEvidence;
+}
+
+export interface SetupEvidence {
+  type: SetupEvidenceType;
+  reference: string;
+  checkedAt: string;
+  note?: string;
+}
+
+export interface SetupCoverage {
+  id: string;
+  app: string;
+  surface: string;
+  journey?: string;
+  status: SetupCoverageStatus;
+  evidence: SetupEvidence[];
+  guidanceFiles: string[];
+  gap?: string;
+}
+
+export interface SetupScope {
+  description: string;
+  selection: "user_confirmed" | "host_selected";
+  repositoryApps: string[];
+  products: string[];
+  exclusions: string[];
+  coverageTarget: string;
+  requiredCoverage: string[];
+}
 
 export interface PackManifest {
   name: string;
@@ -20,8 +55,11 @@ export interface PackManifest {
    */
   supportedModes?: TasteMode[];
   surfaces: string[];
-  /** Lifecycle marker for explicit setup; legacy Packs without it are treated as pre-existing. */
+  /** New Setup readiness state. `incomplete` is accepted only for backward compatibility. */
   setupStatus?: PackSetupStatus;
+  setupPolicy?: SetupPolicy;
+  setupScope?: SetupScope;
+  coverage?: SetupCoverage[];
   /** Legacy optional reminder for hosts that still record structured Decision promotions. */
   decisionPromotionCheckpoint?: string;
 }
@@ -67,6 +105,8 @@ First identify the user's task and the affected product surface. Load only the p
 
 These labels describe how the host handles this task; they are not persisted states or Pack modes. Existing guidance can still inform an Expression task. Keep review tasks report-only unless editing is separately requested. Follow canonical repository sources for component APIs, design tokens, accessibility, and interaction contracts instead of copying them into this Pack.
 
+Respect setup readiness and coverage separately. \`in_progress\` is not usable. With \`usable_partial\`, apply only guidanceFiles listed for evidence-backed surfaces; do not generalize it to blocked or uninspected journeys. \`complete\` applies only to the recorded scope and coverage target.
+
 During setup, build the routing map from the actual product tasks, surfaces, and evidence. Do not assume every product needs the same reference categories or files. Add a shared reference only when it captures guidance useful across multiple surfaces; otherwise keep guidance scoped to the relevant surface. A URL, screenshot, or component identifies scope; it does not authorize an edit. Skip backend-only work with no user-visible effect, telemetry-only changes, generated files, and tests without shipped UI impact.
 
 ## Product-specific routing
@@ -80,7 +120,7 @@ Treat a user correction, rejection, or disagreement as direct evidence for the c
 For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 
-export function createStarterPackFiles(productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string): PackFile[] {
+export function createStarterPackFiles(productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string, setupPolicy: SetupPolicy = { minimumUsableEvidence: "source_reviewed" }): PackFile[] {
   const normalizedName = productName.trim();
   if (normalizedName.length < 2 || normalizedName.length > 120) {
     throw new TasteError("Product name must be between 2 and 120 characters.", "invalid_product_name");
@@ -88,19 +128,23 @@ export function createStarterPackFiles(productName: string, surfaces: string[] =
   if (decisionPromotionCheckpoint !== undefined && (!decisionPromotionCheckpoint.trim() || decisionPromotionCheckpoint.length > 500)) {
     throw new TasteError("decisionPromotionCheckpoint must be non-empty and no longer than 500 characters.", "invalid_promotion_checkpoint");
   }
+  if (setupPolicy.minimumUsableEvidence !== "source_reviewed" && setupPolicy.minimumUsableEvidence !== "rendered_flow") {
+    throw new TasteError("minimumUsableEvidence must be source_reviewed or rendered_flow.", "invalid_setup_policy");
+  }
 
   const manifest: PackManifest = {
     name: normalizedName,
     version: "0.1.0",
     surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean),
-    setupStatus: "incomplete",
+    setupStatus: "in_progress",
+    setupPolicy,
     ...(decisionPromotionCheckpoint?.trim() ? { decisionPromotionCheckpoint: decisionPromotionCheckpoint.trim() } : {}),
   };
 
   return [
     {
       path: "README.md",
-      content: `# ${normalizedName} Taste Pack\n\nSetup status: **incomplete**. This is only a safe-to-resume shell. Run the explicit \`/taste-setup\` workflow to inspect the repository, choose a bounded scope, and write product-specific guidance. Do not report setup complete until the host has finished and self-checked the evidence-backed Pack, then sets \`setupStatus\` to \`complete\` in \`manifest.json\`.\n`,
+      content: `# ${normalizedName} Taste Pack\n\nSetup status: **in_progress**. This is only a safe-to-resume shell. Run the explicit \`/taste-setup\` workflow to independently inventory the repository, confirm a bounded scope, and write product-specific evidence-backed guidance. Listed surfaces are scope hints, not approved scope. Do not report setup usable until at least one surface meets \`setupPolicy.minimumUsableEvidence\`, or complete until all required coverage in the confirmed scope is rendered and validated.\n`,
     },
     { path: "manifest.json", content: `${JSON.stringify(manifest, null, 2)}\n` },
     { path: ENTRY_SKILL, content: starterEntrySkill(normalizedName) },
@@ -298,6 +342,8 @@ export type PackLayout = "product-specific" | "shared" | "legacy-split" | "mixed
 export async function inspectPack(repositoryPath: string): Promise<{
   packPath: string;
   manifest: PackManifest | null;
+  setupStatus: PackSetupStatus | "legacy";
+  coverageSummary: { sourceReviewed: number; rendered: number; blocked: number; notInspected: number; required: number; targetMet: boolean };
   entrySkillAvailable: boolean;
   referenceCount: number;
   decisionCount: number;
@@ -314,6 +360,12 @@ export async function inspectPack(repositoryPath: string): Promise<{
   } catch {
     // The validator returns the actionable manifest diagnostic.
   }
+  const coverage = Array.isArray(manifest?.coverage)
+    ? manifest.coverage.filter((item): item is SetupCoverage => isObjectRecord(item) && typeof item.id === "string" && typeof item.status === "string")
+    : [];
+  const requiredCoverage = Array.isArray(manifest?.setupScope?.requiredCoverage) ? manifest.setupScope.requiredCoverage.filter((id): id is string => typeof id === "string") : [];
+  const coverageById = new Map(coverage.map((item) => [item.id, item]));
+  const setupStatus = manifest?.setupStatus === "incomplete" ? "in_progress" : manifest?.setupStatus ?? "legacy";
   const referenceRoot = path.join(packRoot, "skills/product-design/references");
   const referenceCount = await countMarkdown(referenceRoot);
   const decisionCount = await countDecisionFiles(packRoot);
@@ -324,6 +376,15 @@ export async function inspectPack(repositoryPath: string): Promise<{
   return {
     packPath: path.relative(repositoryRoot, packRoot).split(path.sep).join("/"),
     manifest,
+    setupStatus,
+    coverageSummary: {
+      sourceReviewed: coverage.filter((item) => item.status === "source_reviewed").length,
+      rendered: coverage.filter((item) => item.status === "rendered").length,
+      blocked: coverage.filter((item) => item.status === "blocked").length,
+      notInspected: coverage.filter((item) => item.status === "not_inspected").length,
+      required: requiredCoverage.length,
+      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => coverageById.get(id)?.status === "rendered"),
+    },
     entrySkillAvailable: await resolvePackFile(packRoot, ENTRY_SKILL).then(() => true).catch(() => false),
     referenceCount,
     decisionCount,
@@ -382,6 +443,114 @@ async function exists(filePath: string): Promise<boolean> {
 const DECISIONS_HOME = "skills/product-design/references/decisions/README.md";
 const LEGACY_CONFORMANCE_HOME = "skills/product-design/references/conformance/README.md";
 const LEGACY_EXPRESSION_HOME = "skills/product-design/references/expression/README.md";
+const SETUP_STATUSES = ["in_progress", "usable_partial", "complete", "incomplete"] as const;
+const COVERAGE_STATUSES = ["source_reviewed", "rendered", "blocked", "not_inspected"] as const;
+const EVIDENCE_TYPES = ["source_reviewed", "rendered", "design_reference", "inference"] as const;
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim().length > 0);
+}
+
+function validateSetupScope(value: unknown, issues: ValidationIssue[]): SetupScope | null {
+  if (!isObjectRecord(value)) {
+    issues.push({ path: "manifest.json", message: "setupScope must record the independently inventoried apps, selected products, exclusions, scope selection, and coverage target." });
+    return null;
+  }
+  const selection = value.selection;
+  const valid = typeof value.description === "string" && value.description.trim().length > 0
+    && (selection === "user_confirmed" || selection === "host_selected")
+    && stringArray(value.repositoryApps)
+    && stringArray(value.products)
+    && Array.isArray(value.exclusions) && value.exclusions.every((item) => typeof item === "string")
+    && typeof value.coverageTarget === "string" && value.coverageTarget.trim().length > 0
+    && stringArray(value.requiredCoverage) && new Set(value.requiredCoverage).size === value.requiredCoverage.length;
+  if (!valid) {
+    issues.push({ path: "manifest.json", message: "setupScope is missing a valid description, selection, repositoryApps, products, exclusions, coverageTarget, or requiredCoverage list." });
+    return null;
+  }
+  return value as unknown as SetupScope;
+}
+
+function parseCoverage(value: unknown, issues: ValidationIssue[]): SetupCoverage[] {
+  if (!Array.isArray(value)) {
+    issues.push({ path: "manifest.json", message: "coverage must be an array that records source-reviewed, rendered, blocked, or not-inspected coverage per app/surface/journey." });
+    return [];
+  }
+  const coverage: SetupCoverage[] = [];
+  const ids = new Set<string>();
+  value.forEach((item, index) => {
+    const prefix = `coverage[${index}]`;
+    if (!isObjectRecord(item)) {
+      issues.push({ path: "manifest.json", message: `${prefix} must be an object.` });
+      return;
+    }
+    if (typeof item.id !== "string" || !item.id.trim() || ids.has(item.id)) {
+      issues.push({ path: "manifest.json", message: `${prefix}.id must be a unique, non-empty identifier.` });
+    } else ids.add(item.id);
+    if (typeof item.app !== "string" || !item.app.trim() || typeof item.surface !== "string" || !item.surface.trim()) {
+      issues.push({ path: "manifest.json", message: `${prefix} must identify its app and surface.` });
+    }
+    if (item.journey !== undefined && (typeof item.journey !== "string" || !item.journey.trim())) {
+      issues.push({ path: "manifest.json", message: `${prefix}.journey must be a non-empty string when present.` });
+    }
+    if (!COVERAGE_STATUSES.includes(item.status as (typeof COVERAGE_STATUSES)[number])) {
+      issues.push({ path: "manifest.json", message: `${prefix}.status must be source_reviewed, rendered, blocked, or not_inspected.` });
+    }
+    if (!Array.isArray(item.evidence)) {
+      issues.push({ path: "manifest.json", message: `${prefix}.evidence must be an array of typed, dated source references.` });
+    } else {
+      item.evidence.forEach((evidence, evidenceIndex) => {
+        if (!isObjectRecord(evidence)
+          || !EVIDENCE_TYPES.includes(evidence.type as (typeof EVIDENCE_TYPES)[number])
+          || typeof evidence.reference !== "string" || !evidence.reference.trim()
+          || typeof evidence.checkedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(evidence.checkedAt)) {
+          issues.push({ path: "manifest.json", message: `${prefix}.evidence[${evidenceIndex}] needs a supported type, reference, and YYYY-MM-DD checkedAt date.` });
+        }
+      });
+    }
+    if (!stringArray(item.guidanceFiles)) {
+      issues.push({ path: "manifest.json", message: `${prefix}.guidanceFiles must list the Pack files supported by this coverage evidence.` });
+    }
+    if ((item.status === "blocked" || item.status === "not_inspected") && (typeof item.gap !== "string" || !item.gap.trim())) {
+      issues.push({ path: "manifest.json", message: `${prefix}.gap must explain blocked or uninspected coverage.` });
+    }
+    if (typeof item.id === "string" && typeof item.app === "string" && typeof item.surface === "string" && COVERAGE_STATUSES.includes(item.status as (typeof COVERAGE_STATUSES)[number]) && Array.isArray(item.evidence) && stringArray(item.guidanceFiles)) {
+      coverage.push(item as unknown as SetupCoverage);
+    }
+  });
+  return coverage;
+}
+
+async function hasCitedActionableGuidance(packRoot: string, entry: SetupCoverage): Promise<boolean> {
+  const sourceEvidence = entry.evidence.filter((evidence) => isObjectRecord(evidence) && evidence.type === "source_reviewed" && typeof evidence.reference === "string");
+  if (sourceEvidence.length === 0) return false;
+  for (const relative of entry.guidanceFiles) {
+    try {
+      const content = await readFile(await resolvePackFile(packRoot, relative), "utf8");
+      if (content.trim().length < 80 || !sourceEvidence.some((evidence) => content.includes(evidence.reference))) continue;
+      const hasRenderedEvidence = entry.evidence.some((evidence) => evidence.type === "rendered");
+      if (!hasRenderedEvidence && !/(visual(?:ly)?[^\n.]{0,80}(?:not verified|unverified)|(?:not verified|unverified)[^\n.]{0,80}visual)/i.test(content)) continue;
+      return true;
+    } catch {
+      // Missing guidance files cannot establish a usable surface.
+    }
+  }
+  return false;
+}
+
+async function satisfiesMinimumEvidence(packRoot: string, coverage: SetupCoverage[], minimum: MinimumUsableEvidence): Promise<SetupCoverage[]> {
+  const usable: SetupCoverage[] = [];
+  for (const entry of coverage) {
+    if (entry.status === "not_inspected") continue;
+    if (minimum === "rendered_flow" && (entry.status !== "rendered" || !entry.evidence.some((evidence) => evidence.type === "rendered"))) continue;
+    if (await hasCitedActionableGuidance(packRoot, entry)) usable.push(entry);
+  }
+  return usable;
+}
 
 async function readablePackFile(packRoot: string, relative: string, issues: ValidationIssue[]): Promise<"ok" | "missing" | "bad"> {
   try {
@@ -433,13 +602,47 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
     if (record.surfaces !== undefined && (!Array.isArray(record.surfaces) || !record.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
     }
-    if (record.setupStatus !== undefined && record.setupStatus !== "incomplete" && record.setupStatus !== "complete") {
-      issues.push({ path: "manifest.json", message: "setupStatus must be incomplete or complete when present." });
+    if (record.setupStatus !== undefined && !SETUP_STATUSES.includes(record.setupStatus as (typeof SETUP_STATUSES)[number])) {
+      issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete. Legacy incomplete remains readable." });
     }
-    if (record.setupStatus === "incomplete") {
-      issues.push({ path: "manifest.json", message: "Taste setup is incomplete. Resume /taste-setup, then mark complete only after the scoped evidence-backed Pack is written and self-checked." });
+    const setupStatus = record.setupStatus === "incomplete" ? "in_progress" : record.setupStatus;
+    let minimumUsableEvidence: MinimumUsableEvidence = "source_reviewed";
+    if (record.setupPolicy !== undefined) {
+      if (!isObjectRecord(record.setupPolicy) || (record.setupPolicy.minimumUsableEvidence !== "source_reviewed" && record.setupPolicy.minimumUsableEvidence !== "rendered_flow") || Object.keys(record.setupPolicy).some((key) => key !== "minimumUsableEvidence")) {
+        issues.push({ path: "manifest.json", message: "setupPolicy.minimumUsableEvidence must be source_reviewed or rendered_flow." });
+      } else {
+        minimumUsableEvidence = record.setupPolicy.minimumUsableEvidence;
+      }
     }
-    if (record.setupStatus === "complete") {
+    let setupScope: SetupScope | null = null;
+    let coverage: SetupCoverage[] = [];
+    if (setupStatus === "usable_partial" || setupStatus === "complete") {
+      setupScope = validateSetupScope(record.setupScope, issues);
+      coverage = parseCoverage(record.coverage, issues);
+    } else if (record.setupScope !== undefined) {
+      setupScope = validateSetupScope(record.setupScope, issues);
+      if (record.coverage !== undefined) coverage = parseCoverage(record.coverage, issues);
+    }
+    if (setupStatus === "in_progress") {
+      issues.push({ path: "manifest.json", message: "Taste setup is in progress and not yet usable. Resume /taste-setup; use usable_partial only after a surface meets the configured evidence bar." });
+    }
+    if (setupStatus === "usable_partial" || setupStatus === "complete") {
+      const usableCoverage = await satisfiesMinimumEvidence(packRoot, coverage, minimumUsableEvidence);
+      if (usableCoverage.length === 0) {
+        issues.push({ path: "manifest.json", message: `No surface has specific, cited guidance meeting minimumUsableEvidence=${minimumUsableEvidence}. Keep setupStatus=in_progress.` });
+      }
+      if (setupStatus === "complete") {
+        if (!setupScope || setupScope.requiredCoverage.length === 0) {
+          issues.push({ path: "manifest.json", message: "A complete Pack must list its confirmed requiredCoverage and coverage target in setupScope." });
+        } else {
+          for (const requiredId of setupScope.requiredCoverage) {
+            const entry = coverage.find((item) => item.id === requiredId);
+            if (!entry || entry.status !== "rendered" || !entry.evidence.some((evidence) => evidence.type === "rendered") || !entry.evidence.some((evidence) => evidence.type === "source_reviewed") || !(await hasCitedActionableGuidance(packRoot, entry))) {
+              issues.push({ path: "manifest.json", message: `Required coverage '${requiredId}' is not rendered, source-correlated, and supported by cited guidance; setup cannot be complete.` });
+            }
+          }
+        }
+      }
       const readOptional = async (relative: string) => {
         try {
           return await readFile(await resolvePackFile(packRoot, relative), "utf8");
@@ -449,8 +652,8 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
       };
       const readme = await readOptional("README.md");
       const entry = await readOptional(ENTRY_SKILL);
-      if (/Setup status:\s*\*\*incomplete\*\*/i.test(readme) || /This starter is incomplete/i.test(entry)) {
-        issues.push({ path: "manifest.json", message: "Pack still contains starter boilerplate. Replace it with scoped, repository-specific guidance before marking setup complete." });
+      if (/Setup status:\s*\*\*(?:incomplete|in_progress)\*\*/i.test(readme) || /This starter is incomplete/i.test(entry)) {
+        issues.push({ path: "manifest.json", message: "Pack still contains starter boilerplate. Replace it with scoped, repository-specific guidance before marking it usable_partial or complete." });
       }
     }
     if (record.decisionPromotionCheckpoint !== undefined && (typeof record.decisionPromotionCheckpoint !== "string" || record.decisionPromotionCheckpoint.trim().length === 0 || record.decisionPromotionCheckpoint.length > 500)) {
@@ -480,7 +683,7 @@ export async function validatePack(repositoryPath: string): Promise<PackValidati
   return validatePackAt(packRoot);
 }
 
-export async function initializePack(repositoryPath: string, productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string): Promise<{ packPath: string; filesCreated: string[] }> {
+export async function initializePack(repositoryPath: string, productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string, setupPolicy: SetupPolicy = { minimumUsableEvidence: "source_reviewed" }): Promise<{ packPath: string; filesCreated: string[] }> {
   const repositoryRoot = await resolveRepositoryRoot(repositoryPath);
   const packRoot = path.join(repositoryRoot, PACK_DIRECTORY);
   try {
@@ -491,7 +694,7 @@ export async function initializePack(repositoryPath: string, productName: string
     // A missing path is the expected starting state.
   }
 
-  const files = createStarterPackFiles(productName, surfaces, decisionPromotionCheckpoint);
+  const files = createStarterPackFiles(productName, surfaces, decisionPromotionCheckpoint, setupPolicy);
   await mkdir(packRoot, { recursive: false });
   try {
     for (const file of files) {

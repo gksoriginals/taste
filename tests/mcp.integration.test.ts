@@ -43,9 +43,9 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
     );
     assert.equal(tools.find((tool) => tool.name === "taste_pack_write")?.annotations?.destructiveHint, true);
     assert.equal(tools.find((tool) => tool.name === "taste_record_signal")?.annotations?.destructiveHint, true);
-    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /rendered inspection of product UI/i);
-    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /Do not initialize if no product UI exists/i);
-    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /important auth coverage is blocked.*leave setupStatus=incomplete/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /repository inventory confirms user-facing product UI or UI source/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /Do not initialize if no product UI or UI source exists/i);
+    assert.match(tools.find((tool) => tool.name === "taste_pack_initialize")?.description ?? "", /source-only inspection may yield useful cited guidance.*setupStatus=usable_partial/i);
 
     const initialized = await client.callTool({
       name: "taste_pack_initialize",
@@ -73,7 +73,7 @@ test("bundled stdio MCP server initializes and serves Pack tools", async () => {
       arguments: { repositoryPath },
     });
     assert.equal(incompleteValidation.isError, undefined);
-    assert.match(JSON.stringify(incompleteValidation.structuredContent), /setup is incomplete/i);
+    assert.match(JSON.stringify(incompleteValidation.structuredContent), /setup is in progress/i);
 
     const early = await client.callTool({
       name: "taste_record_signal",

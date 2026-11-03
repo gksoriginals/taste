@@ -13,6 +13,7 @@ import {
   validatePack,
   writePackFile,
 } from "../src/core/pack.js";
+import type { MinimumUsableEvidence, SetupCoverage, SetupScope } from "../src/core/pack.js";
 
 async function withRepository(run: (repositoryPath: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(path.join(os.tmpdir(), "taste-pack-test-"));
@@ -21,6 +22,64 @@ async function withRepository(run: (repositoryPath: string) => Promise<void>): P
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+}
+
+async function prepareEvidencePack(repositoryPath: string, minimumUsableEvidence: MinimumUsableEvidence = "source_reviewed", renderedIds: string[] = []): Promise<void> {
+  await initializePack(repositoryPath, "Example Product", ["Admin login"], undefined, { minimumUsableEvidence });
+  const packRoot = path.join(repositoryPath, "taste");
+  await writeFile(path.join(packRoot, "README.md"), "# Example Product Taste Pack\n\nEvidence-backed guidance for the selected Admin and Portal journeys.\n");
+  await writeFile(path.join(packRoot, "skills/product-design/SKILL.md"), "---\nname: product-design\ndescription: Product-specific Admin and Portal guidance.\n---\n# Product design\nRoute tasks by the affected app and journey.\n");
+  const definitions = [
+    { id: "admin.login", app: "Admin", surface: "Authentication", journey: "OTP login", ref: "src/admin/routes.ts", file: "skills/product-design/references/admin-login.md", status: "source_reviewed" as const },
+    { id: "portal.profile", app: "Portal", surface: "Profile", journey: "Edit profile", ref: "src/portal/profile.tsx", file: "skills/product-design/references/portal-profile.md", status: "source_reviewed" as const },
+    { id: "portal.billing", app: "Portal", surface: "Billing", journey: "View invoices", ref: "src/portal/billing.tsx", file: "skills/product-design/references/portal-billing.md", status: "blocked" as const },
+  ];
+  const coverage: SetupCoverage[] = [];
+  for (const definition of definitions) {
+    const rendered = renderedIds.includes(definition.id);
+    await mkdir(path.dirname(path.join(packRoot, definition.file)), { recursive: true });
+    await writeFile(path.join(packRoot, definition.file), `# ${definition.app} ${definition.surface}\n\nFor this journey, keep the task scoped to the documented product behavior and preserve its validation and recovery states. Source: ${definition.ref}. Visual behavior is not verified by this source-only evidence.\n`);
+    coverage.push({
+      id: definition.id,
+      app: definition.app,
+      surface: definition.surface,
+      journey: definition.journey,
+      status: rendered ? "rendered" : definition.status,
+      evidence: [
+        { type: "source_reviewed", reference: definition.ref, checkedAt: "2026-11-04" },
+        ...(rendered ? [{ type: "rendered" as const, reference: `screenshots/${definition.id}.png`, checkedAt: "2026-11-04" }] : []),
+      ],
+      guidanceFiles: [definition.file],
+      ...(definition.status === "blocked" && !rendered ? { gap: "Local authenticated access is not available." } : {}),
+    });
+  }
+  const scope: SetupScope = {
+    description: "Representative Admin authentication and Portal profile/billing journeys.",
+    selection: "host_selected",
+    repositoryApps: ["Admin", "Portal"],
+    products: ["Admin", "Portal"],
+    exclusions: ["Other Portal routes share the inspected layout and remain a later sweep target."],
+    coverageTarget: "Render all required journeys and corroborate them with source.",
+    requiredCoverage: definitions.map((definition) => definition.id),
+  };
+  const manifestPath = path.join(packRoot, "manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+  await writeFile(manifestPath, JSON.stringify({ ...manifest, setupScope: scope, coverage }, null, 2) + "\n");
+}
+
+async function markRenderedCoverage(repositoryPath: string, ids: string[]): Promise<void> {
+  const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+  const coverage = manifest.coverage as SetupCoverage[];
+  const updated = coverage.map((entry) => ids.includes(entry.id)
+    ? {
+      ...entry,
+      status: "rendered" as const,
+      evidence: [...entry.evidence, { type: "rendered" as const, reference: `screenshots/${entry.id}.png`, checkedAt: "2026-11-04" }],
+      gap: undefined,
+    }
+    : entry);
+  await writeFile(manifestPath, JSON.stringify({ ...manifest, coverage: updated }, null, 2) + "\n");
 }
 
 test("initializes an incomplete product-specific Pack shell without touching repository instructions", async () => {
@@ -38,11 +97,13 @@ test("initializes an incomplete product-specific Pack shell without touching rep
     assert.equal(inspection.manifest?.name, "Example Product");
     assert.equal(inspection.manifest?.supportedModes, undefined);
     assert.equal(inspection.manifest?.decisionPromotionCheckpoint, undefined);
-    assert.equal(inspection.manifest?.setupStatus, "incomplete");
+    assert.equal(inspection.manifest?.setupStatus, "in_progress");
+    assert.deepEqual(inspection.manifest?.setupPolicy, { minimumUsableEvidence: "source_reviewed" });
     assert.equal(inspection.layout, "product-specific");
     assert.equal(inspection.supportedModesDeprecated, false);
     assert.equal(inspection.validation.valid, false);
-    assert.ok(inspection.validation.issues.some((issue) => /setup is incomplete/.test(issue.message)));
+    assert.equal(inspection.setupStatus, "in_progress");
+    assert.ok(inspection.validation.issues.some((issue) => /setup is in progress/.test(issue.message)));
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
   });
@@ -53,7 +114,7 @@ test("initialization can record a host-defined Decision promotion checkpoint", a
     await initializePack(repositoryPath, "Example Product", [], "After product checks and user approval, before push.");
     const inspection = await inspectPack(repositoryPath);
     assert.equal(inspection.manifest?.decisionPromotionCheckpoint, "After product checks and user approval, before push.");
-    assert.equal(inspection.manifest?.setupStatus, "incomplete");
+    assert.equal(inspection.manifest?.setupStatus, "in_progress");
     assert.equal(inspection.validation.valid, false);
   });
 });
@@ -66,6 +127,56 @@ test("initialization never overwrites an existing Pack", async () => {
 
     await assert.rejects(() => initializePack(repositoryPath, "Different Product"), /never overwrites/);
     assert.equal(await readFile(pathToReadme, "utf8"), original);
+  });
+});
+
+test("source-reviewed evidence can make a Pack usable_partial while blocked journeys stay visible", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial" }, null, 2) + "\n");
+
+    const inspection = await inspectPack(repositoryPath);
+    assert.equal(inspection.setupStatus, "usable_partial");
+    assert.deepEqual(inspection.coverageSummary, { sourceReviewed: 2, rendered: 0, blocked: 1, notInspected: 0, required: 3, targetMet: false });
+    assert.equal(inspection.validation.valid, true, JSON.stringify(inspection.validation.issues));
+  });
+});
+
+test("rendered_flow policy rejects source-only guidance and accepts a rendered representative journey", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath, "rendered_flow");
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    let manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial" }, null, 2) + "\n");
+    const sourceOnly = await validatePack(repositoryPath);
+    assert.equal(sourceOnly.valid, false);
+    assert.ok(sourceOnly.issues.some((issue) => /minimumUsableEvidence=rendered_flow/.test(issue.message)));
+
+    await markRenderedCoverage(repositoryPath, ["admin.login"]);
+    manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial" }, null, 2) + "\n");
+    const rendered = await validatePack(repositoryPath);
+    assert.equal(rendered.valid, true, JSON.stringify(rendered.issues));
+  });
+});
+
+test("complete status requires every confirmed coverage target to be rendered and source-correlated", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login", "portal.profile"]);
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    let manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "complete" }, null, 2) + "\n");
+    const blocked = await validatePack(repositoryPath);
+    assert.equal(blocked.valid, false);
+    assert.ok(blocked.issues.some((issue) => /portal.billing.*not rendered/.test(issue.message)));
+
+    await markRenderedCoverage(repositoryPath, ["admin.login", "portal.profile", "portal.billing"]);
+    const complete = await inspectPack(repositoryPath);
+    assert.equal(complete.setupStatus, "complete");
+    assert.equal(complete.coverageSummary.targetMet, true);
+    assert.equal(complete.validation.valid, true, JSON.stringify(complete.validation.issues));
   });
 });
 
@@ -118,12 +229,10 @@ test("Pack writes create or replace supported files only inside taste/", async (
 
 test("completed product-specific packs need no decision home and legacy split packs remain valid", async () => {
   await withRepository(async (repositoryPath) => {
-    await initializePack(repositoryPath, "Example Product");
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login", "portal.profile", "portal.billing"]);
     const manifestPath = path.join(repositoryPath, "taste/manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
     await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "complete" }, null, 2) + "\n");
-    await writeFile(path.join(repositoryPath, "taste/README.md"), "# Example Product Taste Pack\n\nScope: checkout. Evidence-based product guidance.\n");
-    await writeFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "---\nname: product-design\ndescription: Example Product UI guidance.\n---\n# Checkout\nUse checkout-specific source guidance.\n");
     const completed = await validatePack(repositoryPath);
     assert.equal(completed.valid, true, JSON.stringify(completed.issues));
     const inspection = await inspectPack(repositoryPath);
@@ -139,9 +248,7 @@ test("completed product-specific packs need no decision home and legacy split pa
 
 test("generator and Judge fixture tools receive separate data", async () => {
   await withRepository(async (repositoryPath) => {
-    await initializePack(repositoryPath, "Example Product");
-    await writeFile(path.join(repositoryPath, "taste/README.md"), "# Example Product Taste Pack\n\nScope: checkout. Evidence-backed product guidance.\n");
-    await writeFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "---\nname: product-design\ndescription: Checkout product guidance.\n---\n# Checkout\nUse the sourced checkout guidance.\n");
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login", "portal.profile", "portal.billing"]);
     const manifestPath = path.join(repositoryPath, "taste/manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
     await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "complete" }, null, 2) + "\n");

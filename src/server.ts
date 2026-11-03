@@ -13,6 +13,7 @@ import {
   TasteError,
   validatePack,
   writePackFile,
+  type SetupPolicy,
   type TasteMode,
 } from "./core/pack.js";
 import { readPartState, recordSignal } from "./core/signals.js";
@@ -78,23 +79,24 @@ export function createTasteServer(): McpServer {
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting Taste Pack shell only during explicitly invoked /taste-setup, after repository inspection and rendered inspection of product UI. Do not initialize if no product UI exists or none of the chosen first-time scope can be rendered. If some UI is rendered but important auth coverage is blocked, the host may create only evidence-backed guidance and must leave setupStatus=incomplete. It starts with setupStatus=incomplete. The host writes only useful, evidence-backed product guidance, then self-checks and marks complete. If setup is interrupted after initialization, preserve the incomplete Pack so /taste-setup can resume it. Routine UI work must not start setup or create a missing Pack; with an existing complete Pack, resolved reusable user feedback may update its relevant checklist in the same task. Setup never edits product UI, AGENTS.md, or harness configuration.",
+      description: "Create a non-overwriting Taste Pack shell only during explicitly invoked /taste-setup, after repository inventory confirms user-facing product UI or UI source. Do not initialize if no product UI or UI source exists. Source-only inspection may yield useful cited guidance and setupStatus=usable_partial under the default source_reviewed policy, with visual behavior labeled unverified; rendered_flow requires a rendered representative journey. New Packs default to setupStatus=in_progress and setupPolicy.minimumUsableEvidence=source_reviewed. Setup status is in_progress, usable_partial, or complete; coverage remains recorded separately per app/surface/journey. Continue across accessible apps when one journey is blocked. Routine UI work must not start setup or create a missing Pack. Setup never edits product UI, AGENTS.md, or harness configuration.",
       inputSchema: {
         repositoryPath,
         productName: z.string().min(2).max(120).describe("Product name for the starter Pack."),
-        surfaces: z.array(z.string().min(1).max(100)).max(30).optional().describe("Known product surfaces to record in the Pack manifest."),
+        surfaces: z.array(z.string().min(1).max(100)).max(30).optional().describe("Unconfirmed surface hints only; the host must independently inventory the repository and confirm scope."),
         decisionPromotionCheckpoint: z.string().trim().min(1).max(500).optional().describe("Legacy reminder text for hosts that still use structured Decision promotion. Routine checklist learning from product setup and conversation does not require this checkpoint."),
+        setupPolicy: z.object({ minimumUsableEvidence: z.enum(["source_reviewed", "rendered_flow"]) }).optional().describe("Per-repository minimum bar for usable_partial. Defaults to source_reviewed; rendered_flow requires a representative journey in the running product."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint)),
+    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint, setupPolicy }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint, setupPolicy as SetupPolicy | undefined)),
   );
 
   server.registerTool(
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack: product-specific or legacy layout, setupStatus from manifest when present, decision count, references, evaluation fixtures, and validation. A newly initialized Pack marked incomplete is safe to resume; it is not a completed setup. supportedModes is reported only as deprecated. Reads only taste/.",
+      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts and target progress, legacy layout, decisions, references, fixtures, and validation. Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Legacy incomplete maps to in_progress, and Packs without a setupStatus are reported as legacy. Reads only taste/.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
