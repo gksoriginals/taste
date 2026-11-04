@@ -1,11 +1,19 @@
 ---
 name: taste-evaluate
-description: Use when the user explicitly requests an evaluation or when deliberately calibrating product Skills; compare with/without-Skill outputs using a separate higher-capacity Judge.
+description: Use when the user explicitly requests an evaluation or when deliberately calibrating product Skills; replay a learned decision in a fresh context or compare with/without-Skill outputs using a separate higher-capacity Judge.
 ---
 
 # Evaluate Taste guidance
 
 The harness owns task execution and model delegation. Taste supplies fixture access, evaluation instructions, and product Rubrics.
+
+## Decision replay
+
+Use this lightweight diagnostic when checking whether a lesson transfers across sessions. Capture one scoped, reusable decision from an actual correction or product evidence and label its provenance. In a fresh host context, give the agent the task and repository without supplying the answer or the guidance path. Use an applicable case and a nearby case where the guidance should lead to a different choice or should be skipped.
+
+Keep a local trace outside the Pack with the task and input revision, files actually loaded, decision and rationale for each case, rendered or source checks, and any reviewer correction. Distinguish a routing miss, a misread or overgeneralized rule, and an implementation or verification failure. Label any manually activated skill, missing access, or other deviation. A replay checks transfer under those conditions. Use the paired protocol below to measure improvement over a baseline.
+
+## Paired evaluation
 
 1. Start with one high-leverage product surface where Git history, reviews, shipped UI, or user corrections show repeated design decisions. Ask the user/harness to obtain access to required Git history, design sources, or production data; do not assume access or invent evidence. Record the source and any access gaps.
 2. Build a fixture from a shipped example: task, before-state files, expected-after files, relevant product guidance, and a Rubric. Record why the expected result is accepted and any known flaws. Mark whether the fixture is a development example or a holdout. Holdouts should be sampled from different examples or time periods where practical, and their expected edits must remain out of generator context.

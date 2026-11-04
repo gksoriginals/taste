@@ -116,9 +116,9 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(design, /If no Pack exists, do not start a product-wide sweep/i);
   assert.match(design, /create a minimal, evidence-backed Pack for that surface/i);
   const expression = await readFile(path.join(root, "skills/taste-expression/SKILL.md"), "utf8");
-  assert.match(expression, /If this surface is not covered, save a clear reusable lesson/i);
-  assert.match(expression, /setupStatus: usable_partial/);
-  assert.match(expression, /matching `coverage` evidence\/guidance references/);
+  assert.match(expression, /preserving the existing setup status, policy, scope, required coverage, and other coverage entries/);
+  assert.match(expression, /If no Pack exists, initialize a shell/);
+  assert.match(expression, /include it in the matching manifest coverage/);
   assert.match(command, /Inventory repository apps, routes, journeys, design sources/i);
   assert.match(command, /If a journey is blocked, record its gap/i);
   assert.match(command, /source evidence can support useful partial guidance/i);
