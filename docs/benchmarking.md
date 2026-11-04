@@ -52,3 +52,9 @@ npm run eval:report -- .taste-eval-runs/admin-login-feedback.json
 ```
 
 Run `npm test` to check the bundled MCP tools and example fixtures before a benchmark. The committed account setup fixture is suitable for a smoke run. For the first real-product benchmark, choose a bounded product surface with an applicable rule and a nearby exception. Keep private product records local.
+
+## Capture an ordinary product session
+
+Set `TASTE_TRACE_DIR` to an absolute local directory outside product checkouts in the Taste MCP server environment, then restart the server. This opts the host into saving session snapshots with `taste_session_record`. Set `TASTE_LOG_LEVEL=debug` when you also want successful MCP calls and timings. The host passes the same random run ID on calls and snapshots, so the logs can be joined to the session without including its text in stderr.
+
+Snapshots capture the starting revision, task, surface, guidance read and applied, decision rationale, verification and artifact references, and user feedback. A later snapshot can record a correction or acceptance under the same run ID. The host supplies these observations, including files it reads directly. Keep references to diffs and screenshots in a local store and omit sensitive data from summaries. Treat the snapshots as evidence for choosing fixtures and diagnosing results. Use the paired protocol to measure a change against a baseline.

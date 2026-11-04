@@ -3261,8 +3261,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path2) {
-      let input2 = path2;
+    function removeDotSegments(path3) {
+      let input2 = path3;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3336,11 +3336,11 @@ var require_utils = __commonJS({
       }
       return output2.join("");
     }
-    function removeDotSegmentsRelative(path2) {
-      if (path2 === "" || path2[0] === "/") {
-        return removeDotSegments(path2);
+    function removeDotSegmentsRelative(path3) {
+      if (path3 === "" || path3[0] === "/") {
+        return removeDotSegments(path3);
       }
-      const segments = path2.split("/");
+      const segments = path3.split("/");
       const last = segments.length - 1;
       const output2 = [];
       let trailingDirectory = false;
@@ -3703,8 +3703,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path2 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path2 && path2 !== "/" ? path2 : void 0;
+        const path3 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path3 && path3 !== "/" ? path3 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7628,8 +7628,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path2, errorMaps, issueData } = params;
-  const fullPath = [...path2, ...issueData.path || []];
+  const { data, path: path3, errorMaps, issueData } = params;
+  const fullPath = [...path3, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7744,11 +7744,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path2, key) {
+  constructor(parent, value, path3, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path2;
+    this._path = path3;
     this._key = key;
   }
   get path() {
@@ -11703,10 +11703,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path2) {
-  if (!path2)
+function getElementAtPath(obj, path3) {
+  if (!path3)
     return obj;
-  return path2.reduce((acc, key) => acc?.[key], obj);
+  return path3.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -12046,11 +12046,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path2, issues) {
+function prefixIssues(path3, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path2);
+    iss.path.unshift(path3);
     return iss;
   });
 }
@@ -12512,16 +12512,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path2 = []) => {
+  const processError = (error63, path3 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -12560,17 +12560,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path2 = []) => {
+  const processError = (error63, path3 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -12609,8 +12609,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path2 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path2) {
+  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path3) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -28161,11 +28161,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path2) {
-  if (path2.length === 0) {
+function getDotPath(path3) {
+  if (path3.length === 0) {
     return "object root";
   }
-  return path2.reduce((acc, seg, index) => {
+  return path3.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -30392,13 +30392,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path2 = ref.slice(1).split("/").filter(Boolean);
-  if (path2.length === 0) {
+  const path3 = ref.slice(1).split("/").filter(Boolean);
+  if (path3.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path2[0] === defsKey) {
-    const key = path2[1] === void 0 ? void 0 : decodeJSONPointerSegment(path2[1]);
+  if (path3[0] === defsKey) {
+    const key = path3[1] === void 0 ? void 0 : decodeJSONPointerSegment(path3[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -36653,24 +36653,10 @@ var StdioServerTransport = class {
   }
 };
 
-// src/core/diagnostics.ts
-var configuredLevel = process.env.TASTE_LOG_LEVEL?.toLowerCase();
-var logLevel = configuredLevel === "off" || configuredLevel === "debug" ? configuredLevel : "error";
-function logDiagnostic(level, event, fields = {}) {
-  if (logLevel === "off" || level === "debug" && logLevel !== "debug") return;
-  const line = JSON.stringify({
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    component: "taste-mcp",
-    level,
-    event,
-    ...fields
-  });
-  try {
-    process.stderr.write(`${line}
-`);
-  } catch {
-  }
-}
+// src/core/session-trace.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { mkdir as mkdir2, writeFile as writeFile2 } from "node:fs/promises";
+import path2 from "node:path";
 
 // src/core/pack.ts
 import { lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
@@ -37281,6 +37267,66 @@ async function getEvaluationJudgePacket(repositoryPath2, mode, fixtureId, genera
   return { mode, fixtureId, task, rubric, generatedOutput, expectedAfter };
 }
 
+// src/core/session-trace.ts
+var sessionRunId = external_exports.uuid().describe("Host-generated UUID for this product task. Reuse it across Taste calls and trace entries.");
+var summary = external_exports.string().trim().min(1).max(2e3);
+var references = external_exports.array(external_exports.string().trim().min(1).max(500)).max(30);
+var sessionTraceFields = {
+  runId: sessionRunId,
+  inputRevision: summary,
+  task: summary,
+  surface: summary,
+  guidanceRead: references,
+  guidanceApplied: references,
+  decision: summary,
+  verification: external_exports.array(external_exports.object({
+    kind: external_exports.enum(["rendered", "source", "test"]),
+    result: summary,
+    artifacts: references
+  })).max(15),
+  artifacts: references,
+  feedback: external_exports.object({
+    status: external_exports.enum(["pending", "accepted", "corrected", "rejected"]),
+    summary: summary.optional()
+  })
+};
+async function recordSessionTrace(trace) {
+  const directory = process.env.TASTE_TRACE_DIR;
+  if (!directory) throw new TasteError("Session tracing is disabled. Set TASTE_TRACE_DIR to opt in.", "trace_disabled");
+  if (!path2.isAbsolute(directory)) throw new TasteError("TASTE_TRACE_DIR must be an absolute path.", "invalid_trace_directory");
+  const file2 = path2.join(directory, `${trace.runId}-${randomUUID2()}.json`);
+  try {
+    await mkdir2(directory, { recursive: true, mode: 448 });
+    await writeFile2(file2, JSON.stringify({
+      schemaVersion: 1,
+      recordedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      ...trace
+    }, null, 2) + "\n", { flag: "wx", mode: 384 });
+  } catch {
+    throw new TasteError("Could not save the session trace. Check the configured trace directory.", "trace_write_failed");
+  }
+  return { runId: trace.runId, file: file2 };
+}
+
+// src/core/diagnostics.ts
+var configuredLevel = process.env.TASTE_LOG_LEVEL?.toLowerCase();
+var logLevel = configuredLevel === "off" || configuredLevel === "debug" ? configuredLevel : "error";
+function logDiagnostic(level, event, fields = {}) {
+  if (logLevel === "off" || level === "debug" && logLevel !== "debug") return;
+  const line = JSON.stringify({
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    component: "taste-mcp",
+    level,
+    event,
+    ...fields
+  });
+  try {
+    process.stderr.write(`${line}
+`);
+  } catch {
+  }
+}
+
 // src/server.ts
 var repositoryPath = external_exports.string().min(1).describe("Absolute path to the target product repository, obtained from the host harness.");
 function success2(data) {
@@ -37293,17 +37339,19 @@ function failure2(error62) {
   const message = error62 instanceof TasteError ? error62.message : "Taste could not complete this operation. Check the repository path and Pack, then retry.";
   return { isError: true, content: [{ type: "text", text: message }] };
 }
-async function toolResult(toolName, operation) {
+async function toolResult(toolName, operation, runId) {
   const startedAt = Date.now();
-  logDiagnostic("debug", "tool_started", { tool: toolName });
+  const correlation = runId ? { runId } : {};
+  logDiagnostic("debug", "tool_started", { tool: toolName, ...correlation });
   try {
     const result = success2(await operation());
-    logDiagnostic("debug", "tool_completed", { tool: toolName, durationMs: Date.now() - startedAt });
+    logDiagnostic("debug", "tool_completed", { tool: toolName, durationMs: Date.now() - startedAt, ...correlation });
     return result;
   } catch (error62) {
     logDiagnostic("error", "tool_failed", {
       tool: toolName,
       durationMs: Date.now() - startedAt,
+      ...correlation,
       errorCode: error62 instanceof TasteError ? error62.code : "unexpected_error"
     });
     return failure2(error62);
@@ -37313,8 +37361,18 @@ function createTasteServer() {
   const server2 = new McpServer(
     { name: "taste", version: "0.1.0" },
     {
-      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes."
+      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes." + (process.env.TASTE_TRACE_DIR ? " Local session tracing is enabled. Follow the Session traces section of taste-design." : "")
     }
+  );
+  server2.registerTool(
+    "taste_session_record",
+    {
+      title: "Record a local Taste session trace",
+      description: "Save a bounded host-authored decision and verification record outside the Pack. Requires TASTE_TRACE_DIR. Use only for an opted-in product task and omit sensitive data and raw transcripts.",
+      inputSchema: sessionTraceFields,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+    },
+    async (trace) => toolResult("taste_session_record", () => recordSessionTrace(trace), trace.runId)
   );
   server2.registerTool(
     "taste_pack_initialize",
@@ -37322,6 +37380,7 @@ function createTasteServer() {
       title: "Initialize a Taste Pack",
       description: "Create a non-overwriting Taste Pack shell. Use during explicitly invoked /taste-setup after repository inventory, or during normal UI work only after resolved user feedback establishes a clear reusable lesson for a specific surface. In the feedback case, immediately replace starter text with cited, surface-scoped guidance, mark only that coverage usable_partial, and validate; do not sweep unrelated apps or routes. Do not initialize if no product UI or UI source exists. Source-only inspection may yield useful cited guidance under the default source_reviewed policy, with visual behavior labeled unverified; rendered_flow requires a rendered representative journey. New Packs default to setupStatus=in_progress and setupPolicy.minimumUsableEvidence=source_reviewed. Coverage is recorded separately per app/surface/journey. Broader setup remains explicit and never edits product UI, AGENTS.md, or harness configuration.",
       inputSchema: {
+        runId: sessionRunId.optional(),
         repositoryPath,
         productName: external_exports.string().min(2).max(120).describe("Product name for the Pack."),
         surfaces: external_exports.array(external_exports.string().min(1).max(100)).max(30).optional().describe("Scope hints from repository inventory or the active UI task. For a feedback-created Pack, include only the affected surface."),
@@ -37329,17 +37388,17 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
-    async ({ repositoryPath: root, productName, surfaces, setupPolicy }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, setupPolicy))
+    async ({ runId, repositoryPath: root, productName, surfaces, setupPolicy }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, setupPolicy), runId)
   );
   server2.registerTool(
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
       description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts and target progress, references, fixtures, and validation. Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Reads only taste/.",
-      inputSchema: { repositoryPath },
+      inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root }) => toolResult("taste_pack_inspect", async () => inspectPack(root))
+    async ({ runId, repositoryPath: root }) => toolResult("taste_pack_inspect", async () => inspectPack(root), runId)
   );
   server2.registerTool(
     "taste_pack_read",
@@ -37347,12 +37406,13 @@ function createTasteServer() {
       title: "Read Taste Pack guidance",
       description: "Read one Markdown or JSON file by a path relative to the target repository's taste/ directory. Paths are confined to that Pack.",
       inputSchema: {
+        runId: sessionRunId.optional(),
         repositoryPath,
         path: external_exports.string().min(1).max(300).describe("Pack-relative path, such as skills/product-design/SKILL.md.")
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, path: relativePath }) => toolResult("taste_pack_read", async () => readPackFile(root, relativePath))
+    async ({ runId, repositoryPath: root, path: relativePath }) => toolResult("taste_pack_read", async () => readPackFile(root, relativePath), runId)
   );
   server2.registerTool(
     "taste_pack_write",
@@ -37360,33 +37420,34 @@ function createTasteServer() {
       title: "Write Taste Pack guidance",
       description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. When creating a missing Pack from feedback, write only the affected surface's cited guidance and coverage metadata; do not start a sweep. The host applies and self-checks the lesson in the same task; no separate review or approval is required.",
       inputSchema: {
+        runId: sessionRunId.optional(),
         repositoryPath,
         path: external_exports.string().min(1).max(300).describe("Pack-relative destination path."),
         content: external_exports.string().max(256 * 1024).describe("UTF-8 file contents, up to 256 KiB.")
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, path: relativePath, content }) => toolResult("taste_pack_write", async () => writePackFile(root, relativePath, content))
+    async ({ runId, repositoryPath: root, path: relativePath, content }) => toolResult("taste_pack_write", async () => writePackFile(root, relativePath, content), runId)
   );
   server2.registerTool(
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
       description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Product references and metadata are optional. Structural validation only, not a quality judgment.",
-      inputSchema: { repositoryPath },
+      inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root }) => toolResult("taste_pack_validate", async () => validatePack(root))
+    async ({ runId, repositoryPath: root }) => toolResult("taste_pack_validate", async () => validatePack(root), runId)
   );
   server2.registerTool(
     "taste_eval_list_fixtures",
     {
       title: "List Taste evaluation fixtures",
       description: "List fixture IDs for one task approach without exposing before or expected-after states.",
-      inputSchema: { repositoryPath, taskApproach: external_exports.enum(["conformance", "expression"]) },
+      inputSchema: { runId: sessionRunId.optional(), repositoryPath, taskApproach: external_exports.enum(["conformance", "expression"]) },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, taskApproach }) => toolResult("taste_eval_list_fixtures", async () => ({ taskApproach, fixtureIds: await listEvaluationFixtures(root, taskApproach) }))
+    async ({ runId, repositoryPath: root, taskApproach }) => toolResult("taste_eval_list_fixtures", async () => ({ taskApproach, fixtureIds: await listEvaluationFixtures(root, taskApproach) }), runId)
   );
   server2.registerTool(
     "taste_eval_get_generator_case",
@@ -37394,13 +37455,14 @@ function createTasteServer() {
       title: "Get evaluation generator input",
       description: "Return the task and before/ state for one evaluation fixture. Never returns expected-after files or the Rubric. Use for the generator arm only.",
       inputSchema: {
+        runId: sessionRunId.optional(),
         repositoryPath,
         taskApproach: external_exports.enum(["conformance", "expression"]),
         fixtureId: external_exports.string().min(1).max(100)
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, taskApproach: selectedMode, fixtureId }) => toolResult("taste_eval_get_generator_case", async () => getEvaluationGeneratorCase(root, selectedMode, fixtureId))
+    async ({ runId, repositoryPath: root, taskApproach: selectedMode, fixtureId }) => toolResult("taste_eval_get_generator_case", async () => getEvaluationGeneratorCase(root, selectedMode, fixtureId), runId)
   );
   server2.registerTool(
     "taste_eval_get_judge_packet",
@@ -37408,6 +37470,7 @@ function createTasteServer() {
       title: "Get evaluation Judge packet",
       description: "Return the task, one completed generator output, expected-after state, and product Rubric for a Judge pass. Call only after the generator run is complete and from the harness's higher-capacity Eval Judge subagent in a fresh context. This is context separation by workflow, not an access-control boundary.",
       inputSchema: {
+        runId: sessionRunId.optional(),
         repositoryPath,
         taskApproach: external_exports.enum(["conformance", "expression"]),
         fixtureId: external_exports.string().min(1).max(100),
@@ -37418,7 +37481,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, taskApproach: selectedMode, fixtureId, generatedOutput }) => toolResult("taste_eval_get_judge_packet", async () => getEvaluationJudgePacket(root, selectedMode, fixtureId, generatedOutput))
+    async ({ runId, repositoryPath: root, taskApproach: selectedMode, fixtureId, generatedOutput }) => toolResult("taste_eval_get_judge_packet", async () => getEvaluationJudgePacket(root, selectedMode, fixtureId, generatedOutput), runId)
   );
   return server2;
 }
