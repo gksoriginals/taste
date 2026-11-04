@@ -51,7 +51,7 @@ export function createTasteServer(): McpServer {
   const server = new McpServer(
     { name: "taste", version: "0.1.0" },
     {
-      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill, reference, and checklist. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes.",
+      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes.",
     },
   );
 

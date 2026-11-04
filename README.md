@@ -16,7 +16,7 @@ Taste is a set of focused instructions and tools that your coding assistant can 
 
 This repository ships seven Taste Skills: setup, sweep, design, conformance, expression, Pack maintenance, and evaluation. They describe when to inspect product guidance, how to work with it, and how to learn from feedback.
 
-For ordinary UI work, the assistant reads guidance for the affected surface, makes the requested change, and checks its work. When you correct a design choice, the assistant applies the correction. If the feedback establishes a clear lesson worth reusing, it updates the relevant checklist. If no Pack covers that surface, it creates a small Pack for that surface. One-off reactions stay in the conversation. This learning does not start a product-wide sweep.
+For ordinary UI work, the assistant reads guidance for the affected surface, makes the requested change, and checks its work. When you correct a design choice, the assistant applies the correction. If the feedback establishes a clear lesson worth reusing, it updates the relevant guidance. If no Pack covers that surface, it creates a small Pack for that surface. One-off reactions stay in the conversation. This learning does not start a product-wide sweep.
 
 Use `/taste-setup` in Cursor, or invoke Taste's `taste-setup` Skill in another supported assistant, when you want a broader product inspection. Setup inventories the repository, identifies apps and journeys, chooses a scope, inspects accessible UI and source, then writes product-specific guidance. If part of the product is inaccessible, it records the gap and continues with other accessible parts. The assistant checks its own guidance; no separate human approval step is required.
 
@@ -26,7 +26,7 @@ flowchart TD
   Read --> Change[Make and check the requested change]
   Change --> Feedback{Clear reusable lesson from feedback?}
   Feedback -->|No| Done[Keep one-off feedback in the conversation]
-  Feedback -->|Yes, surface already covered| Update[Update that surface's checklist]
+  Feedback -->|Yes, surface already covered| Update[Update scoped guidance]
   Feedback -->|Yes, surface not covered| Create[Create a small usable Pack for that surface]
   Setup[Run /taste-setup explicitly] --> Inventory[Inventory apps, screens and journeys]
   Inventory --> Sweep[Inspect evidence for the agreed scope]
@@ -56,7 +56,7 @@ product-repository/
 
 - **`SKILL.md`** is the entry point. It routes the current task to the relevant product and surface guidance.
 - **References** capture product-specific patterns, facts, examples, and exceptions. A reference should say when a rule applies and why, not just name a preferred style.
-- **Checklists** turn recurring lessons into concrete checks an assistant can apply. A user correction can become a checklist item after the assistant has applied and checked it.
+- **Guidance** can use direct rules, checklists, decision trees, or annotated examples. Choose the form that helps the next assistant make the decision. Record when it applies, why it matters, its limits, and the supporting evidence.
 - **`manifest.json`** records Pack readiness, the covered product surfaces, and evidence for those coverage claims.
 - **Metadata and evaluations** are optional. Add them only when the product benefits from them; Taste does not require a fixed set of files.
 

@@ -14,6 +14,6 @@ Follow `taste-setup` for the full lifecycle. Independently inventory repository 
 - Track per-app/surface/journey status independently: `source_reviewed`, `rendered`, `blocked`, or `not_inspected`, with evidence and gaps. Pack readiness is `in_progress`, `usable_partial`, or `complete`. Default `source_reviewed` policy allows cited, actionable source guidance that clearly says visual behavior is unverified; `rendered_flow` requires a rendered representative journey. `usable_partial` applies only to listed supported coverage. `complete` requires all recorded required coverage rendered and source-correlated, target met, self-review, and passing `taste_pack_validate`.
 - If interrupted, preserve existing work and the most accurate status, and report `/taste-setup` as the resume path. Do not initialize a Pack if no product UI or UI source exists.
 
-Normal UI task feedback remains in the active conversation unless it becomes a clear reusable lesson. Expression may save that lesson to a relevant checklist or create a minimal Pack for the affected surface; this does not trigger this multi-surface sweep.
+Normal UI task feedback remains in the active conversation unless it becomes a clear reusable lesson. Expression may save that lesson to a relevant guidance file or create a minimal Pack for the affected surface; this does not trigger this multi-surface sweep.
 
 Conformance and Expression are task approaches, not setup states or persistent Pack modes.

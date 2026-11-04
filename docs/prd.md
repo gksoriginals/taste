@@ -20,15 +20,15 @@ Conformance and Expression describe how the host approaches a task:
 - **Expression** explores a new direction, addresses an unsupported area, or responds to a user correction. Existing guidance may still apply.
 - **Clarify** asks a focused question only when the repository and conversation do not resolve a material ambiguity.
 
-They are not Pack modes or setup states. Checklist-based Packs do not need persistent per-task routing state.
+They are not Pack modes or setup states. Packs do not need persistent per-task routing state.
 
 ## Setup and learning
 
 **Explicit Setup** (`/taste-setup` where supported, or the `taste-setup` Skill) inspects the repository, identifies product scope, reviews accessible UI and source, and creates or refreshes tailored guidance. The host asks about scope or access only when repository evidence cannot resolve a consequential choice. Setup records evidence and coverage gaps, resumes without overwriting useful work, and validates the Pack. It does not change product UI.
 
-**Normal UI work** uses the existing Pack where relevant. If the Pack is absent or does not cover the surface, the host can still do the requested work in Expression. When a user correction or resolved disagreement establishes a clear reusable lesson, the host applies and self-checks it, then may write the lesson to a scoped checklist. If needed, the host can create a minimal Pack for that affected surface; this is not a product-wide sweep. One-off or unresolved feedback stays in the active conversation.
+**Normal UI work** uses the existing Pack where relevant. If the Pack is absent or does not cover the surface, the host can still do the requested work in Expression. When a user correction or resolved disagreement establishes a clear reusable lesson, the host applies and self-checks it, then may write the lesson to scoped guidance. If needed, the host can create a minimal Pack for that affected surface; this is not a product-wide sweep. One-off or unresolved feedback stays in the active conversation.
 
-Taste does not observe conversations or decide whether a lesson is reusable. The host makes that judgment and supplies the content to Taste's Pack tools. There is no separate human approval or promotion step for checklist learning.
+Taste does not observe conversations or decide whether a lesson is reusable. The host makes that judgment and supplies the content to Taste's Pack tools. There is no separate human approval or promotion step for updating scoped guidance.
 
 ## Product boundaries
 

@@ -12,7 +12,7 @@
     "repositoryApps": ["Web"],
     "products": ["Example Product"],
     "exclusions": ["All other product surfaces"],
-    "coverageTarget": "Illustrate a single source-backed checklist entry.",
+    "coverageTarget": "Illustrate a source-backed checklist and a decision tree.",
     "requiredCoverage": ["web.account-setup"]
   },
   "coverage": [
@@ -30,7 +30,7 @@
           "note": "Synthetic evaluation task; no rendered product inspection is represented."
         }
       ],
-      "guidanceFiles": ["skills/product-design/references/checklists/account-setup.md"],
+      "guidanceFiles": ["skills/product-design/references/checklists/account-setup.md", "skills/product-design/references/setup-progress.md"],
       "gap": "The example does not contain a running product UI."
     }
   ]

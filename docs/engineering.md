@@ -28,7 +28,7 @@ The host routes from the user's request and affected product surface:
 
 These are behavior labels, not persisted Pack modes. Taste has no persisted task-routing state.
 
-During normal UI work, a clear reusable correction can become a scoped checklist lesson after the host applies and self-checks it. If the surface has no Pack yet, the host may initialize the minimal scaffold, replace starter content with evidence-backed surface guidance, and mark only that surface `usable_partial`. This does not start a broad sweep. One-off or unresolved feedback remains task-local. There is no separate approval or promotion step for this path.
+During normal UI work, a clear reusable correction can become a piece of scoped guidance after the host applies and self-checks it. If the surface has no Pack yet, the host may initialize the minimal scaffold, replace starter content with evidence-backed surface guidance, and mark only that surface `usable_partial`. This does not start a broad sweep. One-off or unresolved feedback remains task-local. There is no separate approval or promotion step for this path.
 
 Explicit `/taste-setup` or invocation of the `taste-setup` Skill is the broader repository workflow. The host inventories the repository before choosing scope, inspects a bounded selection of rendered UI and source as available, and creates or selectively refreshes guidance. The host distinguishes evidence types, records coverage and inaccessible areas, self-checks its work, validates, and reports limits. Taste supplies the workflow and file tools; it does not perform the sweep itself.
 

@@ -36700,7 +36700,7 @@ This starter is not product guidance. Use explicit \`/taste-setup\` to inspect a
 
 ## Apply this Pack
 
-First identify the user's task and the affected product surface. Load only the product Skills, references, and checklists relevant to that pair. Then make a small approach choice:
+First identify the user's task and the affected product surface. Load only the product Skills and references relevant to that pair. Then make a small approach choice:
 
 - **Conformance:** apply relevant, established, sourced product guidance.
 - **Expression:** explore when the request asks for a new direction, identifies a gap, or corrects existing guidance.
@@ -36718,7 +36718,7 @@ Use the manifest and Pack routing map to identify the affected surface, then loa
 
 ## Learn from user feedback
 
-Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review or approval. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
+Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped guidance when it expresses a clear reusable lesson. Do not require a separate Pack review or approval. Keep unresolved alternatives and one-off feedback in the host task. Use a form that teaches the decision clearly, such as a checklist, decision tree, or annotated exemplar. Record when it applies, why it matters, exceptions, and evidence. Distinguish observed behavior, inferred intent, and settled decisions. Route to new guidance by task and surface and list it in matching manifest coverage.
 
 For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
@@ -37313,7 +37313,7 @@ function createTasteServer() {
   const server2 = new McpServer(
     { name: "taste", version: "0.1.0" },
     {
-      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill, reference, and checklist. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes."
+      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes."
     }
   );
   server2.registerTool(
