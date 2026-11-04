@@ -25,7 +25,7 @@ async function withRepository(run: (repositoryPath: string) => Promise<void>): P
 }
 
 async function prepareEvidencePack(repositoryPath: string, minimumUsableEvidence: MinimumUsableEvidence = "source_reviewed", renderedIds: string[] = []): Promise<void> {
-  await initializePack(repositoryPath, "Example Product", ["Admin login"], undefined, { minimumUsableEvidence });
+  await initializePack(repositoryPath, "Example Product", ["Admin login"], { minimumUsableEvidence });
   const packRoot = path.join(repositoryPath, "taste");
   await writeFile(path.join(packRoot, "README.md"), "# Example Product Taste Pack\n\nEvidence-backed guidance for the selected Admin and Portal journeys.\n");
   await writeFile(path.join(packRoot, "skills/product-design/SKILL.md"), "---\nname: product-design\ndescription: Product-specific Admin and Portal guidance.\n---\n# Product design\nRoute tasks by the affected app and journey.\n");
@@ -82,7 +82,7 @@ async function markRenderedCoverage(repositoryPath: string, ids: string[]): Prom
   await writeFile(manifestPath, JSON.stringify({ ...manifest, coverage: updated }, null, 2) + "\n");
 }
 
-test("initializes an incomplete product-specific Pack shell without touching repository instructions", async () => {
+test("initializes an in-progress product-specific Pack shell without touching repository instructions", async () => {
   await withRepository(async (repositoryPath) => {
     const originalInstructions = "Use the existing repository workflow.\n";
     await writeFile(path.join(repositoryPath, "AGENTS.md"), originalInstructions);
@@ -95,27 +95,14 @@ test("initializes an incomplete product-specific Pack shell without touching rep
     assert.equal(result.filesCreated.length, 3);
     assert.equal(result.filesCreated.some((file) => file.includes("references/")), false);
     assert.equal(inspection.manifest?.name, "Example Product");
-    assert.equal(inspection.manifest?.supportedModes, undefined);
-    assert.equal(inspection.manifest?.decisionPromotionCheckpoint, undefined);
     assert.equal(inspection.manifest?.setupStatus, "in_progress");
     assert.deepEqual(inspection.manifest?.setupPolicy, { minimumUsableEvidence: "source_reviewed" });
     assert.equal(inspection.layout, "product-specific");
-    assert.equal(inspection.supportedModesDeprecated, false);
     assert.equal(inspection.validation.valid, false);
     assert.equal(inspection.setupStatus, "in_progress");
     assert.ok(inspection.validation.issues.some((issue) => /setup is in progress/.test(issue.message)));
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
-  });
-});
-
-test("initialization can record a host-defined Decision promotion checkpoint", async () => {
-  await withRepository(async (repositoryPath) => {
-    await initializePack(repositoryPath, "Example Product", [], "After product checks and user approval, before push.");
-    const inspection = await inspectPack(repositoryPath);
-    assert.equal(inspection.manifest?.decisionPromotionCheckpoint, "After product checks and user approval, before push.");
-    assert.equal(inspection.manifest?.setupStatus, "in_progress");
-    assert.equal(inspection.validation.valid, false);
   });
 });
 
@@ -196,7 +183,7 @@ test("Pack validation rejects required files that resolve through an external sy
   await withRepository(async (repositoryPath) => {
     await initializePack(repositoryPath, "Example Product");
     const outsideManifest = path.join(repositoryPath, "outside.json");
-    await writeFile(outsideManifest, JSON.stringify({ name: "Outside", version: "1", supportedModes: ["conformance", "expression"] }));
+    await writeFile(outsideManifest, JSON.stringify({ name: "Outside", version: "1" }));
     await rm(path.join(repositoryPath, "taste/manifest.json"));
     await symlink(outsideManifest, path.join(repositoryPath, "taste/manifest.json"));
 
@@ -213,10 +200,8 @@ test("Pack writes create or replace supported files only inside taste/", async (
     assert.equal(written.content, "# Button decisions\n");
     await writePackFile(repositoryPath, "skills/product-design/references/conformance/buttons.md", "# Updated decisions\n");
     assert.equal((await readPackFile(repositoryPath, written.path)).content, "# Updated decisions\n");
-    await assert.rejects(
-      () => writePackFile(repositoryPath, "skills/product-design/references/decisions/early.md", "# Draft\n"),
-      /only be written through taste_record_signal/,
-    );
+    await writePackFile(repositoryPath, "skills/product-design/references/checklists/lesson.md", "# Reusable lesson\n");
+    assert.match((await readPackFile(repositoryPath, "skills/product-design/references/checklists/lesson.md")).content, /Reusable lesson/);
     await assert.rejects(() => writePackFile(repositoryPath, "../AGENTS.md", "override"), /relative path inside the Taste Pack/);
     await assert.rejects(() => writePackFile(repositoryPath, "private.bin", "binary"), /supported text format/);
 
@@ -227,7 +212,7 @@ test("Pack writes create or replace supported files only inside taste/", async (
   });
 });
 
-test("completed product-specific packs need no decision home and legacy split packs remain valid", async () => {
+test("completed product-specific packs validate without a fixed reference catalog", async () => {
   await withRepository(async (repositoryPath) => {
     await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login", "portal.profile", "portal.billing"]);
     const manifestPath = path.join(repositoryPath, "taste/manifest.json");
@@ -239,11 +224,7 @@ test("completed product-specific packs need no decision home and legacy split pa
     assert.equal(inspection.layout, "product-specific");
   });
 
-  const legacy = await validatePack(path.resolve("examples/product-pack"));
-  assert.equal(legacy.valid, true, JSON.stringify(legacy.issues));
-  const inspection = await inspectPack(path.resolve("examples/product-pack"));
-  assert.equal(inspection.layout, "legacy-split");
-  assert.equal(inspection.supportedModesDeprecated, true);
+
 });
 
 test("generator and Judge fixture tools receive separate data", async () => {

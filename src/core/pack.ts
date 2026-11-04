@@ -8,8 +8,8 @@ export const MAX_PACK_FILE_BYTES = 256 * 1024;
 const MAX_EVAL_FILES = 100;
 const MAX_EVAL_BYTES = 1024 * 1024;
 
-export type TasteMode = "conformance" | "expression";
-export type PackSetupStatus = "in_progress" | "usable_partial" | "complete" | "incomplete";
+export type TaskApproach = "conformance" | "expression";
+export type PackSetupStatus = "in_progress" | "usable_partial" | "complete";
 export type MinimumUsableEvidence = "source_reviewed" | "rendered_flow";
 export type SetupCoverageStatus = "source_reviewed" | "rendered" | "blocked" | "not_inspected";
 export type SetupEvidenceType = "source_reviewed" | "rendered" | "design_reference" | "inference";
@@ -49,19 +49,12 @@ export interface SetupScope {
 export interface PackManifest {
   name: string;
   version: string;
-  /**
-   * Deprecated legacy metadata. Conformance/Expression are host task approaches,
-   * not Pack modes. Kept only so older Packs parse.
-   */
-  supportedModes?: TasteMode[];
   surfaces: string[];
-  /** New Setup readiness state. `incomplete` is accepted only for backward compatibility. */
-  setupStatus?: PackSetupStatus;
+  /** Setup readiness state. */
+  setupStatus: PackSetupStatus;
   setupPolicy?: SetupPolicy;
   setupScope?: SetupScope;
   coverage?: SetupCoverage[];
-  /** Legacy optional reminder for hosts that still record structured Decision promotions. */
-  decisionPromotionCheckpoint?: string;
 }
 
 export interface ValidationIssue {
@@ -93,7 +86,7 @@ description: Apply ${productName}'s product-specific design judgment when creati
 
 # Product design guidance for ${productName}
 
-This starter is incomplete until the explicit \`/taste-setup\` workflow inspects the repository, selects a bounded product scope, and replaces this text with sourced product guidance. Normal UI tasks must not create or refresh this Pack. Once setup is complete, the host may update an existing scoped checklist during normal UI work when user feedback resolves into a clear reusable lesson; no separate approval is needed.
+This starter is not product guidance. Use explicit \`/taste-setup\` to inspect and map a broader product scope. During normal UI work, do not launch that sweep; if resolved user feedback establishes a clear reusable lesson, the host may replace the starter with a minimal, evidence-backed Pack for the affected surface and mark that coverage \`usable_partial\`. No separate approval is needed.
 
 ## Apply this Pack
 
@@ -111,22 +104,19 @@ During setup, build the routing map from the actual product tasks, surfaces, and
 
 ## Product-specific routing
 
-Use the manifest and Pack routing map to identify the affected surface, then load only guidance relevant to both the task and surface. The host owns this routing judgment; \`taste_part_state\` is reserved for legacy structured Decision compatibility or diagnostics. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
+Use the manifest and Pack routing map to identify the affected surface, then load only guidance relevant to both the task and surface. The host owns this routing judgment. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
 
 ## Learn from user feedback
 
-Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review, Decision approval, or promotion checkpoint. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
+Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review or approval. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
 
 For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
 
-export function createStarterPackFiles(productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string, setupPolicy: SetupPolicy = { minimumUsableEvidence: "source_reviewed" }): PackFile[] {
+export function createStarterPackFiles(productName: string, surfaces: string[] = [], setupPolicy: SetupPolicy = { minimumUsableEvidence: "source_reviewed" }): PackFile[] {
   const normalizedName = productName.trim();
   if (normalizedName.length < 2 || normalizedName.length > 120) {
     throw new TasteError("Product name must be between 2 and 120 characters.", "invalid_product_name");
-  }
-  if (decisionPromotionCheckpoint !== undefined && (!decisionPromotionCheckpoint.trim() || decisionPromotionCheckpoint.length > 500)) {
-    throw new TasteError("decisionPromotionCheckpoint must be non-empty and no longer than 500 characters.", "invalid_promotion_checkpoint");
   }
   if (setupPolicy.minimumUsableEvidence !== "source_reviewed" && setupPolicy.minimumUsableEvidence !== "rendered_flow") {
     throw new TasteError("minimumUsableEvidence must be source_reviewed or rendered_flow.", "invalid_setup_policy");
@@ -138,7 +128,6 @@ export function createStarterPackFiles(productName: string, surfaces: string[] =
     surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean),
     setupStatus: "in_progress",
     setupPolicy,
-    ...(decisionPromotionCheckpoint?.trim() ? { decisionPromotionCheckpoint: decisionPromotionCheckpoint.trim() } : {}),
   };
 
   return [
@@ -279,20 +268,12 @@ export async function readPackFile(repositoryPath: string, relativePath: string)
 }
 
 export async function writePackFile(repositoryPath: string, relativePath: string, content: string): Promise<PackFile> {
-  return writePackFileInternal(repositoryPath, relativePath, content, false);
+  return writePackFileInternal(repositoryPath, relativePath, content);
 }
 
-export async function writeDecisionFile(repositoryPath: string, relativePath: string, content: string): Promise<PackFile> {
-  return writePackFileInternal(repositoryPath, relativePath, content, true);
-}
-
-async function writePackFileInternal(repositoryPath: string, relativePath: string, content: string, allowDecisionWrite: boolean): Promise<PackFile> {
+async function writePackFileInternal(repositoryPath: string, relativePath: string, content: string): Promise<PackFile> {
   const { packRoot } = await resolvePackRoot(repositoryPath);
   const normalized = normalizePackRelativePath(relativePath);
-  const decisionsPrefix = path.join("skills", "product-design", "references", "decisions") + path.sep;
-  if (!allowDecisionWrite && normalized.startsWith(decisionsPrefix)) {
-    throw new TasteError("Decision files can only be written through taste_record_signal after final validation and user approval.", "decision_write_requires_promotion");
-  }
   if (!/\.(md|json|html|css|js|jsx|ts|tsx|svg|txt)$/i.test(normalized)) {
     throw new TasteError("Pack files must use a supported text format (Markdown, JSON, HTML, CSS, JavaScript, TypeScript, SVG, or text).", "unsupported_pack_file");
   }
@@ -337,19 +318,17 @@ async function writePackFileInternal(repositoryPath: string, relativePath: strin
   return { path: normalized.split(path.sep).join("/"), content };
 }
 
-export type PackLayout = "product-specific" | "shared" | "legacy-split" | "mixed" | "incomplete";
+export type PackLayout = "product-specific" | "incomplete";
 
 export async function inspectPack(repositoryPath: string): Promise<{
   packPath: string;
   manifest: PackManifest | null;
-  setupStatus: PackSetupStatus | "legacy";
+  setupStatus: PackSetupStatus;
   coverageSummary: { sourceReviewed: number; rendered: number; blocked: number; notInspected: number; required: number; targetMet: boolean };
   entrySkillAvailable: boolean;
   referenceCount: number;
-  decisionCount: number;
   layout: PackLayout;
-  supportedModesDeprecated: boolean;
-  fixtureCounts: Record<TasteMode, number>;
+  fixtureCounts: Record<TaskApproach, number>;
   validation: PackValidation;
 }> {
   const { repositoryRoot, packRoot } = await resolvePackRoot(repositoryPath);
@@ -365,11 +344,10 @@ export async function inspectPack(repositoryPath: string): Promise<{
     : [];
   const requiredCoverage = Array.isArray(manifest?.setupScope?.requiredCoverage) ? manifest.setupScope.requiredCoverage.filter((id): id is string => typeof id === "string") : [];
   const coverageById = new Map(coverage.map((item) => [item.id, item]));
-  const setupStatus = manifest?.setupStatus === "incomplete" ? "in_progress" : manifest?.setupStatus ?? "legacy";
+  const setupStatus = manifest?.setupStatus ?? "in_progress";
   const referenceRoot = path.join(packRoot, "skills/product-design/references");
   const referenceCount = await countMarkdown(referenceRoot);
-  const decisionCount = await countDecisionFiles(packRoot);
-  const fixtureCounts: Record<TasteMode, number> = {
+  const fixtureCounts: Record<TaskApproach, number> = {
     conformance: (await listFixturesAt(packRoot, "conformance")).length,
     expression: (await listFixturesAt(packRoot, "expression")).length,
   };
@@ -387,33 +365,15 @@ export async function inspectPack(repositoryPath: string): Promise<{
     },
     entrySkillAvailable: await resolvePackFile(packRoot, ENTRY_SKILL).then(() => true).catch(() => false),
     referenceCount,
-    decisionCount,
     layout: await packLayout(packRoot),
-    supportedModesDeprecated: manifest?.supportedModes !== undefined,
     fixtureCounts,
     validation: await validatePackAt(packRoot),
   };
 }
 
 async function packLayout(packRoot: string): Promise<PackLayout> {
-  const hasDecisions = await exists(path.join(packRoot, "skills/product-design/references/decisions/README.md"));
-  const hasLegacy = (await exists(path.join(packRoot, "skills/product-design/references/conformance/README.md")))
-    && (await exists(path.join(packRoot, "skills/product-design/references/expression/README.md")));
-  if (hasDecisions && hasLegacy) return "mixed";
-  if (hasDecisions) return "shared";
-  if (hasLegacy) return "legacy-split";
   const hasBase = await Promise.all(["README.md", "manifest.json", ENTRY_SKILL].map((relative) => exists(path.join(packRoot, relative))));
   return hasBase.every(Boolean) ? "product-specific" : "incomplete";
-}
-
-async function countDecisionFiles(packRoot: string): Promise<number> {
-  const directory = path.join(packRoot, "skills/product-design/references/decisions");
-  try {
-    const entries = await readdir(directory, { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".md") && entry.name !== "README.md").length;
-  } catch {
-    return 0;
-  }
 }
 
 async function countMarkdown(directory: string): Promise<number> {
@@ -440,10 +400,7 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-const DECISIONS_HOME = "skills/product-design/references/decisions/README.md";
-const LEGACY_CONFORMANCE_HOME = "skills/product-design/references/conformance/README.md";
-const LEGACY_EXPRESSION_HOME = "skills/product-design/references/expression/README.md";
-const SETUP_STATUSES = ["in_progress", "usable_partial", "complete", "incomplete"] as const;
+const SETUP_STATUSES = ["in_progress", "usable_partial", "complete"] as const;
 const COVERAGE_STATUSES = ["source_reviewed", "rendered", "blocked", "not_inspected"] as const;
 const EVIDENCE_TYPES = ["source_reviewed", "rendered", "design_reference", "inference"] as const;
 
@@ -574,12 +531,7 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
     if (state === "missing") issues.push({ path: relative, message: "Required Pack file is missing or unreadable." });
   }
 
-  // Product references and metadata are intentionally optional: the host derives
-  // the useful Pack shape from the product sweep instead of satisfying a fixed catalog.
-  // Legacy Decision layouts are still inspected when present, but are not required.
-  await readablePackFile(packRoot, DECISIONS_HOME, issues);
-  await readablePackFile(packRoot, LEGACY_CONFORMANCE_HOME, issues);
-  await readablePackFile(packRoot, LEGACY_EXPRESSION_HOME, issues);
+  // Product references and metadata are optional; the host derives a useful shape from evidence.
 
   let manifest: unknown;
   try {
@@ -590,22 +542,25 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
   }
   if (manifest && typeof manifest === "object") {
     const record = manifest as Record<string, unknown>;
+    const allowedManifestFields = new Set(["name", "version", "surfaces", "setupStatus", "setupPolicy", "setupScope", "coverage"]);
+    for (const key of Object.keys(record)) {
+      if (!allowedManifestFields.has(key)) issues.push({ path: "manifest.json", message: `Unsupported manifest field: ${key}.` });
+    }
     if (typeof record.name !== "string" || record.name.trim().length === 0) {
       issues.push({ path: "manifest.json", message: "name must be a non-empty string." });
     }
     if (typeof record.version !== "string" || record.version.trim().length === 0) {
       issues.push({ path: "manifest.json", message: "version must be a non-empty string." });
     }
-    if (record.supportedModes !== undefined && (!Array.isArray(record.supportedModes) || !record.supportedModes.every((item) => typeof item === "string"))) {
-      issues.push({ path: "manifest.json", message: "supportedModes is deprecated and ignored. Remove it, or keep it as an array of strings." });
-    }
     if (record.surfaces !== undefined && (!Array.isArray(record.surfaces) || !record.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
     }
-    if (record.setupStatus !== undefined && !SETUP_STATUSES.includes(record.setupStatus as (typeof SETUP_STATUSES)[number])) {
-      issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete. Legacy incomplete remains readable." });
+    if (record.setupStatus === undefined) {
+      issues.push({ path: "manifest.json", message: "setupStatus is required and must be in_progress, usable_partial, or complete." });
+    } else if (!SETUP_STATUSES.includes(record.setupStatus as (typeof SETUP_STATUSES)[number])) {
+      issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete." });
     }
-    const setupStatus = record.setupStatus === "incomplete" ? "in_progress" : record.setupStatus;
+    const setupStatus = record.setupStatus;
     let minimumUsableEvidence: MinimumUsableEvidence = "source_reviewed";
     if (record.setupPolicy !== undefined) {
       if (!isObjectRecord(record.setupPolicy) || (record.setupPolicy.minimumUsableEvidence !== "source_reviewed" && record.setupPolicy.minimumUsableEvidence !== "rendered_flow") || Object.keys(record.setupPolicy).some((key) => key !== "minimumUsableEvidence")) {
@@ -652,12 +607,9 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
       };
       const readme = await readOptional("README.md");
       const entry = await readOptional(ENTRY_SKILL);
-      if (/Setup status:\s*\*\*(?:incomplete|in_progress)\*\*/i.test(readme) || /This starter is incomplete/i.test(entry)) {
+      if (/Setup status:\s*\*\*in_progress\*\*/i.test(readme) || /This starter is not product guidance/i.test(entry)) {
         issues.push({ path: "manifest.json", message: "Pack still contains starter boilerplate. Replace it with scoped, repository-specific guidance before marking it usable_partial or complete." });
       }
-    }
-    if (record.decisionPromotionCheckpoint !== undefined && (typeof record.decisionPromotionCheckpoint !== "string" || record.decisionPromotionCheckpoint.trim().length === 0 || record.decisionPromotionCheckpoint.length > 500)) {
-      issues.push({ path: "manifest.json", message: "decisionPromotionCheckpoint must be a non-empty string of at most 500 characters when present." });
     }
   }
 
@@ -683,7 +635,7 @@ export async function validatePack(repositoryPath: string): Promise<PackValidati
   return validatePackAt(packRoot);
 }
 
-export async function initializePack(repositoryPath: string, productName: string, surfaces: string[] = [], decisionPromotionCheckpoint?: string, setupPolicy: SetupPolicy = { minimumUsableEvidence: "source_reviewed" }): Promise<{ packPath: string; filesCreated: string[] }> {
+export async function initializePack(repositoryPath: string, productName: string, surfaces: string[] = [], setupPolicy: SetupPolicy = { minimumUsableEvidence: "source_reviewed" }): Promise<{ packPath: string; filesCreated: string[] }> {
   const repositoryRoot = await resolveRepositoryRoot(repositoryPath);
   const packRoot = path.join(repositoryRoot, PACK_DIRECTORY);
   try {
@@ -694,7 +646,7 @@ export async function initializePack(repositoryPath: string, productName: string
     // A missing path is the expected starting state.
   }
 
-  const files = createStarterPackFiles(productName, surfaces, decisionPromotionCheckpoint, setupPolicy);
+  const files = createStarterPackFiles(productName, surfaces, setupPolicy);
   await mkdir(packRoot, { recursive: false });
   try {
     for (const file of files) {
@@ -729,7 +681,7 @@ async function readFilesRecursively(directory: string, root: string, accumulator
   }
 }
 
-async function listFixturesAt(packRoot: string, mode: TasteMode): Promise<string[]> {
+async function listFixturesAt(packRoot: string, mode: TaskApproach): Promise<string[]> {
   const directory = path.join(packRoot, "evals", mode, "fixtures");
   try {
     const resolved = await realpath(directory);
@@ -741,7 +693,7 @@ async function listFixturesAt(packRoot: string, mode: TasteMode): Promise<string
   }
 }
 
-async function fixtureRoot(repositoryPath: string, mode: TasteMode, fixtureId: string): Promise<string> {
+async function fixtureRoot(repositoryPath: string, mode: TaskApproach, fixtureId: string): Promise<string> {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(fixtureId)) {
     throw new TasteError("fixtureId may contain letters, numbers, dots, underscores, and hyphens.", "invalid_fixture_id");
   }
@@ -761,12 +713,12 @@ async function fixtureRoot(repositoryPath: string, mode: TasteMode, fixtureId: s
   return resolved;
 }
 
-export async function listEvaluationFixtures(repositoryPath: string, mode: TasteMode): Promise<string[]> {
+export async function listEvaluationFixtures(repositoryPath: string, taskApproach: TaskApproach): Promise<string[]> {
   const { packRoot } = await resolvePackRoot(repositoryPath);
-  return listFixturesAt(packRoot, mode);
+  return listFixturesAt(packRoot, taskApproach);
 }
 
-export async function getEvaluationGeneratorCase(repositoryPath: string, mode: TasteMode, fixtureId: string): Promise<{ mode: TasteMode; fixtureId: string; task: string; before: PackFile[] }> {
+export async function getEvaluationGeneratorCase(repositoryPath: string, mode: TaskApproach, fixtureId: string): Promise<{ mode: TaskApproach; fixtureId: string; task: string; before: PackFile[] }> {
   const root = await fixtureRoot(repositoryPath, mode, fixtureId);
   let task: string;
   try {
@@ -783,7 +735,7 @@ export async function getEvaluationGeneratorCase(repositoryPath: string, mode: T
   return { mode, fixtureId, task, before: files };
 }
 
-export async function getEvaluationJudgePacket(repositoryPath: string, mode: TasteMode, fixtureId: string, generatedOutput: PackFile[] = []): Promise<{ mode: TasteMode; fixtureId: string; task: string; rubric: string; generatedOutput: PackFile[]; expectedAfter: PackFile[] }> {
+export async function getEvaluationJudgePacket(repositoryPath: string, mode: TaskApproach, fixtureId: string, generatedOutput: PackFile[] = []): Promise<{ mode: TaskApproach; fixtureId: string; task: string; rubric: string; generatedOutput: PackFile[]; expectedAfter: PackFile[] }> {
   if (generatedOutput.length > MAX_EVAL_FILES) throw new TasteError(`Generated output cannot exceed ${MAX_EVAL_FILES} files.`, "eval_too_many_files");
   let generatedBytes = 0;
   for (const file of generatedOutput) {

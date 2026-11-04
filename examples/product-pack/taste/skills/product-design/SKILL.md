@@ -1,23 +1,10 @@
 ---
 name: product-design
-description: Apply Example Product's design direction when implementing or reviewing its account setup experience.
+description: Apply Example Product guidance to its account setup journey when implementing or reviewing UI.
 ---
 
 # Example Product design
 
-This example is synthetic. Its split Conformance and Expression folders are a legacy layout. New Packs keep one `references/decisions/` tree and derive part activity from Decision status, shipped evidence, and coverage gap. There is no authored mode field. `taste_mode_resolve` does not decide who initiates a change.
+Route from the user's task and affected surface. For account setup, read [the checklist](references/checklists/account-setup.md). This synthetic Pack does not define a general visual style or establish rules for other product surfaces.
 
-## Choose and switch the task mode
-
-- Use **Conformance** when the requested change follows accepted product direction. Consider the current product UI and interaction states, source, and accepted decisions; do not equate an observed pattern with an approved rule.
-- Use **Expression** when the user asks to explore, establish, or intentionally change direction. Ask the user questions through the harness, based on the decisions still open; do not turn assumptions into product intent.
-- For mixed or unclear intent, ask one focused question through the harness before the choice changes the work. Honor an explicit user mode request.
-- Use `taste_mode_resolve` with the product Skill's interpreted signal. A selected mode is task-local. Transition Expression to Conformance only after the user confirms the proposed direction as accepted product guidance.
-
-Read shared product facts, then only the relevant mode references. A visual Conformance sweep requires rendered product evidence: inspect relevant pages and flow states with available browser/computer tools and capture screenshots. Treat shipped work as evidence, not as an automatic rule; note known flaws and uncertainty.
-
-## Shared and mode-specific guidance
-
-- [Shared product facts](references/shared/product-facts.md)
-- [Conformance: account setup](references/conformance/account-setup.md)
-- [Expression: account setup](references/expression/account-setup.md)
+Conformance applies established guidance. Expression explores a new direction or responds to a correction. These describe the current task, not Pack states. When feedback resolves into a clear reusable lesson, apply and self-check it, then update the relevant checklist with evidence. Keep one-off feedback in the current task.

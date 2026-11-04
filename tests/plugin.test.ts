@@ -84,7 +84,7 @@ test("Codex repo marketplace points to the root portable package", async () => {
   assert.equal(taste?.policy?.authentication, "ON_INSTALL");
 });
 
-test("setup creates Packs only from inspected product UI and keeps task routing separate", async () => {
+test("setup remains explicit while Expression saves clear feedback as scoped guidance", async () => {
   const setup = await readFile(path.join(root, "skills/taste-setup/SKILL.md"), "utf8");
   const sweep = await readFile(path.join(root, "skills/taste-sweep/SKILL.md"), "utf8");
   const design = await readFile(path.join(root, "skills/taste-design/SKILL.md"), "utf8");
@@ -112,8 +112,13 @@ test("setup creates Packs only from inspected product UI and keeps task routing 
   assert.match(sweep, /Figma is optional/i);
   assert.match(sweep, /Ask once for safe access/i);
   assert.match(sweep, /Do not require every route to be toured/i);
-  assert.match(design, /A user-requested new direction, correction, or greenfield product\/surface is Expression work and can proceed without setup/);
-  assert.match(design, /If no Pack exists, do not initialize one or start a sweep/);
+  assert.match(design, /A new direction, correction, or greenfield surface is Expression work and can proceed without a prior Pack/);
+  assert.match(design, /If no Pack exists, do not start a product-wide sweep/i);
+  assert.match(design, /create a minimal, evidence-backed Pack for that surface/i);
+  const expression = await readFile(path.join(root, "skills/taste-expression/SKILL.md"), "utf8");
+  assert.match(expression, /If this surface is not covered, save a clear reusable lesson/i);
+  assert.match(expression, /setupStatus: usable_partial/);
+  assert.match(expression, /matching `coverage` evidence\/guidance references/);
   assert.match(command, /Inventory repository apps, routes, journeys, design sources/i);
   assert.match(command, /If a journey is blocked, record its gap/i);
   assert.match(command, /source evidence can support useful partial guidance/i);

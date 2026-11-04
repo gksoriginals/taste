@@ -1206,11 +1206,11 @@ var require_util = __commonJS({
       return jsPropertySyntax ? (0, codegen_1.getProperty)(dataProp).toString() : "/" + escapeJsonPointer(dataProp);
     }
     exports.getErrorPath = getErrorPath;
-    function checkStrictMode(it, msg, mode2 = it.opts.strictSchema) {
-      if (!mode2)
+    function checkStrictMode(it, msg, mode = it.opts.strictSchema) {
+      if (!mode)
         return;
       msg = `strict mode: ${msg}`;
-      if (mode2 === true)
+      if (mode === true)
         throw new Error(msg);
       it.self.logger.warn(msg);
     }
@@ -7234,8 +7234,8 @@ var require_dist = __commonJS({
         (0, limit_1.default)(ajv);
       return ajv;
     };
-    formatsPlugin.get = (name, mode2 = "full") => {
-      const formats = mode2 === "fast" ? formats_1.fastFormats : formats_1.fullFormats;
+    formatsPlugin.get = (name, mode = "full") => {
+      const formats = mode === "fast" ? formats_1.fastFormats : formats_1.fullFormats;
       const f = formats[name];
       if (!f)
         throw new Error(`Unknown format "${name}"`);
@@ -35141,8 +35141,8 @@ var ExperimentalServerTasks = class {
    */
   elicitInputStream(params, options) {
     const clientCapabilities = this._server.getClientCapabilities();
-    const mode2 = params.mode ?? "form";
-    switch (mode2) {
+    const mode = params.mode ?? "form";
+    switch (mode) {
       case "url": {
         if (!clientCapabilities?.elicitation?.url) {
           throw new Error("Client does not support url elicitation.");
@@ -35156,7 +35156,7 @@ var ExperimentalServerTasks = class {
         break;
       }
     }
-    const normalizedParams = mode2 === "form" && params.mode === void 0 ? { ...params, mode: "form" } : params;
+    const normalizedParams = mode === "form" && params.mode === void 0 ? { ...params, mode: "form" } : params;
     return this.requestStream({
       method: "elicitation/create",
       params: normalizedParams
@@ -35530,8 +35530,8 @@ var Server = class extends Protocol {
    * @returns The result of the elicitation request.
    */
   async elicitInput(params, options) {
-    const mode2 = params.mode ?? "form";
-    switch (mode2) {
+    const mode = params.mode ?? "form";
+    switch (mode) {
       case "url": {
         if (!this._clientCapabilities?.elicitation?.url) {
           throw new Error("Client does not support url elicitation.");
@@ -36653,47 +36653,6 @@ var StdioServerTransport = class {
   }
 };
 
-// src/core/mode.ts
-function resolveTasteMode(input2) {
-  const rationale = input2.rationale.trim();
-  const ask = (question) => ({
-    status: "needs_user",
-    mode: null,
-    transition: null,
-    rationale,
-    question
-  });
-  if (!rationale) {
-    return ask("Ask the user to clarify the intended mode and record the reason for the choice.");
-  }
-  let mode2;
-  switch (input2.trigger) {
-    case "explicit_mode":
-      if (!input2.explicitMode) return ask("The user requested an explicit mode, but the requested mode was not provided.");
-      mode2 = input2.explicitMode;
-      break;
-    case "established_direction":
-      mode2 = "conformance";
-      break;
-    case "new_direction":
-      mode2 = "expression";
-      break;
-    case "direction_accepted":
-      if (input2.userConfirmed !== true) {
-        return ask("Ask through the harness whether the proposed direction is accepted as product guidance before switching to Conformance.");
-      }
-      mode2 = "conformance";
-      break;
-    case "unclear":
-      return ask("Ask one focused question through the harness to determine whether the user wants established product direction or a new direction.");
-  }
-  if (input2.currentMode === "expression" && mode2 === "conformance" && input2.trigger !== "explicit_mode" && input2.trigger !== "direction_accepted") {
-    return ask("Confirm through the harness that the user accepts the proposed Expression direction as product guidance before switching to Conformance.");
-  }
-  const transition = input2.currentMode === void 0 ? "start" : input2.currentMode === mode2 ? "stay" : "switch";
-  return { status: "selected", mode: mode2, transition, rationale };
-}
-
 // src/core/diagnostics.ts
 var configuredLevel = process.env.TASTE_LOG_LEVEL?.toLowerCase();
 var logLevel = configuredLevel === "off" || configuredLevel === "debug" ? configuredLevel : "error";
@@ -36737,7 +36696,7 @@ description: Apply ${productName}'s product-specific design judgment when creati
 
 # Product design guidance for ${productName}
 
-This starter is incomplete until the explicit \`/taste-setup\` workflow inspects the repository, selects a bounded product scope, and replaces this text with sourced product guidance. Normal UI tasks must not create or refresh this Pack. Once setup is complete, the host may update an existing scoped checklist during normal UI work when user feedback resolves into a clear reusable lesson; no separate approval is needed.
+This starter is not product guidance. Use explicit \`/taste-setup\` to inspect and map a broader product scope. During normal UI work, do not launch that sweep; if resolved user feedback establishes a clear reusable lesson, the host may replace the starter with a minimal, evidence-backed Pack for the affected surface and mark that coverage \`usable_partial\`. No separate approval is needed.
 
 ## Apply this Pack
 
@@ -36755,21 +36714,18 @@ During setup, build the routing map from the actual product tasks, surfaces, and
 
 ## Product-specific routing
 
-Use the manifest and Pack routing map to identify the affected surface, then load only guidance relevant to both the task and surface. The host owns this routing judgment; \`taste_part_state\` is reserved for legacy structured Decision compatibility or diagnostics. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
+Use the manifest and Pack routing map to identify the affected surface, then load only guidance relevant to both the task and surface. The host owns this routing judgment. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
 
 ## Learn from user feedback
 
-Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review, Decision approval, or promotion checkpoint. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
+Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped checklist when it expresses a clear reusable lesson. Do not require a separate Pack review or approval. Keep unresolved alternatives and one-off feedback in the host task. Distinguish directly observed behavior from inferred intent, cite sources, and mark uncertainty.
 
 For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
-function createStarterPackFiles(productName, surfaces = [], decisionPromotionCheckpoint, setupPolicy = { minimumUsableEvidence: "source_reviewed" }) {
+function createStarterPackFiles(productName, surfaces = [], setupPolicy = { minimumUsableEvidence: "source_reviewed" }) {
   const normalizedName = productName.trim();
   if (normalizedName.length < 2 || normalizedName.length > 120) {
     throw new TasteError("Product name must be between 2 and 120 characters.", "invalid_product_name");
-  }
-  if (decisionPromotionCheckpoint !== void 0 && (!decisionPromotionCheckpoint.trim() || decisionPromotionCheckpoint.length > 500)) {
-    throw new TasteError("decisionPromotionCheckpoint must be non-empty and no longer than 500 characters.", "invalid_promotion_checkpoint");
   }
   if (setupPolicy.minimumUsableEvidence !== "source_reviewed" && setupPolicy.minimumUsableEvidence !== "rendered_flow") {
     throw new TasteError("minimumUsableEvidence must be source_reviewed or rendered_flow.", "invalid_setup_policy");
@@ -36779,8 +36735,7 @@ function createStarterPackFiles(productName, surfaces = [], decisionPromotionChe
     version: "0.1.0",
     surfaces: surfaces.map((surface) => surface.trim()).filter(Boolean),
     setupStatus: "in_progress",
-    setupPolicy,
-    ...decisionPromotionCheckpoint?.trim() ? { decisionPromotionCheckpoint: decisionPromotionCheckpoint.trim() } : {}
+    setupPolicy
   };
   return [
     {
@@ -36884,30 +36839,6 @@ async function resolveFileWithin(root, relativePath) {
   if (metadata.size > MAX_PACK_FILE_BYTES) throw new TasteError(`File exceeds the ${MAX_PACK_FILE_BYTES}-byte limit.`, "pack_file_too_large");
   return resolved;
 }
-async function listPackMarkdown(repositoryPath2, relativeDirectory) {
-  const { packRoot } = await resolvePackRoot(repositoryPath2);
-  const normalized = normalizePackRelativePath(relativeDirectory);
-  const directory = path.join(packRoot, normalized);
-  let resolved;
-  try {
-    const metadata = await lstat(directory);
-    if (metadata.isSymbolicLink() || !metadata.isDirectory()) return [];
-    resolved = await realpath(directory);
-  } catch {
-    return [];
-  }
-  if (!isWithin(packRoot, resolved)) {
-    throw new TasteError("Pack directory resolves outside the Taste Pack.", "pack_path_escape");
-  }
-  const entries = await readdir(resolved, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".md") || entry.name === "README.md") continue;
-    const relative = `${normalized.split(path.sep).join("/")}/${entry.name}`;
-    files.push(await readPackFile(repositoryPath2, relative));
-  }
-  return files.sort((a, b) => a.path.localeCompare(b.path));
-}
 async function readPackFile(repositoryPath2, relativePath) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
   const normalized = normalizePackRelativePath(relativePath);
@@ -36915,18 +36846,11 @@ async function readPackFile(repositoryPath2, relativePath) {
   return { path: normalized.split(path.sep).join("/"), content: await readFile(filePath, "utf8") };
 }
 async function writePackFile(repositoryPath2, relativePath, content) {
-  return writePackFileInternal(repositoryPath2, relativePath, content, false);
+  return writePackFileInternal(repositoryPath2, relativePath, content);
 }
-async function writeDecisionFile(repositoryPath2, relativePath, content) {
-  return writePackFileInternal(repositoryPath2, relativePath, content, true);
-}
-async function writePackFileInternal(repositoryPath2, relativePath, content, allowDecisionWrite) {
+async function writePackFileInternal(repositoryPath2, relativePath, content) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
   const normalized = normalizePackRelativePath(relativePath);
-  const decisionsPrefix = path.join("skills", "product-design", "references", "decisions") + path.sep;
-  if (!allowDecisionWrite && normalized.startsWith(decisionsPrefix)) {
-    throw new TasteError("Decision files can only be written through taste_record_signal after final validation and user approval.", "decision_write_requires_promotion");
-  }
   if (!/\.(md|json|html|css|js|jsx|ts|tsx|svg|txt)$/i.test(normalized)) {
     throw new TasteError("Pack files must use a supported text format (Markdown, JSON, HTML, CSS, JavaScript, TypeScript, SVG, or text).", "unsupported_pack_file");
   }
@@ -36977,10 +36901,9 @@ async function inspectPack(repositoryPath2) {
   const coverage = Array.isArray(manifest?.coverage) ? manifest.coverage.filter((item) => isObjectRecord(item) && typeof item.id === "string" && typeof item.status === "string") : [];
   const requiredCoverage = Array.isArray(manifest?.setupScope?.requiredCoverage) ? manifest.setupScope.requiredCoverage.filter((id) => typeof id === "string") : [];
   const coverageById = new Map(coverage.map((item) => [item.id, item]));
-  const setupStatus = manifest?.setupStatus === "incomplete" ? "in_progress" : manifest?.setupStatus ?? "legacy";
+  const setupStatus = manifest?.setupStatus ?? "in_progress";
   const referenceRoot = path.join(packRoot, "skills/product-design/references");
   const referenceCount = await countMarkdown(referenceRoot);
-  const decisionCount = await countDecisionFiles(packRoot);
   const fixtureCounts = {
     conformance: (await listFixturesAt(packRoot, "conformance")).length,
     expression: (await listFixturesAt(packRoot, "expression")).length
@@ -36999,30 +36922,14 @@ async function inspectPack(repositoryPath2) {
     },
     entrySkillAvailable: await resolvePackFile(packRoot, ENTRY_SKILL).then(() => true).catch(() => false),
     referenceCount,
-    decisionCount,
     layout: await packLayout(packRoot),
-    supportedModesDeprecated: manifest?.supportedModes !== void 0,
     fixtureCounts,
     validation: await validatePackAt(packRoot)
   };
 }
 async function packLayout(packRoot) {
-  const hasDecisions = await exists(path.join(packRoot, "skills/product-design/references/decisions/README.md"));
-  const hasLegacy = await exists(path.join(packRoot, "skills/product-design/references/conformance/README.md")) && await exists(path.join(packRoot, "skills/product-design/references/expression/README.md"));
-  if (hasDecisions && hasLegacy) return "mixed";
-  if (hasDecisions) return "shared";
-  if (hasLegacy) return "legacy-split";
   const hasBase = await Promise.all(["README.md", "manifest.json", ENTRY_SKILL].map((relative) => exists(path.join(packRoot, relative))));
   return hasBase.every(Boolean) ? "product-specific" : "incomplete";
-}
-async function countDecisionFiles(packRoot) {
-  const directory = path.join(packRoot, "skills/product-design/references/decisions");
-  try {
-    const entries = await readdir(directory, { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".md") && entry.name !== "README.md").length;
-  } catch {
-    return 0;
-  }
 }
 async function countMarkdown(directory) {
   try {
@@ -37046,10 +36953,7 @@ async function exists(filePath) {
     return false;
   }
 }
-var DECISIONS_HOME = "skills/product-design/references/decisions/README.md";
-var LEGACY_CONFORMANCE_HOME = "skills/product-design/references/conformance/README.md";
-var LEGACY_EXPRESSION_HOME = "skills/product-design/references/expression/README.md";
-var SETUP_STATUSES = ["in_progress", "usable_partial", "complete", "incomplete"];
+var SETUP_STATUSES = ["in_progress", "usable_partial", "complete"];
 var COVERAGE_STATUSES = ["source_reviewed", "rendered", "blocked", "not_inspected"];
 var EVIDENCE_TYPES = ["source_reviewed", "rendered", "design_reference", "inference"];
 function isObjectRecord(value) {
@@ -37161,9 +37065,6 @@ async function validatePackAt(packRoot) {
     const state = await readablePackFile(packRoot, relative, issues);
     if (state === "missing") issues.push({ path: relative, message: "Required Pack file is missing or unreadable." });
   }
-  await readablePackFile(packRoot, DECISIONS_HOME, issues);
-  await readablePackFile(packRoot, LEGACY_CONFORMANCE_HOME, issues);
-  await readablePackFile(packRoot, LEGACY_EXPRESSION_HOME, issues);
   let manifest;
   try {
     const manifestPath = await resolvePackFile(packRoot, "manifest.json");
@@ -37173,22 +37074,25 @@ async function validatePackAt(packRoot) {
   }
   if (manifest && typeof manifest === "object") {
     const record2 = manifest;
+    const allowedManifestFields = /* @__PURE__ */ new Set(["name", "version", "surfaces", "setupStatus", "setupPolicy", "setupScope", "coverage"]);
+    for (const key of Object.keys(record2)) {
+      if (!allowedManifestFields.has(key)) issues.push({ path: "manifest.json", message: `Unsupported manifest field: ${key}.` });
+    }
     if (typeof record2.name !== "string" || record2.name.trim().length === 0) {
       issues.push({ path: "manifest.json", message: "name must be a non-empty string." });
     }
     if (typeof record2.version !== "string" || record2.version.trim().length === 0) {
       issues.push({ path: "manifest.json", message: "version must be a non-empty string." });
     }
-    if (record2.supportedModes !== void 0 && (!Array.isArray(record2.supportedModes) || !record2.supportedModes.every((item) => typeof item === "string"))) {
-      issues.push({ path: "manifest.json", message: "supportedModes is deprecated and ignored. Remove it, or keep it as an array of strings." });
-    }
     if (record2.surfaces !== void 0 && (!Array.isArray(record2.surfaces) || !record2.surfaces.every((item) => typeof item === "string"))) {
       issues.push({ path: "manifest.json", message: "surfaces must be an array of strings when present." });
     }
-    if (record2.setupStatus !== void 0 && !SETUP_STATUSES.includes(record2.setupStatus)) {
-      issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete. Legacy incomplete remains readable." });
+    if (record2.setupStatus === void 0) {
+      issues.push({ path: "manifest.json", message: "setupStatus is required and must be in_progress, usable_partial, or complete." });
+    } else if (!SETUP_STATUSES.includes(record2.setupStatus)) {
+      issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete." });
     }
-    const setupStatus = record2.setupStatus === "incomplete" ? "in_progress" : record2.setupStatus;
+    const setupStatus = record2.setupStatus;
     let minimumUsableEvidence = "source_reviewed";
     if (record2.setupPolicy !== void 0) {
       if (!isObjectRecord(record2.setupPolicy) || record2.setupPolicy.minimumUsableEvidence !== "source_reviewed" && record2.setupPolicy.minimumUsableEvidence !== "rendered_flow" || Object.keys(record2.setupPolicy).some((key) => key !== "minimumUsableEvidence")) {
@@ -37235,12 +37139,9 @@ async function validatePackAt(packRoot) {
       };
       const readme = await readOptional("README.md");
       const entry = await readOptional(ENTRY_SKILL);
-      if (/Setup status:\s*\*\*(?:incomplete|in_progress)\*\*/i.test(readme) || /This starter is incomplete/i.test(entry)) {
+      if (/Setup status:\s*\*\*in_progress\*\*/i.test(readme) || /This starter is not product guidance/i.test(entry)) {
         issues.push({ path: "manifest.json", message: "Pack still contains starter boilerplate. Replace it with scoped, repository-specific guidance before marking it usable_partial or complete." });
       }
-    }
-    if (record2.decisionPromotionCheckpoint !== void 0 && (typeof record2.decisionPromotionCheckpoint !== "string" || record2.decisionPromotionCheckpoint.trim().length === 0 || record2.decisionPromotionCheckpoint.length > 500)) {
-      issues.push({ path: "manifest.json", message: "decisionPromotionCheckpoint must be a non-empty string of at most 500 characters when present." });
     }
   }
   try {
@@ -37261,7 +37162,7 @@ async function validatePack(repositoryPath2) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
   return validatePackAt(packRoot);
 }
-async function initializePack(repositoryPath2, productName, surfaces = [], decisionPromotionCheckpoint, setupPolicy = { minimumUsableEvidence: "source_reviewed" }) {
+async function initializePack(repositoryPath2, productName, surfaces = [], setupPolicy = { minimumUsableEvidence: "source_reviewed" }) {
   const repositoryRoot = await resolveRepositoryRoot(repositoryPath2);
   const packRoot = path.join(repositoryRoot, PACK_DIRECTORY);
   try {
@@ -37270,7 +37171,7 @@ async function initializePack(repositoryPath2, productName, surfaces = [], decis
   } catch (error62) {
     if (error62 instanceof TasteError) throw error62;
   }
-  const files = createStarterPackFiles(productName, surfaces, decisionPromotionCheckpoint, setupPolicy);
+  const files = createStarterPackFiles(productName, surfaces, setupPolicy);
   await mkdir(packRoot, { recursive: false });
   try {
     for (const file2 of files) {
@@ -37303,8 +37204,8 @@ async function readFilesRecursively(directory, root, accumulator, bytes) {
     accumulator.push({ path: path.relative(root, entryPath).split(path.sep).join("/"), content: file2.toString("utf8") });
   }
 }
-async function listFixturesAt(packRoot, mode2) {
-  const directory = path.join(packRoot, "evals", mode2, "fixtures");
+async function listFixturesAt(packRoot, mode) {
+  const directory = path.join(packRoot, "evals", mode, "fixtures");
   try {
     const resolved = await realpath(directory);
     if (!isWithin(packRoot, resolved)) return [];
@@ -37314,12 +37215,12 @@ async function listFixturesAt(packRoot, mode2) {
     return [];
   }
 }
-async function fixtureRoot(repositoryPath2, mode2, fixtureId) {
+async function fixtureRoot(repositoryPath2, mode, fixtureId) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(fixtureId)) {
     throw new TasteError("fixtureId may contain letters, numbers, dots, underscores, and hyphens.", "invalid_fixture_id");
   }
   const { packRoot } = await resolvePackRoot(repositoryPath2);
-  const base = path.join(packRoot, "evals", mode2, "fixtures");
+  const base = path.join(packRoot, "evals", mode, "fixtures");
   const candidate = path.join(base, fixtureId);
   let resolved;
   try {
@@ -37328,17 +37229,17 @@ async function fixtureRoot(repositoryPath2, mode2, fixtureId) {
     resolved = await realpath(candidate);
   } catch (error62) {
     if (error62 instanceof TasteError) throw error62;
-    throw new TasteError(`Fixture not found: ${mode2}/${fixtureId}`, "fixture_not_found");
+    throw new TasteError(`Fixture not found: ${mode}/${fixtureId}`, "fixture_not_found");
   }
   if (!isWithin(base, resolved)) throw new TasteError("Fixture resolves outside the Pack.", "pack_path_escape");
   return resolved;
 }
-async function listEvaluationFixtures(repositoryPath2, mode2) {
+async function listEvaluationFixtures(repositoryPath2, taskApproach) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
-  return listFixturesAt(packRoot, mode2);
+  return listFixturesAt(packRoot, taskApproach);
 }
-async function getEvaluationGeneratorCase(repositoryPath2, mode2, fixtureId) {
-  const root = await fixtureRoot(repositoryPath2, mode2, fixtureId);
+async function getEvaluationGeneratorCase(repositoryPath2, mode, fixtureId) {
+  const root = await fixtureRoot(repositoryPath2, mode, fixtureId);
   let task;
   try {
     task = await readFile(await resolveFileWithin(root, "task.md"), "utf8");
@@ -37351,9 +37252,9 @@ async function getEvaluationGeneratorCase(repositoryPath2, mode2, fixtureId) {
   const files = [];
   await readFilesRecursively(beforeRoot, beforeRoot, files, { total: 0 });
   if (files.length === 0) throw new TasteError("Fixture before/ directory is empty.", "invalid_fixture");
-  return { mode: mode2, fixtureId, task, before: files };
+  return { mode, fixtureId, task, before: files };
 }
-async function getEvaluationJudgePacket(repositoryPath2, mode2, fixtureId, generatedOutput = []) {
+async function getEvaluationJudgePacket(repositoryPath2, mode, fixtureId, generatedOutput = []) {
   if (generatedOutput.length > MAX_EVAL_FILES) throw new TasteError(`Generated output cannot exceed ${MAX_EVAL_FILES} files.`, "eval_too_many_files");
   let generatedBytes = 0;
   for (const file2 of generatedOutput) {
@@ -37362,7 +37263,7 @@ async function getEvaluationJudgePacket(repositoryPath2, mode2, fixtureId, gener
   }
   if (generatedBytes > MAX_EVAL_BYTES) throw new TasteError(`Generated output cannot exceed ${MAX_EVAL_BYTES} bytes.`, "eval_too_large");
   const { packRoot } = await resolvePackRoot(repositoryPath2);
-  const root = await fixtureRoot(repositoryPath2, mode2, fixtureId);
+  const root = await fixtureRoot(repositoryPath2, mode, fixtureId);
   let task;
   let rubric;
   try {
@@ -37377,359 +37278,11 @@ async function getEvaluationJudgePacket(repositoryPath2, mode2, fixtureId, gener
   const expectedAfter = [];
   await readFilesRecursively(afterRoot, afterRoot, expectedAfter, { total: 0 });
   if (expectedAfter.length === 0) throw new TasteError("Fixture after/ directory is empty.", "invalid_fixture");
-  return { mode: mode2, fixtureId, task, rubric, generatedOutput, expectedAfter };
-}
-
-// src/core/signals.ts
-var DECISION_DIRECTORY = "skills/product-design/references/decisions";
-var STATUSES = /* @__PURE__ */ new Set(["proposed", "accepted", "rejected"]);
-var TRIGGERS = /* @__PURE__ */ new Set(["interview", "sweep", "gap", "rejected_pass"]);
-var EMPTY_NOTE = "_None recorded._";
-var NO_GAP_NOTE = "None recorded.";
-function decisionPath(id) {
-  return `${DECISION_DIRECTORY}/${assertDecisionId(id)}.md`;
-}
-function assertDecisionId(id) {
-  if (!/^[a-z0-9][a-z0-9-]{0,80}$/.test(id)) {
-    throw new TasteError("Decision id must be a lowercase slug (letters, numbers, hyphens).", "invalid_decision_id");
-  }
-  return id;
-}
-function deriveDecisionActivity(decision) {
-  if (decision.coverageGap) return { activity: "expression", reason: "coverage_gap" };
-  if (decision.status === "rejected") return { activity: "expression", reason: "rejected" };
-  if (decision.status === "proposed") return { activity: "expression", reason: "proposed" };
-  if (!decision.promotionEvidenceComplete) return { activity: "expression", reason: "promotion_evidence_missing" };
-  if (!decision.shipped) return { activity: "expression", reason: "accepted_not_shipped" };
-  return { activity: "conformance", reason: "accepted_shipped" };
-}
-function renderDecision(input2) {
-  const id = assertDecisionId(input2.id);
-  const title = oneLine(input2.title, "title");
-  const scope = oneLine(input2.scope?.trim() || "unscoped", "scope");
-  const statement = input2.statement.trim();
-  if (!statement) throw new TasteError("Decision statement is required.", "invalid_decision");
-  validatePromotionEvidence(input2);
-  const shippedEvidence = (input2.shippedEvidence ?? []).map((item) => item.trim()).filter(Boolean);
-  const coverageGap = input2.coverageGap ?? false;
-  if (coverageGap) throw new TasteError("Resolve the coverage gap before writing a Decision to the Pack.", "promotion_incomplete");
-  const lines = [
-    "---",
-    `id: ${id}`,
-    `title: ${yamlScalar(title)}`,
-    `status: ${input2.status}`,
-    `trigger: ${input2.trigger}`,
-    `scope: ${yamlScalar(scope)}`,
-    `coverage_gap: ${coverageGap ? "true" : "false"}`,
-    `shipped: ${shippedEvidence.length > 0 ? "true" : "false"}`,
-    `validated_artifact: ${yamlScalar(input2.validatedArtifact.trim())}`,
-    `user_approved_artifact: ${yamlScalar(input2.userApprovedArtifact.trim())}`,
-    "---",
-    "",
-    `# ${title}`,
-    "",
-    "## Statement",
-    "",
-    statement,
-    "",
-    "## Rationale",
-    "",
-    input2.rationale?.trim() || "_None recorded._",
-    "",
-    "## Shipped evidence",
-    "",
-    shippedEvidence.length > 0 ? shippedEvidence.map((item) => `- ${item}`).join("\n") : "- none",
-    "",
-    "## Validation evidence",
-    "",
-    input2.validationEvidence.map((item) => `- ${item.trim()}`).join("\n"),
-    "",
-    "## User approval evidence",
-    "",
-    input2.userApprovalEvidence.trim(),
-    "",
-    "## Coverage gap",
-    "",
-    coverageGap ? input2.coverageGapNote?.trim() || "Gap recorded. The Pack cannot justify the next step for this part." : "None recorded.",
-    "",
-    "## Known flaws",
-    "",
-    input2.knownFlaws?.trim() || "_None recorded._",
-    "",
-    "## Alternatives",
-    "",
-    input2.alternatives?.trim() || "_None recorded._",
-    ""
-  ];
-  return lines.join("\n");
-}
-function parseDecision(file2) {
-  const idFromPath = file2.path.split("/").pop()?.replace(/\.md$/, "") ?? file2.path;
-  const frontmatter = file2.content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
-  if (!frontmatter) return { path: file2.path, id: idFromPath, parsed: false, reason: "unparsed" };
-  const fields = parseFrontmatter(frontmatter[1]);
-  const status = fields.status;
-  const trigger = fields.trigger;
-  const coverageGap = booleanField(fields.coverage_gap);
-  if (!fields.id || !STATUSES.has(status) || !TRIGGERS.has(trigger) || !fields.scope || coverageGap === void 0) {
-    return { path: file2.path, id: fields.id || idFromPath, parsed: false, reason: "unparsed" };
-  }
-  const body = file2.content.slice(frontmatter[0].length);
-  const sections = sectionMap(body);
-  const validatedArtifact = meaningful(fields.validated_artifact, ["none"]);
-  const userApprovedArtifact = meaningful(fields.user_approved_artifact, ["none"]);
-  const validationEvidence = parseEvidence(sections["Validation evidence"]);
-  const userApprovalEvidence = meaningful(sections["User approval evidence"], [EMPTY_NOTE]);
-  const promotionEvidenceComplete = Boolean(
-    validatedArtifact && validatedArtifact === userApprovedArtifact && validationEvidence.length > 0 && userApprovalEvidence
-  );
-  return {
-    path: file2.path,
-    id: fields.id,
-    title: fields.title || fields.id,
-    status,
-    trigger,
-    scope: fields.scope,
-    coverageGap,
-    shipped: fields.shipped === "true",
-    promotionEvidenceComplete,
-    parsed: true
-  };
-}
-async function recordSignal(repositoryPath2, input2) {
-  validatePromotionEvidence(input2);
-  if (input2.status !== "accepted") {
-    throw new TasteError("Taste only records finalized, user-approved Decisions. Keep drafts and rejected iterations in the host's active task context.", "promotion_incomplete");
-  }
-  if (input2.coverageGap === true) {
-    throw new TasteError("Resolve the coverage gap before writing a Decision to the Pack.", "promotion_incomplete");
-  }
-  const existing = await loadExistingDecision(repositoryPath2, input2.id);
-  const content = renderDecision(mergeSignal(existing, input2));
-  const written = await writeDecisionFile(repositoryPath2, decisionPath(input2.id), content);
-  const parsed = parseDecision(written);
-  if (!parsed.parsed) {
-    return { path: written.path, activity: "expression", reason: "unparsed", content: written.content };
-  }
-  const derived2 = deriveDecisionActivity(parsed);
-  return { path: written.path, activity: derived2.activity, reason: derived2.reason, content: written.content };
-}
-async function readPartState(repositoryPath2, scope, taskIntent) {
-  const files = await listPackMarkdown(repositoryPath2, DECISION_DIRECTORY);
-  const wanted = scope?.trim();
-  const decisions = [];
-  for (const file2 of files) {
-    const parsed = parseDecision(file2);
-    if (!parsed.parsed) {
-      if (wanted && parsed.id !== wanted) continue;
-      decisions.push({
-        id: parsed.id,
-        path: parsed.path,
-        scope: "unscoped",
-        activity: "expression",
-        reason: "unparsed"
-      });
-      continue;
-    }
-    if (wanted && parsed.scope !== wanted && parsed.id !== wanted) continue;
-    const derived2 = deriveDecisionActivity(parsed);
-    decisions.push({
-      id: parsed.id,
-      path: parsed.path,
-      scope: parsed.scope,
-      activity: derived2.activity,
-      reason: derived2.reason,
-      status: parsed.status,
-      trigger: parsed.trigger,
-      shipped: parsed.shipped,
-      promotionEvidenceComplete: parsed.promotionEvidenceComplete,
-      coverageGap: parsed.coverageGap
-    });
-  }
-  if (decisions.length === 0) {
-    return {
-      decisions: [],
-      scopes: [{ scope: wanted || "(pack)", activity: "expression", reason: "no_decisions", decisionIds: [] }],
-      anyPartNeedsExpression: true,
-      ...taskIntent ? { taskRouting: expressionTaskRouting(wanted, taskIntent) } : {},
-      note: "No structured Decision matches. Expression applies for that part until a Decision has complete matching validation and user-approval evidence, shipped evidence, and no coverage gap. The host owns the workflow; this report only derives part activity."
-    };
-  }
-  const byScope = /* @__PURE__ */ new Map();
-  for (const decision of decisions) {
-    const group = byScope.get(decision.scope) ?? [];
-    group.push(decision);
-    byScope.set(decision.scope, group);
-  }
-  const scopes = [...byScope.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([part, group]) => {
-    const blocking = group.find((decision) => decision.activity === "expression");
-    return {
-      scope: part,
-      activity: blocking ? "expression" : "conformance",
-      reason: blocking?.reason ?? "accepted_shipped",
-      decisionIds: group.map((decision) => decision.id)
-    };
-  });
-  return {
-    decisions,
-    scopes,
-    anyPartNeedsExpression: scopes.some((part) => part.activity === "expression"),
-    ...taskIntent ? { taskRouting: expressionTaskRouting(wanted, taskIntent) } : {},
-    note: "Per-part activity only. The Pack does not flip as a whole. An early positive reaction nudges the host to continue its workflow; it does not promote a Decision. The host owns checks, readiness, user review, and push."
-  };
-}
-function expressionTaskRouting(scope, intent) {
-  if (intent === "apply_existing" || intent === "inspect_only") return void 0;
-  const detail = {
-    new_direction: "The current task asks for a new direction, so use Expression for this task even if the Pack contains Conformance Decisions.",
-    correction: "The current task corrects existing UI or product guidance, so use Expression for this task even if the Pack contains Conformance Decisions.",
-    gap: "The current task identifies a gap in the existing guidance, so use Expression for this task.",
-    greenfield: "The current task is creating a new part, so use Expression for this task.",
-    unclear: "The request does not clearly indicate whether to apply or change existing guidance. Stay in Expression while the host clarifies the intended direction."
-  };
-  return {
-    scope: scope ?? "(current task scope not specified)",
-    activity: "expression",
-    intent,
-    note: detail[intent]
-  };
-}
-function booleanField(value) {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return void 0;
-}
-function mergeSignal(existing, input2) {
-  if (!existing) return input2;
-  let coverageGap = input2.coverageGap;
-  if (coverageGap === void 0) {
-    if (existing.coverageGap === void 0) {
-      throw new TasteError(
-        "Existing Decision has a missing or invalid coverage_gap. Provide coverageGap explicitly before updating it.",
-        "invalid_decision"
-      );
-    }
-    coverageGap = existing.coverageGap;
-  }
-  const artifactChanged = existing.validatedArtifact !== input2.validatedArtifact.trim();
-  return {
-    id: input2.id,
-    title: input2.title,
-    statement: input2.statement,
-    status: input2.status,
-    trigger: input2.trigger,
-    rationale: input2.rationale !== void 0 ? input2.rationale : existing.rationale,
-    scope: input2.scope !== void 0 ? input2.scope : existing.scope,
-    validatedArtifact: input2.validatedArtifact,
-    validationEvidence: input2.validationEvidence,
-    userApprovedArtifact: input2.userApprovedArtifact,
-    userApprovalEvidence: input2.userApprovalEvidence,
-    shippedEvidence: input2.shippedEvidence !== void 0 ? input2.shippedEvidence : artifactChanged ? [] : existing.shippedEvidence,
-    coverageGap,
-    coverageGapNote: input2.coverageGapNote !== void 0 ? input2.coverageGapNote : existing.coverageGapNote,
-    knownFlaws: input2.knownFlaws !== void 0 ? input2.knownFlaws : existing.knownFlaws,
-    alternatives: input2.alternatives !== void 0 ? input2.alternatives : existing.alternatives
-  };
-}
-async function loadExistingDecision(repositoryPath2, id) {
-  try {
-    const file2 = await readPackFile(repositoryPath2, decisionPath(id));
-    return parseExistingDecision(file2.content);
-  } catch (error62) {
-    if (error62 instanceof TasteError && error62.code === "pack_file_not_found") return null;
-    throw error62;
-  }
-}
-function parseExistingDecision(content) {
-  const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
-  const fields = frontmatter ? parseFrontmatter(frontmatter[1]) : {};
-  const body = frontmatter ? content.slice(frontmatter[0].length) : content;
-  const sections = sectionMap(body);
-  return {
-    scope: fields.scope,
-    validatedArtifact: meaningful(fields.validated_artifact, ["none"]),
-    coverageGap: booleanField(fields.coverage_gap),
-    statement: meaningful(sections.Statement, []),
-    rationale: meaningful(sections.Rationale, [EMPTY_NOTE]),
-    shippedEvidence: parseEvidence(sections["Shipped evidence"]),
-    coverageGapNote: meaningful(sections["Coverage gap"], [NO_GAP_NOTE]),
-    knownFlaws: meaningful(sections["Known flaws"], [EMPTY_NOTE]),
-    alternatives: meaningful(sections.Alternatives, [EMPTY_NOTE])
-  };
-}
-function sectionMap(body) {
-  const sections = {};
-  for (const part of body.split(/^## /m)) {
-    const newline = part.indexOf("\n");
-    if (newline === -1) continue;
-    const name = part.slice(0, newline).trim();
-    sections[name] = part.slice(newline + 1).trim();
-  }
-  return sections;
-}
-function parseEvidence(section) {
-  if (!section) return [];
-  const items = section.split("\n").map((line) => line.trim()).filter((line) => line.startsWith("- ")).map((line) => line.slice(2).trim()).filter(Boolean);
-  if (items.length === 1 && items[0] === "none") return [];
-  return items;
-}
-function meaningful(text, placeholders) {
-  const trimmed = text?.trim();
-  if (!trimmed || placeholders.includes(trimmed)) return void 0;
-  return trimmed;
-}
-function oneLine(value, label) {
-  return boundedLine(value, label, 200);
-}
-function boundedLine(value, label, maxLength) {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > maxLength || /[\r\n]/.test(trimmed)) {
-    throw new TasteError(`${label} must be a single line of 1\u2013${maxLength} characters.`, "invalid_decision");
-  }
-  return trimmed;
-}
-function validatePromotionEvidence(input2) {
-  const artifact = boundedLine(input2.validatedArtifact, "validatedArtifact", 1e3);
-  const approvedArtifact = boundedLine(input2.userApprovedArtifact, "userApprovedArtifact", 1e3);
-  if (artifact !== approvedArtifact) {
-    throw new TasteError("User approval must refer to the exact validated artifact being recorded.", "promotion_incomplete");
-  }
-  if (!input2.validationEvidence.length || input2.validationEvidence.length > 30) {
-    throw new TasteError("At least one host-reported validation result is required before recording a Decision.", "promotion_incomplete");
-  }
-  for (const [index, evidence] of input2.validationEvidence.entries()) {
-    boundedLine(evidence, `validationEvidence[${index}]`, 1e3);
-  }
-  boundedLine(input2.userApprovalEvidence, "userApprovalEvidence", 1e3);
-  if (input2.status !== "accepted") {
-    throw new TasteError("Only accepted Decisions can be added to the Pack. Keep unapproved drafts and rejected iterations in the host's active task context.", "promotion_incomplete");
-  }
-}
-function yamlScalar(value) {
-  if (/[:#"'&*!|>%@`[\],{}]/.test(value) || value !== value.trim()) {
-    return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
-  }
-  return value;
-}
-function parseFrontmatter(block) {
-  const fields = {};
-  for (const line of block.split("\n")) {
-    const match = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
-    if (!match) continue;
-    fields[match[1]] = unquote(match[2].trim());
-  }
-  return fields;
-}
-function unquote(value) {
-  if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
-    return value.slice(1, -1).replaceAll('\\"', '"').replaceAll("\\\\", "\\");
-  }
-  return value;
+  return { mode, fixtureId, task, rubric, generatedOutput, expectedAfter };
 }
 
 // src/server.ts
 var repositoryPath = external_exports.string().min(1).describe("Absolute path to the target product repository, obtained from the host harness.");
-var mode = external_exports.enum(["conformance", "expression"]);
 function success2(data) {
   return {
     content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
@@ -37760,46 +37313,29 @@ function createTasteServer() {
   const server2 = new McpServer(
     { name: "taste", version: "0.1.0" },
     {
-      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill, reference, and checklist. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not persistent Pack modes. Use taste_part_state only for legacy structured Decision compatibility or diagnostics; it is not the normal routing authority for checklist-based Packs."
+      instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill, reference, and checklist. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes."
     }
-  );
-  server2.registerTool(
-    "taste_mode_resolve",
-    {
-      title: "Resolve the selected Taste mode",
-      description: "Deprecated legacy helper. Maps an already-interpreted signal to Conformance or Expression. It does not read the Pack or route normal task-and-surface work. Checklist-based UI routing belongs to the host and product Skill; Taste does not classify raw user language.",
-      inputSchema: {
-        currentMode: mode.optional().describe("Current task-local mode, if one has already been selected."),
-        trigger: external_exports.enum(["explicit_mode", "established_direction", "new_direction", "direction_accepted", "unclear"]),
-        explicitMode: mode.optional().describe("Required when trigger is explicit_mode."),
-        userConfirmed: external_exports.boolean().optional().describe("Whether the user explicitly accepted the proposed direction as product guidance."),
-        rationale: external_exports.string().max(2e3).describe("The coding agent's short rationale, based on the product Skill and conversation context.")
-      },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
-    },
-    async (input2) => toolResult("taste_mode_resolve", () => resolveTasteMode(input2))
   );
   server2.registerTool(
     "taste_pack_initialize",
     {
       title: "Initialize a Taste Pack",
-      description: "Create a non-overwriting Taste Pack shell only during explicitly invoked /taste-setup, after repository inventory confirms user-facing product UI or UI source. Do not initialize if no product UI or UI source exists. Source-only inspection may yield useful cited guidance and setupStatus=usable_partial under the default source_reviewed policy, with visual behavior labeled unverified; rendered_flow requires a rendered representative journey. New Packs default to setupStatus=in_progress and setupPolicy.minimumUsableEvidence=source_reviewed. Setup status is in_progress, usable_partial, or complete; coverage remains recorded separately per app/surface/journey. Continue across accessible apps when one journey is blocked. Routine UI work must not start setup or create a missing Pack. Setup never edits product UI, AGENTS.md, or harness configuration.",
+      description: "Create a non-overwriting Taste Pack shell. Use during explicitly invoked /taste-setup after repository inventory, or during normal UI work only after resolved user feedback establishes a clear reusable lesson for a specific surface. In the feedback case, immediately replace starter text with cited, surface-scoped guidance, mark only that coverage usable_partial, and validate; do not sweep unrelated apps or routes. Do not initialize if no product UI or UI source exists. Source-only inspection may yield useful cited guidance under the default source_reviewed policy, with visual behavior labeled unverified; rendered_flow requires a rendered representative journey. New Packs default to setupStatus=in_progress and setupPolicy.minimumUsableEvidence=source_reviewed. Coverage is recorded separately per app/surface/journey. Broader setup remains explicit and never edits product UI, AGENTS.md, or harness configuration.",
       inputSchema: {
         repositoryPath,
-        productName: external_exports.string().min(2).max(120).describe("Product name for the starter Pack."),
-        surfaces: external_exports.array(external_exports.string().min(1).max(100)).max(30).optional().describe("Unconfirmed surface hints only; the host must independently inventory the repository and confirm scope."),
-        decisionPromotionCheckpoint: external_exports.string().trim().min(1).max(500).optional().describe("Legacy reminder text for hosts that still use structured Decision promotion. Routine checklist learning from product setup and conversation does not require this checkpoint."),
+        productName: external_exports.string().min(2).max(120).describe("Product name for the Pack."),
+        surfaces: external_exports.array(external_exports.string().min(1).max(100)).max(30).optional().describe("Scope hints from repository inventory or the active UI task. For a feedback-created Pack, include only the affected surface."),
         setupPolicy: external_exports.object({ minimumUsableEvidence: external_exports.enum(["source_reviewed", "rendered_flow"]) }).optional().describe("Per-repository minimum bar for usable_partial. Defaults to source_reviewed; rendered_flow requires a representative journey in the running product.")
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
-    async ({ repositoryPath: root, productName, surfaces, decisionPromotionCheckpoint, setupPolicy }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, decisionPromotionCheckpoint, setupPolicy))
+    async ({ repositoryPath: root, productName, surfaces, setupPolicy }) => toolResult("taste_pack_initialize", async () => initializePack(root, productName, surfaces, setupPolicy))
   );
   server2.registerTool(
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts and target progress, legacy layout, decisions, references, fixtures, and validation. Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Legacy incomplete maps to in_progress, and Packs without a setupStatus are reported as legacy. Reads only taste/.",
+      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts and target progress, references, fixtures, and validation. Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Reads only taste/.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
@@ -37822,7 +37358,7 @@ function createTasteServer() {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack, or structured Decision files under skills/product-design/references/decisions/. Use for explicit Pack setup/maintenance, and for a resolved reusable checklist lesson from normal UI work when a complete Pack already exists. Do not use normal UI work to create a missing Pack or refresh setup. The host self-checks checklist learning in the same task; no separate review or promotion approval is required. taste_record_signal is retained for legacy structured Decision records.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. When creating a missing Pack from feedback, write only the affected surface's cited guidance and coverage metadata; do not start a sweep. The host applies and self-checks the lesson in the same task; no separate review or approval is required.",
       inputSchema: {
         repositoryPath,
         path: external_exports.string().min(1).max(300).describe("Pack-relative destination path."),
@@ -37836,62 +37372,21 @@ function createTasteServer() {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check Pack structure: manifest, entry Skill, shared facts, authority, rubric, and either a decisions/ home or the legacy conformance plus expression reference READMEs. Does not require supportedModes. Structural validation only, not a quality judgment.",
+      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Product references and metadata are optional. Structural validation only, not a quality judgment.",
       inputSchema: { repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
     async ({ repositoryPath: root }) => toolResult("taste_pack_validate", async () => validatePack(root))
   );
   server2.registerTool(
-    "taste_record_signal",
-    {
-      title: "Record a Taste Decision",
-      description: "Legacy structured Decision write path. Routine product learning from user corrections, rejected directions, and resolved design disagreements belongs in scoped checklist files written with taste_pack_write; do not route it through a separate Decision promotion or approval step. The legacy schema still requires matching validation and user-approval evidence. Use it only to maintain an existing structured Decision record, not as the default learning path. Taste stores supplied reports; it does not run or judge checks, observe conversations, or push. Same id updates the legacy Decision in place; a new artifact clears prior shipped evidence unless new shipped evidence is supplied.",
-      inputSchema: {
-        repositoryPath,
-        id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,80}$/).describe("Stable decision slug. Reuse it to update the same signal."),
-        title: external_exports.string().min(1).max(200),
-        statement: external_exports.string().min(1).max(8e3).describe("The judgment, in the user's terms."),
-        rationale: external_exports.string().max(8e3).optional(),
-        scope: external_exports.string().min(1).max(200).optional().describe("Part this Decision belongs to, such as a surface or feature. Defaults to unscoped."),
-        status: external_exports.literal("accepted").describe("Record only after the user approves the tested artifact; that approval authorizes recording the derived reusable Decision."),
-        trigger: external_exports.enum(["interview", "sweep", "gap", "rejected_pass"]),
-        validatedArtifact: external_exports.string().trim().min(1).max(1e3).describe("Stable reference to the exact final artifact the host's workflow validated, such as a commit, release candidate, or inspected deployed version."),
-        validationEvidence: external_exports.array(external_exports.string().trim().min(1).max(1e3)).min(1).max(30).describe("Host-reported results and evidence for relevant product-specific checks. The host chooses these; Taste does not run or judge them."),
-        userApprovedArtifact: external_exports.string().trim().min(1).max(1e3).describe("Must identify the same final artifact as validatedArtifact."),
-        userApprovalEvidence: external_exports.string().trim().min(1).max(1e3).describe("Brief host-reported evidence that the user approved this exact tested artifact."),
-        shippedEvidence: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("References to shipped UI actually inspected. Empty means not shipped."),
-        coverageGap: external_exports.literal(false).default(false).describe("An unresolved coverage gap cannot be promoted to the Pack."),
-        knownFlaws: external_exports.string().max(4e3).optional(),
-        alternatives: external_exports.string().max(4e3).optional()
-      },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
-    },
-    async (input2) => toolResult("taste_record_signal", async () => recordSignal(input2.repositoryPath, input2))
-  );
-  server2.registerTool(
-    "taste_part_state",
-    {
-      title: "Inspect legacy Taste Decision state",
-      description: "Legacy compatibility and diagnostics only. Reports derived activity for structured Decision records and optionally accepts the caller's interpreted taskIntent for legacy taskRouting output. Do not use this tool to route checklist-based Packs; the host routes from the current task and affected surface. It does not read conversation text, run checks, write a mode field, or change the Pack.",
-      inputSchema: {
-        repositoryPath,
-        scope: external_exports.string().min(1).max(200).optional().describe("Optional part name or decision id to filter."),
-        taskIntent: external_exports.enum(["apply_existing", "new_direction", "correction", "gap", "greenfield", "unclear", "inspect_only"]).optional().describe("Optional legacy diagnostic context. Omit for Pack inspection. This does not route normal checklist-based UI tasks.")
-      },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
-    },
-    async ({ repositoryPath: root, scope, taskIntent }) => toolResult("taste_part_state", async () => readPartState(root, scope, taskIntent))
-  );
-  server2.registerTool(
     "taste_eval_list_fixtures",
     {
       title: "List Taste evaluation fixtures",
-      description: "List fixture IDs for one mode without exposing before or expected-after states.",
-      inputSchema: { repositoryPath, mode },
+      description: "List fixture IDs for one task approach without exposing before or expected-after states.",
+      inputSchema: { repositoryPath, taskApproach: external_exports.enum(["conformance", "expression"]) },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, mode: selectedMode }) => toolResult("taste_eval_list_fixtures", async () => ({ mode: selectedMode, fixtureIds: await listEvaluationFixtures(root, selectedMode) }))
+    async ({ repositoryPath: root, taskApproach }) => toolResult("taste_eval_list_fixtures", async () => ({ taskApproach, fixtureIds: await listEvaluationFixtures(root, taskApproach) }))
   );
   server2.registerTool(
     "taste_eval_get_generator_case",
@@ -37900,12 +37395,12 @@ function createTasteServer() {
       description: "Return the task and before/ state for one evaluation fixture. Never returns expected-after files or the Rubric. Use for the generator arm only.",
       inputSchema: {
         repositoryPath,
-        mode,
+        taskApproach: external_exports.enum(["conformance", "expression"]),
         fixtureId: external_exports.string().min(1).max(100)
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, mode: selectedMode, fixtureId }) => toolResult("taste_eval_get_generator_case", async () => getEvaluationGeneratorCase(root, selectedMode, fixtureId))
+    async ({ repositoryPath: root, taskApproach: selectedMode, fixtureId }) => toolResult("taste_eval_get_generator_case", async () => getEvaluationGeneratorCase(root, selectedMode, fixtureId))
   );
   server2.registerTool(
     "taste_eval_get_judge_packet",
@@ -37914,7 +37409,7 @@ function createTasteServer() {
       description: "Return the task, one completed generator output, expected-after state, and product Rubric for a Judge pass. Call only after the generator run is complete and from the harness's higher-capacity Eval Judge subagent in a fresh context. This is context separation by workflow, not an access-control boundary.",
       inputSchema: {
         repositoryPath,
-        mode,
+        taskApproach: external_exports.enum(["conformance", "expression"]),
         fixtureId: external_exports.string().min(1).max(100),
         generatedOutput: external_exports.array(external_exports.object({
           path: external_exports.string().min(1).max(300),
@@ -37923,7 +37418,7 @@ function createTasteServer() {
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ repositoryPath: root, mode: selectedMode, fixtureId, generatedOutput }) => toolResult("taste_eval_get_judge_packet", async () => getEvaluationJudgePacket(root, selectedMode, fixtureId, generatedOutput))
+    async ({ repositoryPath: root, taskApproach: selectedMode, fixtureId, generatedOutput }) => toolResult("taste_eval_get_judge_packet", async () => getEvaluationJudgePacket(root, selectedMode, fixtureId, generatedOutput))
   );
   return server2;
 }
