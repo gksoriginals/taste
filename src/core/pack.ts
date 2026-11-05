@@ -65,6 +65,8 @@ export interface ValidationIssue {
 export interface PackValidation {
   valid: boolean;
   issues: ValidationIssue[];
+  /** Soft findings. They do not make the Pack invalid. */
+  warnings: ValidationIssue[];
 }
 
 export interface PackFile {
@@ -108,7 +110,7 @@ Use the manifest and Pack routing map to identify the affected surface, then loa
 
 ## Learn from user feedback
 
-Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped guidance when it expresses a clear reusable lesson. Do not require a separate Pack review or approval. Keep unresolved alternatives and one-off feedback in the host task. Use a form that teaches the decision clearly, such as a checklist, decision tree, or annotated exemplar. Record when it applies, why it matters, exceptions, and evidence. Distinguish observed behavior, inferred intent, and settled decisions. Route to new guidance by task and surface and list it in matching manifest coverage.
+Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, then keep the edit only if the product's existing checks and the relevant Pack checklist show improvement or no regression; otherwise revert and retry. Update the scoped guidance when the lesson is clear and reusable. Do not require a separate Pack review or approval. Unresolved alternatives stay in the active task and are not written into the Pack. When you write guidance, record the trigger, scope, why, exceptions, and evidence, and include settled rejected alternatives (what was considered and why it lost). Do not invent examples; cite product evidence. Use a form that teaches the decision clearly, such as a checklist, decision tree, or an annotated example grounded in that evidence. Distinguish observed behavior, inferred intent, and settled decisions. Route to new guidance by task and surface and list it in matching manifest coverage.
 
 For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
@@ -509,6 +511,40 @@ async function satisfiesMinimumEvidence(packRoot: string, coverage: SetupCoverag
   return usable;
 }
 
+const WHY_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:why|rationale|reasons?)\b|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*(?:why|rationale)\b/i;
+const REJECTED_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:rejected\b|alternatives(?:[ \t]+considered)?[ \t]+rejected\b|considered(?:[ \t]+and)?[ \t]+rejected\b|settled rejections?\b|options rejected\b)|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*rejected\b/i;
+
+function inferenceOnlyCoverage(entry: SetupCoverage): boolean {
+  if (entry.status !== "source_reviewed" && entry.status !== "rendered") return false;
+  return entry.evidence.length > 0 && entry.evidence.every((evidence) => evidence.type === "inference");
+}
+
+async function warnOnGuidanceShape(packRoot: string, coverage: SetupCoverage[], warnings: ValidationIssue[]): Promise<void> {
+  const seen = new Set<string>();
+  for (const entry of coverage) {
+    if (entry.status !== "source_reviewed" && entry.status !== "rendered") continue;
+    for (const relative of entry.guidanceFiles) {
+      const key = relative.replaceAll("\\", "/");
+      if (seen.has(key) || !/\.md$/i.test(key)) continue;
+      seen.add(key);
+      let content: string;
+      try {
+        content = await readFile(await resolvePackFile(packRoot, key), "utf8");
+      } catch {
+        continue;
+      }
+      const missing: string[] = [];
+      if (!WHY_SECTION.test(content)) missing.push("Why");
+      if (!REJECTED_SECTION.test(content)) missing.push("Rejected");
+      if (missing.length === 0) continue;
+      warnings.push({
+        path: key,
+        message: `Linked guidance is missing a ${missing.join(" and ")} section (or an equivalent heading or **label:**). Record why the choice won and the settled rejected alternatives. This warning does not fail validation.`,
+      });
+    }
+  }
+}
+
 async function readablePackFile(packRoot: string, relative: string, issues: ValidationIssue[]): Promise<"ok" | "missing" | "bad"> {
   try {
     await resolvePackFile(packRoot, relative);
@@ -525,6 +561,7 @@ async function readablePackFile(packRoot: string, relative: string, issues: Vali
 
 async function validatePackAt(packRoot: string): Promise<PackValidation> {
   const issues: ValidationIssue[] = [];
+  const warnings: ValidationIssue[] = [];
   const requiredFiles = ["README.md", "manifest.json", ENTRY_SKILL];
   for (const relative of requiredFiles) {
     const state = await readablePackFile(packRoot, relative, issues);
@@ -582,6 +619,15 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
       issues.push({ path: "manifest.json", message: "Taste setup is in progress and not yet usable. Resume /taste-setup; use usable_partial only after a surface meets the configured evidence bar." });
     }
     if (setupStatus === "usable_partial" || setupStatus === "complete") {
+      for (const entry of coverage) {
+        if (inferenceOnlyCoverage(entry)) {
+          issues.push({
+            path: "manifest.json",
+            message: `Coverage '${entry.id}' uses only inference evidence. usable_partial and complete coverage need source, rendered, or design-reference evidence; inference alone cannot establish a covered surface.`,
+          });
+        }
+      }
+      await warnOnGuidanceShape(packRoot, coverage, warnings);
       const usableCoverage = await satisfiesMinimumEvidence(packRoot, coverage, minimumUsableEvidence);
       if (usableCoverage.length === 0) {
         issues.push({ path: "manifest.json", message: `No surface has specific, cited guidance meeting minimumUsableEvidence=${minimumUsableEvidence}. Keep setupStatus=in_progress.` });
@@ -627,7 +673,7 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
     // Missing and unsafe skill paths are already reported from the required-file pass.
   }
 
-  return { valid: issues.length === 0, issues };
+  return { valid: issues.length === 0, issues, warnings };
 }
 
 export async function validatePack(repositoryPath: string): Promise<PackValidation> {

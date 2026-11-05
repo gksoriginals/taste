@@ -27,6 +27,10 @@ export const sessionTraceFields = {
     status: z.enum(["pending", "accepted", "corrected", "rejected"]),
     summary: summary.optional(),
   }),
+  checkSummaries: z.object({
+    before: summary,
+    after: summary,
+  }).optional().describe("Before and after summaries from the host's existing product checks or Pack checklist. Omit when that comparison was not run."),
 };
 
 export async function recordSessionTrace(trace: z.infer<z.ZodObject<typeof sessionTraceFields>>) {

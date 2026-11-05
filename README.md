@@ -56,7 +56,7 @@ product-repository/
 
 - **`SKILL.md`** is the entry point. It routes the current task to the relevant product and surface guidance.
 - **References** capture product-specific patterns, facts, examples, and exceptions. A reference should say when a rule applies and why, not just name a preferred style.
-- **Guidance** can use direct rules, checklists, decision trees, or annotated examples. Choose the form that helps the next assistant make the decision. Record when it applies, why it matters, its limits, and the supporting evidence.
+- **Guidance** can use direct rules, checklists, decision trees, or annotated examples. Choose the form that helps the next assistant make the decision. Record when it applies, why it matters, which settled alternatives were rejected and why, its limits, and the supporting evidence. Cite product evidence for examples.
 - **`manifest.json`** records Pack readiness, the covered product surfaces, and evidence for those coverage claims.
 - **Metadata and evaluations** are optional. Add them only when the product benefits from them; Taste does not require a fixed set of files.
 

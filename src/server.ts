@@ -63,7 +63,7 @@ export function createTasteServer(): McpServer {
     "taste_session_record",
     {
       title: "Record a local Taste session trace",
-      description: "Save a bounded host-authored decision and verification record outside the Pack. Requires TASTE_TRACE_DIR. Use only for an opted-in product task and omit sensitive data and raw transcripts.",
+      description: "Save a bounded host-authored decision and verification record outside the Pack. Requires TASTE_TRACE_DIR. Use only for an opted-in product task and omit sensitive data and raw transcripts. When the host ran check-and-repair, include checkSummaries.before and checkSummaries.after.",
       inputSchema: sessionTraceFields,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -117,7 +117,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. When creating a missing Pack from feedback, write only the affected surface's cited guidance and coverage metadata; do not start a sweep. The host applies and self-checks the lesson in the same task; no separate review or approval is required.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. When the file is guidance, include why the choice won and the settled rejected alternatives, and cite product evidence rather than invented examples. Do not add manifest fields for that rationale. When creating a missing Pack from feedback, write only the affected surface's cited guidance and coverage metadata; do not start a sweep. The host applies the lesson and keeps it only when existing checks show improvement or no regression; no separate review or approval is required.",
       inputSchema: {
         runId: sessionRunId.optional(),
         repositoryPath,
@@ -133,7 +133,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Product references and metadata are optional. Structural validation only, not a quality judgment.",
+      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. usable_partial and complete coverage whose only evidence is inference fails. Linked guidance is soft-checked for Why and Rejected sections; a miss is a warning and does not fail validation. Product references and metadata are optional. Structural validation only, not a quality judgment or a guidance grammar.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

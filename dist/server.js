@@ -36704,7 +36704,7 @@ Use the manifest and Pack routing map to identify the affected surface, then loa
 
 ## Learn from user feedback
 
-Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, self-check the result with the host's available workflow, and update the scoped guidance when it expresses a clear reusable lesson. Do not require a separate Pack review or approval. Keep unresolved alternatives and one-off feedback in the host task. Use a form that teaches the decision clearly, such as a checklist, decision tree, or annotated exemplar. Record when it applies, why it matters, exceptions, and evidence. Distinguish observed behavior, inferred intent, and settled decisions. Route to new guidance by task and surface and list it in matching manifest coverage.
+Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, then keep the edit only if the product's existing checks and the relevant Pack checklist show improvement or no regression; otherwise revert and retry. Update the scoped guidance when the lesson is clear and reusable. Do not require a separate Pack review or approval. Unresolved alternatives stay in the active task and are not written into the Pack. When you write guidance, record the trigger, scope, why, exceptions, and evidence, and include settled rejected alternatives (what was considered and why it lost). Do not invent examples; cite product evidence. Use a form that teaches the decision clearly, such as a checklist, decision tree, or an annotated example grounded in that evidence. Distinguish observed behavior, inferred intent, and settled decisions. Route to new guidance by task and surface and list it in matching manifest coverage.
 
 For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
 `;
@@ -37031,6 +37031,37 @@ async function satisfiesMinimumEvidence(packRoot, coverage, minimum) {
   }
   return usable;
 }
+var WHY_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:why|rationale|reasons?)\b|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*(?:why|rationale)\b/i;
+var REJECTED_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:rejected\b|alternatives(?:[ \t]+considered)?[ \t]+rejected\b|considered(?:[ \t]+and)?[ \t]+rejected\b|settled rejections?\b|options rejected\b)|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*rejected\b/i;
+function inferenceOnlyCoverage(entry) {
+  if (entry.status !== "source_reviewed" && entry.status !== "rendered") return false;
+  return entry.evidence.length > 0 && entry.evidence.every((evidence) => evidence.type === "inference");
+}
+async function warnOnGuidanceShape(packRoot, coverage, warnings) {
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of coverage) {
+    if (entry.status !== "source_reviewed" && entry.status !== "rendered") continue;
+    for (const relative of entry.guidanceFiles) {
+      const key = relative.replaceAll("\\", "/");
+      if (seen.has(key) || !/\.md$/i.test(key)) continue;
+      seen.add(key);
+      let content;
+      try {
+        content = await readFile(await resolvePackFile(packRoot, key), "utf8");
+      } catch {
+        continue;
+      }
+      const missing = [];
+      if (!WHY_SECTION.test(content)) missing.push("Why");
+      if (!REJECTED_SECTION.test(content)) missing.push("Rejected");
+      if (missing.length === 0) continue;
+      warnings.push({
+        path: key,
+        message: `Linked guidance is missing a ${missing.join(" and ")} section (or an equivalent heading or **label:**). Record why the choice won and the settled rejected alternatives. This warning does not fail validation.`
+      });
+    }
+  }
+}
 async function readablePackFile(packRoot, relative, issues) {
   try {
     await resolvePackFile(packRoot, relative);
@@ -37046,6 +37077,7 @@ async function readablePackFile(packRoot, relative, issues) {
 }
 async function validatePackAt(packRoot) {
   const issues = [];
+  const warnings = [];
   const requiredFiles = ["README.md", "manifest.json", ENTRY_SKILL];
   for (const relative of requiredFiles) {
     const state = await readablePackFile(packRoot, relative, issues);
@@ -37100,6 +37132,15 @@ async function validatePackAt(packRoot) {
       issues.push({ path: "manifest.json", message: "Taste setup is in progress and not yet usable. Resume /taste-setup; use usable_partial only after a surface meets the configured evidence bar." });
     }
     if (setupStatus === "usable_partial" || setupStatus === "complete") {
+      for (const entry2 of coverage) {
+        if (inferenceOnlyCoverage(entry2)) {
+          issues.push({
+            path: "manifest.json",
+            message: `Coverage '${entry2.id}' uses only inference evidence. usable_partial and complete coverage need source, rendered, or design-reference evidence; inference alone cannot establish a covered surface.`
+          });
+        }
+      }
+      await warnOnGuidanceShape(packRoot, coverage, warnings);
       const usableCoverage = await satisfiesMinimumEvidence(packRoot, coverage, minimumUsableEvidence);
       if (usableCoverage.length === 0) {
         issues.push({ path: "manifest.json", message: `No surface has specific, cited guidance meeting minimumUsableEvidence=${minimumUsableEvidence}. Keep setupStatus=in_progress.` });
@@ -37142,7 +37183,7 @@ async function validatePackAt(packRoot) {
     }
   } catch {
   }
-  return { valid: issues.length === 0, issues };
+  return { valid: issues.length === 0, issues, warnings };
 }
 async function validatePack(repositoryPath2) {
   const { packRoot } = await resolvePackRoot(repositoryPath2);
@@ -37288,7 +37329,11 @@ var sessionTraceFields = {
   feedback: external_exports.object({
     status: external_exports.enum(["pending", "accepted", "corrected", "rejected"]),
     summary: summary.optional()
-  })
+  }),
+  checkSummaries: external_exports.object({
+    before: summary,
+    after: summary
+  }).optional().describe("Before and after summaries from the host's existing product checks or Pack checklist. Omit when that comparison was not run.")
 };
 async function recordSessionTrace(trace) {
   const directory = process.env.TASTE_TRACE_DIR;
@@ -37368,7 +37413,7 @@ function createTasteServer() {
     "taste_session_record",
     {
       title: "Record a local Taste session trace",
-      description: "Save a bounded host-authored decision and verification record outside the Pack. Requires TASTE_TRACE_DIR. Use only for an opted-in product task and omit sensitive data and raw transcripts.",
+      description: "Save a bounded host-authored decision and verification record outside the Pack. Requires TASTE_TRACE_DIR. Use only for an opted-in product task and omit sensitive data and raw transcripts. When the host ran check-and-repair, include checkSummaries.before and checkSummaries.after.",
       inputSchema: sessionTraceFields,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
     },
@@ -37418,7 +37463,7 @@ function createTasteServer() {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. When creating a missing Pack from feedback, write only the affected surface's cited guidance and coverage metadata; do not start a sweep. The host applies and self-checks the lesson in the same task; no separate review or approval is required.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. When the file is guidance, include why the choice won and the settled rejected alternatives, and cite product evidence rather than invented examples. Do not add manifest fields for that rationale. When creating a missing Pack from feedback, write only the affected surface's cited guidance and coverage metadata; do not start a sweep. The host applies the lesson and keeps it only when existing checks show improvement or no regression; no separate review or approval is required.",
       inputSchema: {
         runId: sessionRunId.optional(),
         repositoryPath,
@@ -37433,7 +37478,7 @@ function createTasteServer() {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Product references and metadata are optional. Structural validation only, not a quality judgment.",
+      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. usable_partial and complete coverage whose only evidence is inference fails. Linked guidance is soft-checked for Why and Rejected sections; a miss is a warning and does not fail validation. Product references and metadata are optional. Structural validation only, not a quality judgment or a guidance grammar.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },

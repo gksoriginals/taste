@@ -103,6 +103,11 @@ test("initializes an in-progress product-specific Pack shell without touching re
     assert.ok(inspection.validation.issues.some((issue) => /setup is in progress/.test(issue.message)));
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
+    const starter = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
+    assert.match(starter, /Unresolved alternatives stay in the active task/);
+    assert.match(starter, /settled rejected alternatives/);
+    assert.match(starter, /Do not invent examples; cite product evidence/);
+    assert.deepEqual(inspection.validation.warnings, []);
   });
 });
 
@@ -164,6 +169,45 @@ test("complete status requires every confirmed coverage target to be rendered an
     assert.equal(complete.setupStatus, "complete");
     assert.equal(complete.coverageSummary.targetMet, true);
     assert.equal(complete.validation.valid, true, JSON.stringify(complete.validation.issues));
+  });
+});
+
+test("usable coverage whose only evidence is inference fails validation", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { coverage: SetupCoverage[] };
+    const coverage = manifest.coverage.map((entry) => entry.id === "admin.login"
+      ? { ...entry, evidence: [{ type: "inference" as const, reference: "guessed from the route name", checkedAt: "2026-11-04" }] }
+      : entry);
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial", coverage }, null, 2) + "\n");
+
+    const validation = await validatePack(repositoryPath);
+    assert.equal(validation.valid, false);
+    assert.ok(validation.issues.some((issue) => /admin\.login/.test(issue.message) && /only inference evidence/.test(issue.message)));
+    assert.equal(validation.issues.some((issue) => /No surface has specific, cited guidance/.test(issue.message)), false);
+  });
+});
+
+test("linked guidance missing Why or Rejected sections warns without failing validation", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial" }, null, 2) + "\n");
+
+    const warned = await validatePack(repositoryPath);
+    assert.equal(warned.valid, true, JSON.stringify(warned.issues));
+    assert.ok(warned.warnings.some((warning) => warning.path.endsWith("admin-login.md") && /Why and Rejected/.test(warning.message)));
+    assert.equal(warned.warnings.some((warning) => warning.path.endsWith("portal-billing.md")), false);
+
+    const packRoot = path.join(repositoryPath, "taste");
+    await writeFile(path.join(packRoot, "skills/product-design/references/admin-login.md"), "# Admin Authentication\n\n## Why\n\nKeep the user on the form so valid entries survive a validation error.\n\n## Rejected alternatives\n\nA full-page error was rejected because the source keeps the submitted form mounted. Evidence: src/admin/routes.ts. Visual behavior is not verified by this source-only evidence.\n");
+    await writeFile(path.join(packRoot, "skills/product-design/references/portal-profile.md"), "# Portal Profile\n\nFor this journey, keep the task scoped to the documented product behavior and preserve its validation and recovery states.\n\n- **Why:** The profile form is the only place this journey edits identity.\n- **Rejected:** Replacing the form with a wizard was rejected because src/portal/profile.tsx edits the fields in place.\n\nSource: src/portal/profile.tsx. Visual behavior is not verified by this source-only evidence.\n");
+
+    const cleared = await validatePack(repositoryPath);
+    assert.equal(cleared.valid, true, JSON.stringify(cleared.issues));
+    assert.deepEqual(cleared.warnings, []);
   });
 });
 
@@ -257,6 +301,7 @@ test("committed example Pack validates and supplies both conformance and express
   const repositoryPath = path.resolve("examples/product-pack");
   const validation = await validatePack(repositoryPath);
   assert.equal(validation.valid, true, JSON.stringify(validation.issues));
+  assert.deepEqual(validation.warnings, []);
   assert.deepEqual(await listEvaluationFixtures(repositoryPath, "conformance"), ["account-setup-progress"]);
   assert.deepEqual(await listEvaluationFixtures(repositoryPath, "expression"), ["setup-direction"]);
   const generatorCase = await getEvaluationGeneratorCase(repositoryPath, "conformance", "account-setup-progress");

@@ -112,13 +112,26 @@ test("bundled stdio MCP server exposes Pack and evaluation tools", async () => {
     assert.equal(saved.decision, trace.decision);
     if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777, 0o600);
 
+    assert.equal(saved.checkSummaries, undefined);
     const followUp = await client.callTool({
       name: "taste_session_record",
-      arguments: { ...trace, feedback: { status: "accepted" } },
+      arguments: {
+        ...trace,
+        feedback: { status: "accepted" },
+        checkSummaries: {
+          before: "Checklist: progress copy unmatched the three-step flow",
+          after: "Checklist: progress copy matches the three-step flow",
+        },
+      },
     });
     assert.equal(followUp.isError, undefined);
-    assert.notEqual((followUp.structuredContent as { file: string }).file, file);
+    const followUpFile = (followUp.structuredContent as { file: string }).file;
+    assert.notEqual(followUpFile, file);
     assert.equal(JSON.parse(await readFile(file, "utf8")).feedback.status, "pending");
+    const followUpSaved = JSON.parse(await readFile(followUpFile, "utf8"));
+    assert.equal(followUpSaved.checkSummaries.before, "Checklist: progress copy unmatched the three-step flow");
+    assert.equal(followUpSaved.checkSummaries.after, "Checklist: progress copy matches the three-step flow");
+    assert.equal(followUpSaved.feedback.status, "accepted");
     assert.ok(diagnosticOutput.split("\n").some((line) =>
       line.includes('"tool":"taste_pack_inspect"') && line.includes(`"runId":"${runId}"`)));
     assert.doesNotMatch(diagnosticOutput, /Keep progress tied to the actual flow/);

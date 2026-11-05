@@ -8,7 +8,7 @@ Product Packs live in a target product repository's `taste/` directory. There is
 
 For UI tasks, route from the request and affected surface. Apply existing relevant guidance (Conformance), explore a new direction or resolve a correction (Expression), or ask a focused question if a material ambiguity remains. These are task approaches, not persisted Pack modes.
 
-Use explicit `/taste-setup` or the `taste-setup` Skill for a bounded repository-wide setup or refresh. Ordinary UI work must not start a broad sweep. A clear, resolved, reusable user correction may be applied, self-checked, and written as scoped guidance during the task; if needed, create a minimal Pack for only that surface. Keep one-off or unresolved feedback in the conversation. Do not require separate approval or promotion for this guidance update.
+Use explicit `/taste-setup` or the `taste-setup` Skill for a bounded repository-wide setup or refresh. Ordinary UI work must not start a broad sweep. For non-trivial UI work, write a task-local brief before editing product files, then keep an edit only when existing product checks and the Pack checklist show improvement or no regression. A clear, resolved, reusable user correction may be applied and written as scoped guidance during the task; if needed, create a minimal Pack for only that surface. Guidance records why a choice won and which settled alternatives lost. Unresolved alternatives and one-off reactions stay in the conversation. Do not require separate approval or promotion for this guidance update. Examples cite product evidence.
 
 
 Keep documentation aligned with shipped code. Clearly label unverified capabilities and evaluation limits; practitioner articles are design references, not proof of effectiveness.

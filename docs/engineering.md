@@ -28,7 +28,9 @@ The host routes from the user's request and affected product surface:
 
 These are behavior labels, not persisted Pack modes. Taste has no persisted task-routing state.
 
-During normal UI work, a clear reusable correction can become a piece of scoped guidance after the host applies and self-checks it. If the surface has no Pack yet, the host may initialize the minimal scaffold, replace starter content with evidence-backed surface guidance, and mark only that surface `usable_partial`. This does not start a broad sweep. One-off or unresolved feedback remains task-local. There is no separate approval or promotion step for this path.
+During normal UI work, a clear reusable correction can become a piece of scoped guidance after the host applies it and keeps the edit only when existing checks show improvement or no regression. If the surface has no Pack yet, the host may initialize the minimal scaffold, replace starter content with evidence-backed surface guidance, and mark only that surface `usable_partial`. This does not start a broad sweep. One-off reactions and unresolved alternatives remain task-local. Settled rejected alternatives are written into the guidance with the trigger, scope, why, exceptions, and evidence. Examples must cite product evidence. There is no separate approval or promotion step for this path.
+
+For non-trivial UI edits, Skills tell the host to write a task-local brief first (intent, applicable Pack constraints, rejected options), then implement. Check-and-repair is a host protocol: run the product's existing checks and the relevant Pack checklist on the before and after states, and keep the edit only when the checker shows improvement or no regression. Taste does not run those checks, ship a CI runner, or add a tool that computes the delta. When `TASTE_TRACE_DIR` is set, the host may record the two summaries on `taste_session_record` as `checkSummaries`.
 
 Explicit `/taste-setup` or invocation of the `taste-setup` Skill is the broader repository workflow. The host inventories the repository before choosing scope, inspects a bounded selection of rendered UI and source as available, and creates or selectively refreshes guidance. The host distinguishes evidence types, records coverage and inaccessible areas, self-checks its work, validates, and reports limits. Taste supplies the workflow and file tools; it does not perform the sweep itself.
 
@@ -42,22 +44,23 @@ The manifest tracks setup readiness separately from coverage. Current statuses a
 - `usable_partial`: one or more explicitly recorded surfaces have sufficient guidance; apply only to those covered surfaces.
 - `complete`: the confirmed setup scope and its required coverage target have been met and validation passes.
 
-Coverage entries identify the app/surface/journey, status, typed evidence with a checked date, and guidance files supported by that evidence. A Pack can therefore be usable for one surface while other surfaces remain blocked or uninspected. Source-only guidance may satisfy the default `source_reviewed` policy if it is actionable and clearly says visual behavior is unverified. A repository can configure `rendered_flow` when a rendered representative journey is required before a surface is usable.
+Coverage entries identify the app/surface/journey, status, typed evidence with a checked date, and guidance files supported by that evidence. A Pack can therefore be usable for one surface while other surfaces remain blocked or uninspected. Source-only guidance may satisfy the default `source_reviewed` policy if it is actionable and clearly says visual behavior is unverified. A repository can configure `rendered_flow` when a rendered representative journey is required before a surface is usable. Why and settled rejected alternatives live in guidance Markdown (a Why section and a Rejected section, or an equivalent heading). They are not manifest fields. The manifest stays limited to lifecycle fields: name, version, surfaces, setup status, policy, scope, and coverage.
 
 Initialization creates a non-overwriting shell. It is not a completed Pack. The host must replace generic starter text with product-specific guidance before reporting usability. Refresh should inspect existing content first and preserve supported material. Interrupted setup must retain files and an accurate incomplete status so the host can resume.
 
 ## MCP server
 
-`src/server.ts` creates the MCP server and registers tools. `src/core/pack.ts` owns Pack path safety, file operations, manifest parsing, lifecycle inspection, validation, and evaluation fixture access. `src/core/diagnostics.ts` emits opt-in operational diagnostics.
+`src/server.ts` creates the MCP server and registers tools. `src/core/pack.ts` owns Pack path safety, file operations, manifest parsing, lifecycle inspection, validation, and evaluation fixture access. `src/core/diagnostics.ts` emits opt-in operational diagnostics. `src/core/session-trace.ts` writes opt-in local session snapshots when `TASTE_TRACE_DIR` is set, including optional before/after check summaries.
 
 Current tool groups:
 
 | Group | Tools | Role |
 | --- | --- | --- |
 | Pack operations | `taste_pack_initialize`, `taste_pack_inspect`, `taste_pack_read`, `taste_pack_write`, `taste_pack_validate` | Create a non-overwriting shell; inspect status; read/write Pack files; validate structure and evidence metadata. |
+| Session traces | `taste_session_record` | Optional, when `TASTE_TRACE_DIR` is set. The host records a bounded decision snapshot outside the Pack, including optional before/after check summaries. Taste does not run product checks. |
 | Evaluation fixtures | `taste_eval_list_fixtures`, `taste_eval_get_generator_case`, `taste_eval_get_judge_packet` | Provide fixture inputs and a separate judge packet. The host runs generator and judge work; packet separation is workflow guidance, not an access-control boundary. |
 
-All Pack file paths are resolved within the target `taste/` directory. The server does not write product UI, harness instructions, or host configuration. Pack validation checks structure and declared evidence relationships; it does not judge the quality of product design or verify the truth of host-reported observations.
+All Pack file paths are resolved within the target `taste/` directory. The server does not write product UI, harness instructions, or host configuration. Pack validation checks structure and declared evidence relationships. On `usable_partial` and `complete` Packs, coverage whose only evidence type is `inference` fails validation. Linked guidance files are soft-checked for Why and Rejected sections, or clearly equivalent headings; a miss is a warning and does not fail the Pack or require a guidance grammar. Validation does not judge the quality of product design or verify the truth of host-reported observations.
 
 ## Skills and packaging
 

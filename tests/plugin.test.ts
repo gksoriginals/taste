@@ -124,3 +124,29 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(command, /source evidence can support useful partial guidance/i);
   assert.match(command, /Never request production credentials or store secrets or real user data/i);
 });
+
+test("guidance writes record settled rejections, and UI work briefs before check-and-repair", async () => {
+  const readSkill = (name: string) => readFile(path.join(root, "skills", name, "SKILL.md"), "utf8");
+  const [expression, design, conformance, setup, sweep, pack] = await Promise.all([
+    readSkill("taste-expression"),
+    readSkill("taste-design"),
+    readSkill("taste-conformance"),
+    readSkill("taste-setup"),
+    readSkill("taste-sweep"),
+    readSkill("taste-pack"),
+  ]);
+
+  for (const skill of [expression, setup, sweep, pack]) {
+    assert.match(skill, /settled rejected alternatives/i);
+    assert.match(skill, /Unresolved alternatives stay in the active task/);
+    assert.match(skill, /Do not invent examples; cite product evidence/);
+  }
+  for (const skill of [design, conformance]) {
+    assert.match(skill, /task-local brief before editing product files/);
+    assert.match(skill, /Keep the change only if the checker shows improvement or no regression/);
+    assert.match(skill, /checkSummaries\.before/);
+  }
+  assert.match(expression, /Keep the change only if the checker shows improvement or no regression/);
+  assert.match(expression, /checkSummaries\.before/);
+  assert.match(design, /checkSummaries\.before` and `checkSummaries\.after`/);
+});
