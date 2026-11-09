@@ -6,5 +6,5 @@
 - **Applies to:** The account setup preferences screen in this synthetic fixture.
 - **Why:** An invented step count misleads users about how much work remains.
 - **Rejected:** A fixed "step 2 of 4" label was rejected for this fixture because the task describes three steps, and an invented total would overstate the flow.
-- **Evidence:** `taste/evals/conformance/fixtures/account-setup-progress/task.md` describes a three-step flow.
+- **Evidence:** `taste/evals/conformance/fixtures/account-setup-progress/task.md` describes a three-step flow; `taste/evals/conformance/fixtures/account-setup-progress/before/index.html` is the corresponding UI source in this synthetic example.
 - **Limit:** This is source/fixture-derived sample guidance. Visual behavior is not verified because the example is not a rendered product.

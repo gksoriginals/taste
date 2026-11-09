@@ -99,7 +99,7 @@ description: Route UI tasks to relevant ${productName} product judgment. Read li
 
 # ${productName} product design
 
-This starter is not product guidance. Replace it with a short routing index to lessons worth remembering across tasks: decisions, tested lessons, and traps that cannot be cheaply recovered from the product itself. Link to focused references; do not inventory screens or repeat code, docs, lint rules, instructions, or current UI behavior. Keep uncertain and changing information labeled and scoped.
+This starter is not product guidance. Replace it with a short routing index to durable product judgment that future contributors need. Keep the rule, rationale, scope, and limits in the Pack itself so it works across machines and harnesses. Cite committed code surfaces and other repository evidence by path in the guidance; a link supports the lesson but does not replace it. Distill important lessons from local-only or harness-specific sources into concise Pack content, even if that duplicates local knowledge. Do not inventory screens or repeat code, docs, lint rules, instructions, or current UI behavior. Keep uncertain and changing information labeled and scoped.
 
 Run explicit \`/taste-setup\` for a broader review. During ordinary UI work, read only relevant references. A clear reusable correction may add one focused lesson for the affected surface without a repository-wide sweep.
 
@@ -567,20 +567,27 @@ function parseCoverage(value: unknown, issues: ValidationIssue[]): SetupCoverage
 async function hasCitedActionableGuidance(packRoot: string, entry: SetupCoverage): Promise<boolean> {
   const sourceEvidence = entry.evidence.filter((evidence) => isObjectRecord(evidence) && evidence.type === "source_reviewed" && typeof evidence.reference === "string");
   if (sourceEvidence.length === 0) return false;
+  const guidanceContents: string[] = [];
   for (const relative of entry.guidanceFiles) {
     try {
       const content = await readFile(await resolvePackFile(packRoot, relative), "utf8");
-      // Evidence is linked from the manifest and validated against the repository. Repeating
-      // the source path in prose encourages Packs to restate source instead of recording judgment.
-      if (content.trim().length < 80) continue;
-      const hasRenderedEvidence = entry.evidence.some((evidence) => evidence.type === "rendered");
-      if (!hasRenderedEvidence && !/(visual(?:ly)?[^\n.]{0,80}(?:not verified|unverified)|(?:not verified|unverified)[^\n.]{0,80}visual)/i.test(content)) continue;
-      return true;
+      guidanceContents.push(content);
     } catch {
       // Missing guidance files cannot establish a usable surface.
     }
   }
-  return false;
+  // The Pack must carry its judgment and directly discoverable source citations.
+  // A manifest-only reference is too easy to miss when another agent reads the guidance.
+  const citesEverySource = sourceEvidence.every((evidence) => {
+    const reference = (evidence as SetupEvidence).reference.replace(/#L\d+(?:-L?\d+)?$/, "").replace(/:\d+(?:-\d+)?$/, "");
+    return guidanceContents.some((content) => content.includes(reference));
+  });
+  if (!citesEverySource) return false;
+  const hasRenderedEvidence = entry.evidence.some((evidence) => evidence.type === "rendered");
+  return guidanceContents.some((content) => {
+    if (content.trim().length < 80) return false;
+    return hasRenderedEvidence || /(visual(?:ly)?[^\n.]{0,80}(?:not verified|unverified)|(?:not verified|unverified)[^\n.]{0,80}visual)/i.test(content);
+  });
 }
 
 async function satisfiesMinimumEvidence(packRoot: string, coverage: SetupCoverage[], minimum: MinimumUsableEvidence): Promise<SetupCoverage[]> {

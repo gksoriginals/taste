@@ -72,7 +72,7 @@ For example, a checklist entry might say:
 - **Coverage:** The source behavior was reviewed; rendered behavior has not been verified.
 ```
 
-This example is illustrative, not a rule for every product. A Pack should cite the product evidence behind its own guidance. A Pack marked `usable_partial` supports only the surfaces recorded in its coverage; `complete` means the agreed setup scope met its coverage target and Pack checks passed.
+This example is illustrative, not a rule for every product. A Pack should contain the essential product judgment itself and cite committed code surfaces and other evidence behind that guidance; the links support the rule but do not replace it. Important lessons found only in local memories or harness-specific sources should be distilled into the Pack so they travel with the repository. A Pack marked `usable_partial` remains useful for the evidence-backed surfaces in its coverage while broader setup is unfinished; ordinary work can add a narrowly scoped surface without starting a repository sweep. `complete` means the agreed setup scope met its coverage target and Pack checks passed.
 
 ## Why Taste is designed this way
 
@@ -85,7 +85,7 @@ The approach draws on several published systems and methods:
 - [Anthropic's frontend Skills article](https://claude.com/resources/articles/improving-frontend-design-through-skills) explains how focused Skills can give models design context only when a UI task needs it, helping avoid generic output without loading frontend rules into every task.
 - [Emil Kowalski's “Agents with Taste”](https://emilkowal.ski/ui/agents-with-taste) demonstrates how to turn visual judgment into concrete, scenario-based guidance with reasons—for example, how an animation should enter, move, or respond to hover. Taste applies the same idea across product-specific surfaces and tasks, while keeping rules tied to evidence and scope.
 
-Taste applies these ideas with evidence labels and source references: the assistant should distinguish owner decisions, rendered observations, source facts, design references, and inference. It should link to material the same future agent can readily retrieve, while preserving a concise generalized decision from local-only sources that other agents cannot access. It should record coverage gaps rather than turn a small sample into a product-wide rule. `complete` requires user-confirmed setup scope; a host-selected sample cannot establish completion.
+Taste applies these ideas with evidence labels and source references: the assistant should distinguish owner decisions, rendered observations, source facts, design references, and inference. The Pack carries the reusable rule and rationale; repository-relative code references make its evidence verifiable. Important lessons from local-only sources are generalized into the Pack instead of relying on another agent having the same memory. It should record coverage gaps rather than turn a small sample into a product-wide rule. `complete` requires user-confirmed setup scope; a host-selected sample cannot establish completion.
 
 These sources inform Taste's design; they do not prove that Taste improves results. The project's evaluation approach is to compare the same task with and without relevant guidance, keep the conditions as similar as practical, and score following product rules separately from similarity to existing UI. Examples held back from authoring can help check whether guidance generalizes. See [Engineering design](docs/engineering.md) for the full rationale and evaluation details.
 

@@ -36684,7 +36684,7 @@ description: Route UI tasks to relevant ${productName} product judgment. Read li
 
 # ${productName} product design
 
-This starter is not product guidance. Replace it with a short routing index to lessons worth remembering across tasks: decisions, tested lessons, and traps that cannot be cheaply recovered from the product itself. Link to focused references; do not inventory screens or repeat code, docs, lint rules, instructions, or current UI behavior. Keep uncertain and changing information labeled and scoped.
+This starter is not product guidance. Replace it with a short routing index to durable product judgment that future contributors need. Keep the rule, rationale, scope, and limits in the Pack itself so it works across machines and harnesses. Cite committed code surfaces and other repository evidence by path in the guidance; a link supports the lesson but does not replace it. Distill important lessons from local-only or harness-specific sources into concise Pack content, even if that duplicates local knowledge. Do not inventory screens or repeat code, docs, lint rules, instructions, or current UI behavior. Keep uncertain and changing information labeled and scoped.
 
 Run explicit \`/taste-setup\` for a broader review. During ordinary UI work, read only relevant references. A clear reusable correction may add one focused lesson for the affected surface without a repository-wide sweep.
 
@@ -37065,17 +37065,24 @@ function parseCoverage(value, issues) {
 async function hasCitedActionableGuidance(packRoot, entry) {
   const sourceEvidence = entry.evidence.filter((evidence) => isObjectRecord(evidence) && evidence.type === "source_reviewed" && typeof evidence.reference === "string");
   if (sourceEvidence.length === 0) return false;
+  const guidanceContents = [];
   for (const relative of entry.guidanceFiles) {
     try {
       const content = await readFile(await resolvePackFile(packRoot, relative), "utf8");
-      if (content.trim().length < 80) continue;
-      const hasRenderedEvidence = entry.evidence.some((evidence) => evidence.type === "rendered");
-      if (!hasRenderedEvidence && !/(visual(?:ly)?[^\n.]{0,80}(?:not verified|unverified)|(?:not verified|unverified)[^\n.]{0,80}visual)/i.test(content)) continue;
-      return true;
+      guidanceContents.push(content);
     } catch {
     }
   }
-  return false;
+  const citesEverySource = sourceEvidence.every((evidence) => {
+    const reference = evidence.reference.replace(/#L\d+(?:-L?\d+)?$/, "").replace(/:\d+(?:-\d+)?$/, "");
+    return guidanceContents.some((content) => content.includes(reference));
+  });
+  if (!citesEverySource) return false;
+  const hasRenderedEvidence = entry.evidence.some((evidence) => evidence.type === "rendered");
+  return guidanceContents.some((content) => {
+    if (content.trim().length < 80) return false;
+    return hasRenderedEvidence || /(visual(?:ly)?[^\n.]{0,80}(?:not verified|unverified)|(?:not verified|unverified)[^\n.]{0,80}visual)/i.test(content);
+  });
 }
 async function satisfiesMinimumEvidence(packRoot, coverage, minimum) {
   const usable = [];
@@ -37457,7 +37464,7 @@ async function toolResult(toolName, operation, runId) {
 }
 function createTasteServer() {
   const server2 = new McpServer(
-    { name: "taste", version: "0.3.0" },
+    { name: "taste", version: "0.4.0" },
     {
       instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes." + (process.env.TASTE_TRACE_DIR ? " Local session tracing is enabled. Follow the Session traces section of taste-design." : "")
     }
@@ -37584,7 +37591,7 @@ function createTasteServer() {
   return server2;
 }
 var server = createTasteServer();
-logDiagnostic("debug", "server_starting", { version: "0.3.0", transport: "stdio" });
+logDiagnostic("debug", "server_starting", { version: "0.4.0", transport: "stdio" });
 await server.connect(new StdioServerTransport());
 export {
   createTasteServer

@@ -56,11 +56,12 @@ test("Codex compatibility manifest routes to its plugin-root MCP config and Skil
     skills?: string;
     mcpServers?: string;
   };
+  const packageManifest = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as { version?: string };
   const mcp = JSON.parse(await readFile(path.join(root, ".mcp.json"), "utf8")) as {
     mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }>;
   };
   assert.equal(manifest.name, "taste");
-  assert.equal(manifest.version, "0.3.0");
+  assert.equal(manifest.version, packageManifest.version);
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.mcpServers, "./.mcp.json");
   assert.deepEqual(mcp.mcpServers?.taste, {
@@ -101,7 +102,8 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(setup, /continue with other in-scope apps and source review/i);
   assert.match(setup, /They are optional evidence of intended design/i);
   assert.match(setup, /feedback memories and rejected UI directions/i);
-  assert.match(setup, /durable decision is buried in a local-only memory/i);
+  assert.match(setup, /important lesson is buried in a local-only memory/i);
+  assert.match(setup, /citation supports the guidance but does not replace it/i);
   assert.match(setup, /confirm, edit, or reject candidates/i);
   assert.match(setup, /candidate decisions, and which candidates were confirmed/i);
   assert.match(setup, /Ask for design-source access only when it materially improves the agreed scope/i);
@@ -127,9 +129,9 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(design, /If no Pack exists, do not start a product-wide sweep/i);
   assert.match(design, /create a minimal, evidence-backed Pack for that surface/i);
   const expression = await readFile(path.join(root, "skills/taste-expression/SKILL.md"), "utf8");
-  assert.match(expression, /preserving the existing setup status, policy, scope, required coverage, and other coverage entries/);
+  assert.match(expression, /preserving existing setup status, policy, scope, required coverage, and other entries/);
   assert.match(expression, /If no Pack exists, initialize a shell/);
-  assert.match(expression, /include it in the matching manifest coverage/);
+  assert.match(expression, /record the source path in manifest evidence/);
   assert.match(command, /Inventory repository apps, routes, journeys, design sources/i);
   assert.match(command, /If a journey is blocked, record its gap/i);
   assert.match(command, /Save a Pack item only when future work is likely to need it/i);
@@ -155,8 +157,8 @@ test("guidance preserves useful rationale, and UI work briefs before check-and-r
     assert.match(skill, /unresolved alternatives/i);
   }
   assert.match(setup, /include rationale or rejected options when they add durable knowledge/i);
-  assert.match(pack, /Include rationale or rejected options when they preserve knowledge/);
-  assert.match(expression, /cite evidence and distinguish observed behavior, inference, and settled intent/i);
+  assert.match(pack, /essential rule, rationale, scope, and limits in the Pack/i);
+  assert.match(expression, /Mark whether the basis is an owner decision, observed behavior, or inference/i);
   assert.match(sweep, /Do not add route descriptions, coverage rows, word quotas/i);
   assert.match(sweep, /Do not apply a “failures only” rule/i);
   assert.match(sweep, /feedback memories/i);

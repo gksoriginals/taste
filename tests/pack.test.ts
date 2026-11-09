@@ -112,7 +112,8 @@ test("initializes an in-progress product-specific Pack shell without touching re
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
     const starter = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
     assert.match(starter, /short routing index/);
-    assert.match(starter, /do not inventory screens/);
+    assert.match(starter, /cite committed code surfaces/i);
+    assert.match(starter, /do not inventory screens/i);
     assert.doesNotMatch(starter, /## Apply this Pack/);
     assert.deepEqual(inspection.validation.warnings, []);
   });
@@ -143,6 +144,19 @@ test("source-reviewed evidence can make a Pack usable_partial while blocked jour
   });
 });
 
+test("an in-progress Pack can still serve its existing evidence-backed surface guidance", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const inspection = await inspectPack(repositoryPath);
+    const guidance = await readPackFile(repositoryPath, "skills/product-design/references/admin-login.md");
+
+    assert.equal(inspection.setupStatus, "in_progress");
+    assert.equal(inspection.coverageSummary.sourceReviewed, 2);
+    assert.match(guidance.content, /preserve its validation and recovery states/);
+    assert.match(guidance.content, /Source: src\/admin\/routes\.ts/);
+  });
+});
+
 test("required not-inspected coverage must record attempts or a reason it was out of scope", async () => {
   await withRepository(async (repositoryPath) => {
     await prepareEvidencePack(repositoryPath);
@@ -165,16 +179,26 @@ test("required not-inspected coverage must record attempts or a reason it was ou
   });
 });
 
-test("source evidence need not be repeated verbatim inside guidance", async () => {
+test("usable guidance cites its source path inside the portable Pack reference", async () => {
   await withRepository(async (repositoryPath) => {
     await prepareEvidencePack(repositoryPath);
     const manifestPath = path.join(repositoryPath, "taste/manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { setupStatus: string; coverage: SetupCoverage[] };
-    const guidancePath = path.join(repositoryPath, "taste/skills/product-design/references/admin-login.md");
-    await writeFile(guidancePath, "# Admin authentication\n\nPreserve the user's progress when identity verification is interrupted, and make the recovery action clear. Visual behavior is not verified by source-only evidence.\n");
+    for (const entry of manifest.coverage) {
+      const guidancePath = path.join(repositoryPath, "taste", entry.guidanceFiles[0]);
+      await writeFile(guidancePath, `# ${entry.surface}\n\nPreserve the user's progress when identity verification is interrupted, and make the recovery action clear. Visual behavior is not verified by source-only evidence.\n`);
+    }
     await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial" }, null, 2) + "\n");
-    const validation = await validatePack(repositoryPath);
-    assert.equal(validation.issues.some((issue) => /No surface has specific, cited guidance/.test(issue.message)), false);
+    const uncited = await validatePack(repositoryPath);
+    assert.ok(uncited.issues.some((issue) => /No surface has specific, cited guidance/.test(issue.message)));
+
+    for (const entry of manifest.coverage) {
+      const guidancePath = path.join(repositoryPath, "taste", entry.guidanceFiles[0]);
+      const reference = entry.evidence.find((evidence) => evidence.type === "source_reviewed")?.reference;
+      await writeFile(guidancePath, `# ${entry.surface}\n\nPreserve the user's progress when identity verification is interrupted, and make the recovery action clear.\n\n**Code evidence:** \`${reference}\`. Visual behavior is not verified by source-only evidence.\n`);
+    }
+    const cited = await validatePack(repositoryPath);
+    assert.equal(cited.issues.some((issue) => /No surface has specific, cited guidance/.test(issue.message)), false);
   });
 });
 

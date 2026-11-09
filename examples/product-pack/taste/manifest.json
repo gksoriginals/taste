@@ -28,6 +28,12 @@
           "reference": "taste/evals/conformance/fixtures/account-setup-progress/task.md",
           "checkedAt": "2026-11-04",
           "note": "Synthetic evaluation task; no rendered product inspection is represented."
+        },
+        {
+          "type": "source_reviewed",
+          "reference": "taste/evals/conformance/fixtures/account-setup-progress/before/index.html",
+          "checkedAt": "2026-11-09",
+          "note": "Synthetic starting UI source; this is not a real shipped product surface."
         }
       ],
       "guidanceFiles": ["skills/product-design/references/checklists/account-setup.md", "skills/product-design/references/setup-progress.md"],
