@@ -12,7 +12,7 @@ Without product-specific context, coding assistants often make plausible but gen
 
 ## How it works
 
-There is one Pack per product repository. The Pack contains only guidance useful for that product: an entry Skill, surface or task references, checklists, and optional evidence, examples, or evaluation material. The host selects relevant guidance from the request and affected surface rather than loading a universal design taxonomy.
+There is one Pack per product repository. The Pack preserves durable product judgment: decisions and their reasons, tested lessons, and traps discovered through use that a future assistant is unlikely to recover by rereading code or reopening the screen. It links to canonical code, lint, docs, instructions, and rendered behavior instead of copying what those sources already show. Preserve evidence and distinguish observation, inference, and settled intent; give facts that may change enough context to avoid presenting them as timeless rules. Pack shape is product-specific: an entry Skill, surface or task references, checklists, and optional evidence, examples, or evaluation material. The host selects relevant guidance from the request and affected surface rather than loading a universal design taxonomy.
 
 Conformance and Expression describe how the host approaches a task:
 
@@ -24,7 +24,7 @@ They are not Pack modes or setup states. Packs do not need persistent per-task r
 
 ## Setup and learning
 
-**Explicit Setup** (`/taste-setup` where supported, or the `taste-setup` Skill) inspects the repository, identifies product scope, reviews accessible UI and source, and creates or refreshes tailored guidance. The host asks about scope or access only when repository evidence cannot resolve a consequential choice. Setup records evidence and coverage gaps, resumes without overwriting useful work, and validates the Pack. It does not change product UI.
+**Explicit Setup** (`/taste-setup` where supported, or the `taste-setup` Skill) inspects the repository, identifies product scope, reviews accessible UI and source, and creates or refreshes tailored guidance. It keeps reusable guidance, audit findings, and operational notes distinct. The host asks about scope or access only when repository evidence cannot resolve a consequential choice. Setup records evidence and coverage gaps, resumes without overwriting useful work, and validates the Pack. It does not change product UI.
 
 **Normal UI work** uses the existing Pack where relevant. If the Pack is absent or does not cover the surface, the host can still do the requested work in Expression. For non-trivial UI work, the host writes a short task-local brief before editing product files: the intent, the Pack constraints that apply, and options being rejected. The brief stays in the task.
 
@@ -37,6 +37,7 @@ Taste does not observe conversations or decide whether a lesson is reusable. The
 - Keep product guidance in the product repository, not in the Taste plugin checkout.
 - Prefer small, actionable rules with scope, rationale, settled rejected alternatives, and traceable evidence. Put why and rejections in guidance Markdown, not new manifest fields.
 - Treat shipped UI as evidence of current behavior, not proof that every choice is intentional or desirable.
+- Do not turn an observed pattern into an intentional rule without evidence for its rationale. When intent is unresolved, ask concisely if the user is available; otherwise omit it or label it as inference.
 - Distinguish rendered observations, source facts, design references, and inference.
 - Keep setup readiness separate from per-surface coverage; partial Packs must not imply uninspected surfaces are covered.
 - Never store credentials, tokens, or real user data in a Pack.

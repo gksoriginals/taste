@@ -40,7 +40,7 @@ export interface SetupCoverage {
   guidanceFiles: string[];
   /** Required when status is rendered: the UI states actually seen, e.g. populated, empty, error. */
   statesObserved?: RenderedState[];
-  /** Required when status is blocked: what was tried to gain safe access (start commands, seed/test sign-in) and the result. */
+  /** Required for blocked or required not_inspected journeys unless the gap explains why access was inappropriate. */
   accessAttempts?: string[];
   gap?: string;
 }
@@ -98,6 +98,8 @@ description: Apply ${productName}'s product-specific design judgment when creati
 ---
 
 # Product design guidance for ${productName}
+
+This Pack preserves durable product judgment: decisions and reasons, tested lessons, and traps discovered through use that a future assistant is unlikely to recover by rereading code or reopening the screen. Link to existing code, lint, docs, instructions, and rendered behavior rather than copying what they already show. Preserve evidence and distinguish observations, inferences, and settled intent; add context when a fact may change.
 
 This starter is not product guidance. Use explicit \`/taste-setup\` to inspect and map a broader product scope. During normal UI work, do not launch that sweep; if resolved user feedback establishes a clear reusable lesson, the host may replace the starter with a minimal, evidence-backed Pack for the affected surface and mark that coverage \`usable_partial\`. No separate approval is needed.
 
@@ -584,7 +586,9 @@ async function hasCitedActionableGuidance(packRoot: string, entry: SetupCoverage
   for (const relative of entry.guidanceFiles) {
     try {
       const content = await readFile(await resolvePackFile(packRoot, relative), "utf8");
-      if (content.trim().length < 80 || !sourceEvidence.some((evidence) => content.includes(evidence.reference))) continue;
+      // Evidence is linked from the manifest and validated against the repository. Repeating
+      // the source path in prose encourages Packs to restate source instead of recording judgment.
+      if (content.trim().length < 80) continue;
       const hasRenderedEvidence = entry.evidence.some((evidence) => evidence.type === "rendered");
       if (!hasRenderedEvidence && !/(visual(?:ly)?[^\n.]{0,80}(?:not verified|unverified)|(?:not verified|unverified)[^\n.]{0,80}visual)/i.test(content)) continue;
       return true;
@@ -727,6 +731,15 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
       issues.push({ path: "manifest.json", message: "Taste setup is in progress and not yet usable. Resume /taste-setup; use usable_partial only after a surface meets the configured evidence bar." });
     }
     if (setupStatus === "usable_partial" || setupStatus === "complete") {
+      const requiredIds = new Set(setupScope?.requiredCoverage ?? []);
+      for (const entry of coverage) {
+        if (entry.status !== "not_inspected" || !requiredIds.has(entry.id)) continue;
+        const hasAttempts = Array.isArray(entry.accessAttempts) && entry.accessAttempts.length > 0;
+        const outOfScope = /(?:out of scope|not attempted because|unsafe to attempt|excluded by (?:the )?user)/i.test(entry.gap ?? "");
+        if (!hasAttempts && !outOfScope) {
+          issues.push({ path: "manifest.json", message: `Required coverage '${entry.id}' is not_inspected without accessAttempts or an explicit reason it was out of scope. Record what was tried, or why trying was not appropriate.` });
+        }
+      }
       for (const entry of coverage) {
         if (inferenceOnlyCoverage(entry)) {
           issues.push({

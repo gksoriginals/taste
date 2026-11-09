@@ -143,6 +143,41 @@ test("source-reviewed evidence can make a Pack usable_partial while blocked jour
   });
 });
 
+test("required not-inspected coverage must record attempts or a reason it was out of scope", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { setupStatus: string; coverage: SetupCoverage[] };
+    const coverage = manifest.coverage.map((entry) => entry.id === "portal.profile"
+      ? { ...entry, status: "not_inspected" as const, gap: "Another documented test account was not tried.", evidence: [], guidanceFiles: [] }
+      : entry);
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial", coverage }, null, 2) + "\n");
+
+    const missingAttempts = await validatePack(repositoryPath);
+    assert.ok(missingAttempts.issues.some((issue) => /portal\.profile.*not_inspected.*without accessAttempts/.test(issue.message)));
+
+    const withReason = coverage.map((entry) => entry.id === "portal.profile"
+      ? { ...entry, gap: "Not attempted because this tenant is explicitly out of scope for the confirmed setup." }
+      : entry);
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial", coverage: withReason }, null, 2) + "\n");
+    const scopedOut = await validatePack(repositoryPath);
+    assert.equal(scopedOut.issues.some((issue) => /portal\.profile.*not_inspected.*without accessAttempts/.test(issue.message)), false);
+  });
+});
+
+test("source evidence need not be repeated verbatim inside guidance", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { setupStatus: string; coverage: SetupCoverage[] };
+    const guidancePath = path.join(repositoryPath, "taste/skills/product-design/references/admin-login.md");
+    await writeFile(guidancePath, "# Admin authentication\n\nPreserve the user's progress when identity verification is interrupted, and make the recovery action clear. Visual behavior is not verified by source-only evidence.\n");
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, setupStatus: "usable_partial" }, null, 2) + "\n");
+    const validation = await validatePack(repositoryPath);
+    assert.equal(validation.issues.some((issue) => /No surface has specific, cited guidance/.test(issue.message)), false);
+  });
+});
+
 test("rendered_flow policy rejects source-only guidance and accepts a rendered representative journey", async () => {
   await withRepository(async (repositoryPath) => {
     await prepareEvidencePack(repositoryPath, "rendered_flow");

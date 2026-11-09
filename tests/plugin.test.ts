@@ -107,10 +107,16 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(setup, /without manually touring every URL/i);
   assert.match(setup, /Label evidence `rendered`, `source_reviewed`, `design_reference`, or `inference`/i);
   assert.match(setup, /provenance and last-verified dates/i);
+  assert.match(setup, /durable product judgment/);
+  assert.match(setup, /link to code, lint, docs, existing instructions, or rendered behavior/i);
+  assert.match(setup, /Batch unresolved candidate decisions into a concise question/i);
+  assert.match(setup, /Keep audit findings .* separate from Pack guidance/i);
+  assert.match(setup, /For a required journey left `not_inspected`, record attempts too/i);
   assert.match(setup, /Never store secrets or personal data there/i);
   assert.match(setup, /New-product design can proceed as Expression/i);
   assert.match(sweep, /Figma is optional/i);
   assert.match(sweep, /Ask once for safe access/i);
+  assert.match(sweep, /durable product judgment/);
   assert.match(sweep, /Do not require every route to be toured/i);
   assert.match(design, /A new direction, correction, or greenfield surface is Expression work and can proceed without a prior Pack/);
   assert.match(design, /If no Pack exists, do not start a product-wide sweep/i);
@@ -121,6 +127,8 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(expression, /include it in the matching manifest coverage/);
   assert.match(command, /Inventory repository apps, routes, journeys, design sources/i);
   assert.match(command, /If a journey is blocked, record its gap/i);
+  assert.match(command, /durable product judgment/);
+  assert.match(command, /required journeys marked `not_inspected`/i);
   assert.match(command, /source evidence can support useful partial guidance/i);
   assert.match(command, /Never request production credentials or store secrets or real user data/i);
 });
@@ -136,11 +144,12 @@ test("guidance writes record settled rejections, and UI work briefs before check
     readSkill("taste-pack"),
   ]);
 
-  for (const skill of [expression, setup, sweep, pack]) {
+  for (const skill of [expression, setup, pack]) {
     assert.match(skill, /settled rejected alternatives/i);
     assert.match(skill, /Unresolved alternatives stay in the active task/);
     assert.match(skill, /Do not invent examples; cite product evidence/);
   }
+  assert.match(sweep, /Do not invent examples/);
   for (const skill of [design, conformance]) {
     assert.match(skill, /task-local brief before editing product files/);
     assert.match(skill, /Keep the change only if the checker shows improvement or no regression/);
