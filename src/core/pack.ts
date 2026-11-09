@@ -13,6 +13,11 @@ export type PackSetupStatus = "in_progress" | "usable_partial" | "complete";
 export type MinimumUsableEvidence = "source_reviewed" | "rendered_flow";
 export type SetupCoverageStatus = "source_reviewed" | "rendered" | "blocked" | "not_inspected";
 export type SetupEvidenceType = "source_reviewed" | "rendered" | "design_reference" | "inference";
+/** UI states a rendered inspection actually observed. */
+export type RenderedState = "populated" | "empty" | "loading" | "error" | "denied" | "validation" | "offline";
+export const RENDERED_STATES: readonly RenderedState[] = ["populated", "empty", "loading", "error", "denied", "validation", "offline"];
+/** States a complete Pack must have rendered for every required coverage entry unless setupScope.requiredStates says otherwise. */
+export const DEFAULT_REQUIRED_STATES: readonly RenderedState[] = ["populated"];
 
 export interface SetupPolicy {
   minimumUsableEvidence: MinimumUsableEvidence;
@@ -33,6 +38,10 @@ export interface SetupCoverage {
   status: SetupCoverageStatus;
   evidence: SetupEvidence[];
   guidanceFiles: string[];
+  /** Required when status is rendered: the UI states actually seen, e.g. populated, empty, error. */
+  statesObserved?: RenderedState[];
+  /** Required when status is blocked: what was tried to gain safe access (start commands, seed/test sign-in) and the result. */
+  accessAttempts?: string[];
   gap?: string;
 }
 
@@ -44,6 +53,8 @@ export interface SetupScope {
   exclusions: string[];
   coverageTarget: string;
   requiredCoverage: string[];
+  /** Machine-checked part of the coverage target: states every required entry must have rendered before setup is complete. Defaults to ["populated"]. */
+  requiredStates?: RenderedState[];
 }
 
 export interface PackManifest {
@@ -326,7 +337,9 @@ export async function inspectPack(repositoryPath: string): Promise<{
   packPath: string;
   manifest: PackManifest | null;
   setupStatus: PackSetupStatus;
-  coverageSummary: { sourceReviewed: number; rendered: number; blocked: number; notInspected: number; required: number; targetMet: boolean };
+  coverageSummary: { sourceReviewed: number; rendered: number; renderedPopulated: number; blocked: number; notInspected: number; required: number; targetMet: boolean };
+  /** Steps an older or partial Pack needs before /taste-setup can resume cleanly. Empty when the manifest is current. */
+  migrationNeeded: string[];
   entrySkillAvailable: boolean;
   referenceCount: number;
   layout: PackLayout;
@@ -346,7 +359,8 @@ export async function inspectPack(repositoryPath: string): Promise<{
     : [];
   const requiredCoverage = Array.isArray(manifest?.setupScope?.requiredCoverage) ? manifest.setupScope.requiredCoverage.filter((id): id is string => typeof id === "string") : [];
   const coverageById = new Map(coverage.map((item) => [item.id, item]));
-  const setupStatus = manifest?.setupStatus ?? "in_progress";
+  const setupStatus = normalizeSetupStatus(manifest?.setupStatus);
+  const requiredStates = manifest?.setupScope?.requiredStates ?? DEFAULT_REQUIRED_STATES;
   const referenceRoot = path.join(packRoot, "skills/product-design/references");
   const referenceCount = await countMarkdown(referenceRoot);
   const fixtureCounts: Record<TaskApproach, number> = {
@@ -360,11 +374,16 @@ export async function inspectPack(repositoryPath: string): Promise<{
     coverageSummary: {
       sourceReviewed: coverage.filter((item) => item.status === "source_reviewed").length,
       rendered: coverage.filter((item) => item.status === "rendered").length,
+      renderedPopulated: coverage.filter((item) => item.status === "rendered" && Array.isArray(item.statesObserved) && item.statesObserved.includes("populated")).length,
       blocked: coverage.filter((item) => item.status === "blocked").length,
       notInspected: coverage.filter((item) => item.status === "not_inspected").length,
       required: requiredCoverage.length,
-      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => coverageById.get(id)?.status === "rendered"),
+      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => {
+        const entry = coverageById.get(id);
+        return entry?.status === "rendered" && requiredStates.every((state) => Array.isArray(entry.statesObserved) && entry.statesObserved.includes(state));
+      }),
     },
+    migrationNeeded: migrationSteps(manifest as unknown as Record<string, unknown> | null),
     entrySkillAvailable: await resolvePackFile(packRoot, ENTRY_SKILL).then(() => true).catch(() => false),
     referenceCount,
     layout: await packLayout(packRoot),
@@ -403,6 +422,68 @@ async function exists(filePath: string): Promise<boolean> {
 }
 
 const SETUP_STATUSES = ["in_progress", "usable_partial", "complete"] as const;
+/** Older Packs used this value; it means in_progress. */
+const LEGACY_SETUP_STATUSES: Record<string, PackSetupStatus> = { incomplete: "in_progress" };
+
+function validStateList(value: unknown, requireNonEmpty: boolean): value is RenderedState[] {
+  return Array.isArray(value)
+    && (!requireNonEmpty || value.length > 0)
+    && value.every((state) => RENDERED_STATES.includes(state as RenderedState))
+    && new Set(value).size === value.length;
+}
+
+function normalizeSetupStatus(value: unknown): PackSetupStatus {
+  if (typeof value === "string" && SETUP_STATUSES.includes(value as PackSetupStatus)) return value as PackSetupStatus;
+  if (typeof value === "string" && value in LEGACY_SETUP_STATUSES) return LEGACY_SETUP_STATUSES[value];
+  return "in_progress";
+}
+
+/** Steps an older or partial Pack needs before setup can resume cleanly. */
+function migrationSteps(manifest: Record<string, unknown> | null): string[] {
+  if (!manifest) return ["Recreate manifest.json as valid JSON, then resume /taste-setup."];
+  const steps: string[] = [];
+  if (typeof manifest.setupStatus === "string" && manifest.setupStatus in LEGACY_SETUP_STATUSES) {
+    steps.push(`Replace legacy setupStatus '${manifest.setupStatus}' with '${LEGACY_SETUP_STATUSES[manifest.setupStatus]}'.`);
+  }
+  if (manifest.setupPolicy === undefined) steps.push("Add setupPolicy (default { \"minimumUsableEvidence\": \"source_reviewed\" }).");
+  if (manifest.setupScope === undefined) steps.push("Add setupScope from a fresh repository inventory; treat existing surfaces as hints, not confirmed scope.");
+  if (manifest.coverage === undefined) steps.push("Add coverage entries for each surface the existing guidance covers, with dated evidence and statesObserved; keep useful existing guidance files.");
+  return steps;
+}
+
+/**
+ * A source_reviewed evidence reference must be a repository-relative path (optionally with :line or :start-end)
+ * so validation can check it exists. Descriptions belong in evidence.note.
+ */
+function sourceReferencePath(reference: string): string | null {
+  const trimmed = reference.trim().replace(/:\d+(?:-\d+)?$/, "").replace(/#L\d+(?:-L?\d+)?$/, "");
+  if (!trimmed || /\s/.test(trimmed) || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || path.isAbsolute(trimmed)) return null;
+  if (trimmed.split(/[\\/]/).some((piece) => piece === "..")) return null;
+  return trimmed;
+}
+
+async function checkSourceReferences(repositoryRoot: string, coverage: SetupCoverage[], issues: ValidationIssue[]): Promise<void> {
+  for (const entry of coverage) {
+    for (const evidence of entry.evidence) {
+      if (!isObjectRecord(evidence) || evidence.type !== "source_reviewed" || typeof evidence.reference !== "string") continue;
+      const relative = sourceReferencePath(evidence.reference);
+      if (!relative) {
+        issues.push({ path: "manifest.json", message: `Coverage '${entry.id}' source_reviewed reference '${evidence.reference}' must be a repository-relative file path (optionally :line); put descriptions in evidence.note.` });
+        continue;
+      }
+      const candidate = path.join(repositoryRoot, relative);
+      let resolved: string | null = null;
+      try {
+        resolved = await realpath(candidate);
+      } catch {
+        resolved = null;
+      }
+      if (!resolved || !isWithin(repositoryRoot, resolved)) {
+        issues.push({ path: "manifest.json", message: `Coverage '${entry.id}' cites '${evidence.reference}', which does not exist in the repository. Cite a real file.` });
+      }
+    }
+  }
+}
 const COVERAGE_STATUSES = ["source_reviewed", "rendered", "blocked", "not_inspected"] as const;
 const EVIDENCE_TYPES = ["source_reviewed", "rendered", "design_reference", "inference"] as const;
 
@@ -429,6 +510,10 @@ function validateSetupScope(value: unknown, issues: ValidationIssue[]): SetupSco
     && stringArray(value.requiredCoverage) && new Set(value.requiredCoverage).size === value.requiredCoverage.length;
   if (!valid) {
     issues.push({ path: "manifest.json", message: "setupScope is missing a valid description, selection, repositoryApps, products, exclusions, coverageTarget, or requiredCoverage list." });
+    return null;
+  }
+  if (value.requiredStates !== undefined && !validStateList(value.requiredStates, true)) {
+    issues.push({ path: "manifest.json", message: `setupScope.requiredStates must be a non-empty list of ${RENDERED_STATES.join(", ")}.` });
     return null;
   }
   return value as unknown as SetupScope;
@@ -477,6 +562,15 @@ function parseCoverage(value: unknown, issues: ValidationIssue[]): SetupCoverage
     if ((item.status === "blocked" || item.status === "not_inspected") && (typeof item.gap !== "string" || !item.gap.trim())) {
       issues.push({ path: "manifest.json", message: `${prefix}.gap must explain blocked or uninspected coverage.` });
     }
+    if (item.statesObserved !== undefined && !validStateList(item.statesObserved, false)) {
+      issues.push({ path: "manifest.json", message: `${prefix}.statesObserved must list only ${RENDERED_STATES.join(", ")}.` });
+    }
+    if (item.status === "rendered" && !validStateList(item.statesObserved, true)) {
+      issues.push({ path: "manifest.json", message: `${prefix} is rendered but statesObserved does not list which UI states were actually seen (${RENDERED_STATES.join(", ")}). A screen seen only failing is not a populated rendering.` });
+    }
+    if (item.status === "blocked" && !(stringArray(item.accessAttempts) && item.accessAttempts.length > 0)) {
+      issues.push({ path: "manifest.json", message: `${prefix} is blocked but accessAttempts is empty. Before recording a block, try the documented way to run the product (startup/seed recipes from repository docs, launch configs, compose files, host memory) and record each attempt and its result.` });
+    }
     if (typeof item.id === "string" && typeof item.app === "string" && typeof item.surface === "string" && COVERAGE_STATUSES.includes(item.status as (typeof COVERAGE_STATUSES)[number]) && Array.isArray(item.evidence) && stringArray(item.guidanceFiles)) {
       coverage.push(item as unknown as SetupCoverage);
     }
@@ -514,6 +608,17 @@ async function satisfiesMinimumEvidence(packRoot: string, coverage: SetupCoverag
 const WHY_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:why|rationale|reasons?)\b|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*(?:why|rationale)\b/i;
 const REJECTED_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:rejected\b|alternatives(?:[ \t]+considered)?[ \t]+rejected\b|considered(?:[ \t]+and)?[ \t]+rejected\b|settled rejections?\b|options rejected\b)|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*rejected\b/i;
 
+/**
+ * Reference files that record facts or evidence, not design decisions, declare it with
+ * `taste-kind: facts` (or `evidence`) in frontmatter or an HTML comment near the top.
+ * They have no choice to justify, so the Why/Rejected check skips them.
+ */
+const NON_DECISION_KIND = /(?:^|\n)(?:<!--\s*)?taste-kind:\s*(?:facts|evidence)\b/i;
+
+function declaresNonDecisionKind(content: string): boolean {
+  return NON_DECISION_KIND.test(content.slice(0, 600));
+}
+
 function inferenceOnlyCoverage(entry: SetupCoverage): boolean {
   if (entry.status !== "source_reviewed" && entry.status !== "rendered") return false;
   return entry.evidence.length > 0 && entry.evidence.every((evidence) => evidence.type === "inference");
@@ -533,6 +638,7 @@ async function warnOnGuidanceShape(packRoot: string, coverage: SetupCoverage[], 
       } catch {
         continue;
       }
+      if (declaresNonDecisionKind(content)) continue;
       const missing: string[] = [];
       if (!WHY_SECTION.test(content)) missing.push("Why");
       if (!REJECTED_SECTION.test(content)) missing.push("Rejected");
@@ -594,6 +700,8 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
     }
     if (record.setupStatus === undefined) {
       issues.push({ path: "manifest.json", message: "setupStatus is required and must be in_progress, usable_partial, or complete." });
+    } else if (typeof record.setupStatus === "string" && record.setupStatus in LEGACY_SETUP_STATUSES) {
+      issues.push({ path: "manifest.json", message: `Legacy setupStatus '${record.setupStatus}' is read as '${LEGACY_SETUP_STATUSES[record.setupStatus]}'. Migrate the Pack: ${migrationSteps(record).join(" ")} Then resume /taste-setup.` });
     } else if (!SETUP_STATUSES.includes(record.setupStatus as (typeof SETUP_STATUSES)[number])) {
       issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete." });
     }
@@ -627,7 +735,21 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
           });
         }
       }
+      await checkSourceReferences(path.dirname(packRoot), coverage, issues);
       await warnOnGuidanceShape(packRoot, coverage, warnings);
+      if (!coverage.some((entry) => entry.status === "rendered" && entry.statesObserved?.includes("populated"))) {
+        warnings.push({
+          path: "manifest.json",
+          message: "No coverage entry rendered a populated state; every rendered observation is of loading, empty, or failure states (or nothing rendered at all). Guidance about real content is unverified. Start the product with its documented local stack and seed or test accounts, or ask the user once for safe access, then resume /taste-setup.",
+        });
+      }
+      const fixtureTotal = (await listFixturesAt(packRoot, "conformance")).length + (await listFixturesAt(packRoot, "expression")).length;
+      if (fixtureTotal === 0) {
+        warnings.push({
+          path: "evals",
+          message: "The Pack has no evaluation fixtures, so taste-evaluate cannot measure whether this guidance helps. Add at least one conformance fixture (task.md, before/, after/) for a covered surface, built from a real product file.",
+        });
+      }
       const usableCoverage = await satisfiesMinimumEvidence(packRoot, coverage, minimumUsableEvidence);
       if (usableCoverage.length === 0) {
         issues.push({ path: "manifest.json", message: `No surface has specific, cited guidance meeting minimumUsableEvidence=${minimumUsableEvidence}. Keep setupStatus=in_progress.` });
@@ -640,6 +762,12 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
             const entry = coverage.find((item) => item.id === requiredId);
             if (!entry || entry.status !== "rendered" || !entry.evidence.some((evidence) => evidence.type === "rendered") || !entry.evidence.some((evidence) => evidence.type === "source_reviewed") || !(await hasCitedActionableGuidance(packRoot, entry))) {
               issues.push({ path: "manifest.json", message: `Required coverage '${requiredId}' is not rendered, source-correlated, and supported by cited guidance; setup cannot be complete.` });
+              continue;
+            }
+            const requiredStates = setupScope.requiredStates ?? DEFAULT_REQUIRED_STATES;
+            const missingStates = requiredStates.filter((state) => !entry.statesObserved?.includes(state));
+            if (missingStates.length > 0) {
+              issues.push({ path: "manifest.json", message: `Required coverage '${requiredId}' has not rendered the required state(s) ${missingStates.join(", ")}; setup cannot be complete.` });
             }
           }
         }

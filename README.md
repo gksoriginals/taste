@@ -134,11 +134,14 @@ codex plugin marketplace add /absolute/path/to/taste
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-From a Taste checkout, launch Claude Code with:
+Add this repository as a plugin marketplace and install Taste (persists across sessions):
 
 ```sh
-claude --plugin-dir /absolute/path/to/taste
+claude plugin marketplace add gksoriginals/taste
+claude plugin install taste@taste
 ```
+
+To try a local checkout for one session instead, launch Claude Code with `claude --plugin-dir /absolute/path/to/taste`.
 
 </details>
 

@@ -13,7 +13,7 @@ import {
   validatePack,
   writePackFile,
 } from "../src/core/pack.js";
-import type { MinimumUsableEvidence, SetupCoverage, SetupScope } from "../src/core/pack.js";
+import type { MinimumUsableEvidence, RenderedState, SetupCoverage, SetupScope } from "../src/core/pack.js";
 
 async function withRepository(run: (repositoryPath: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(path.join(os.tmpdir(), "taste-pack-test-"));
@@ -38,6 +38,8 @@ async function prepareEvidencePack(repositoryPath: string, minimumUsableEvidence
   for (const definition of definitions) {
     const rendered = renderedIds.includes(definition.id);
     await mkdir(path.dirname(path.join(packRoot, definition.file)), { recursive: true });
+    await mkdir(path.dirname(path.join(repositoryPath, definition.ref)), { recursive: true });
+    await writeFile(path.join(repositoryPath, definition.ref), `// ${definition.app} ${definition.surface} source\n`);
     await writeFile(path.join(packRoot, definition.file), `# ${definition.app} ${definition.surface}\n\nFor this journey, keep the task scoped to the documented product behavior and preserve its validation and recovery states. Source: ${definition.ref}. Visual behavior is not verified by this source-only evidence.\n`);
     coverage.push({
       id: definition.id,
@@ -50,7 +52,10 @@ async function prepareEvidencePack(repositoryPath: string, minimumUsableEvidence
         ...(rendered ? [{ type: "rendered" as const, reference: `screenshots/${definition.id}.png`, checkedAt: "2026-11-04" }] : []),
       ],
       guidanceFiles: [definition.file],
-      ...(definition.status === "blocked" && !rendered ? { gap: "Local authenticated access is not available." } : {}),
+      ...(rendered ? { statesObserved: ["populated", "error"] as RenderedState[] } : {}),
+      ...(definition.status === "blocked" && !rendered
+        ? { gap: "Local authenticated access is not available.", accessAttempts: ["docker compose up -d: daemon not running and could not be started"] }
+        : {}),
     });
   }
   const scope: SetupScope = {
@@ -76,7 +81,9 @@ async function markRenderedCoverage(repositoryPath: string, ids: string[]): Prom
       ...entry,
       status: "rendered" as const,
       evidence: [...entry.evidence, { type: "rendered" as const, reference: `screenshots/${entry.id}.png`, checkedAt: "2026-11-04" }],
+      statesObserved: ["populated"] as SetupCoverage["statesObserved"],
       gap: undefined,
+      accessAttempts: undefined,
     }
     : entry);
   await writeFile(manifestPath, JSON.stringify({ ...manifest, coverage: updated }, null, 2) + "\n");
@@ -131,7 +138,7 @@ test("source-reviewed evidence can make a Pack usable_partial while blocked jour
 
     const inspection = await inspectPack(repositoryPath);
     assert.equal(inspection.setupStatus, "usable_partial");
-    assert.deepEqual(inspection.coverageSummary, { sourceReviewed: 2, rendered: 0, blocked: 1, notInspected: 0, required: 3, targetMet: false });
+    assert.deepEqual(inspection.coverageSummary, { sourceReviewed: 2, rendered: 0, renderedPopulated: 0, blocked: 1, notInspected: 0, required: 3, targetMet: false });
     assert.equal(inspection.validation.valid, true, JSON.stringify(inspection.validation.issues));
   });
 });
@@ -207,7 +214,7 @@ test("linked guidance missing Why or Rejected sections warns without failing val
 
     const cleared = await validatePack(repositoryPath);
     assert.equal(cleared.valid, true, JSON.stringify(cleared.issues));
-    assert.deepEqual(cleared.warnings, []);
+    assert.deepEqual(cleared.warnings.filter((warning) => warning.path.endsWith(".md")), []);
   });
 });
 
@@ -301,7 +308,9 @@ test("committed example Pack validates and supplies both conformance and express
   const repositoryPath = path.resolve("examples/product-pack");
   const validation = await validatePack(repositoryPath);
   assert.equal(validation.valid, true, JSON.stringify(validation.issues));
-  assert.deepEqual(validation.warnings, []);
+  // The example is synthetic with no running UI, so the only warning is the honest "no populated state rendered" one.
+  assert.deepEqual(validation.warnings.map((warning) => warning.path), ["manifest.json"]);
+  assert.match(validation.warnings[0]?.message ?? "", /No coverage entry rendered a populated state/);
   assert.deepEqual(await listEvaluationFixtures(repositoryPath, "conformance"), ["account-setup-progress"]);
   assert.deepEqual(await listEvaluationFixtures(repositoryPath, "expression"), ["setup-direction"]);
   const generatorCase = await getEvaluationGeneratorCase(repositoryPath, "conformance", "account-setup-progress");
@@ -310,4 +319,163 @@ test("committed example Pack validates and supplies both conformance and express
   assert.equal("expectedAfter" in generatorCase, false);
   assert.equal(judgePacket.expectedAfter.length, 1);
   assert.equal(judgePacket.generatedOutput[0]?.content, "<main>Generated result</main>");
+});
+
+async function setManifest(repositoryPath: string, change: (manifest: Record<string, unknown> & { coverage: SetupCoverage[] }) => Record<string, unknown>): Promise<void> {
+  const manifestPath = path.join(repositoryPath, "taste/manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown> & { coverage: SetupCoverage[] };
+  await writeFile(manifestPath, JSON.stringify(change(manifest), null, 2) + "\n");
+}
+
+test("rendered coverage must say which UI states were actually seen", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login"]);
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupStatus: "usable_partial",
+      coverage: manifest.coverage.map((entry) => entry.id === "admin.login" ? { ...entry, statesObserved: undefined } : entry),
+    }));
+    const missing = await validatePack(repositoryPath);
+    assert.equal(missing.valid, false);
+    assert.ok(missing.issues.some((issue) => /coverage\[0\] is rendered but statesObserved/.test(issue.message)));
+
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      coverage: manifest.coverage.map((entry) => entry.id === "admin.login" ? { ...entry, statesObserved: ["error", "sparkly"] } : entry),
+    }));
+    const unknown = await validatePack(repositoryPath);
+    assert.ok(unknown.issues.some((issue) => /statesObserved must list only/.test(issue.message)));
+  });
+});
+
+test("only failure states rendered warns that no populated state was seen", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login"]);
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupStatus: "usable_partial",
+      coverage: manifest.coverage.map((entry) => entry.id === "admin.login" ? { ...entry, statesObserved: ["loading", "error"] } : entry),
+    }));
+    const failureOnly = await inspectPack(repositoryPath);
+    assert.equal(failureOnly.validation.valid, true, JSON.stringify(failureOnly.validation.issues));
+    assert.equal(failureOnly.coverageSummary.renderedPopulated, 0);
+    assert.ok(failureOnly.validation.warnings.some((warning) => /No coverage entry rendered a populated state/.test(warning.message)));
+
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      coverage: manifest.coverage.map((entry) => entry.id === "admin.login" ? { ...entry, statesObserved: ["populated", "error"] } : entry),
+    }));
+    const populated = await inspectPack(repositoryPath);
+    assert.equal(populated.coverageSummary.renderedPopulated, 1);
+    assert.equal(populated.validation.warnings.some((warning) => /populated state/.test(warning.message)), false);
+  });
+});
+
+test("blocked coverage must record the access attempts made before giving up", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupStatus: "usable_partial",
+      coverage: manifest.coverage.map((entry) => entry.id === "portal.billing" ? { ...entry, accessAttempts: [] } : entry),
+    }));
+    const validation = await validatePack(repositoryPath);
+    assert.equal(validation.valid, false);
+    assert.ok(validation.issues.some((issue) => /coverage\[2\] is blocked but accessAttempts is empty/.test(issue.message)));
+  });
+});
+
+test("source_reviewed evidence must cite a repository file that exists", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupStatus: "usable_partial",
+      coverage: manifest.coverage.map((entry) => entry.id === "admin.login"
+        ? { ...entry, evidence: [{ type: "source_reviewed", reference: "src/admin/routes.ts:12-30", checkedAt: "2026-11-04" }] }
+        : entry),
+    }));
+    const lineSuffix = await validatePack(repositoryPath);
+    assert.equal(lineSuffix.valid, true, JSON.stringify(lineSuffix.issues));
+
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      coverage: manifest.coverage.map((entry) => entry.id === "portal.profile"
+        ? { ...entry, evidence: [{ type: "source_reviewed", reference: "src/portal/missing.tsx", checkedAt: "2026-11-04" }] }
+        : entry.id === "portal.billing"
+          ? { ...entry, evidence: [{ type: "source_reviewed", reference: "billing page and its tests", checkedAt: "2026-11-04" }] }
+          : entry),
+    }));
+    const invalid = await validatePack(repositoryPath);
+    assert.equal(invalid.valid, false);
+    assert.ok(invalid.issues.some((issue) => /'src\/portal\/missing.tsx', which does not exist/.test(issue.message)));
+    assert.ok(invalid.issues.some((issue) => /'billing page and its tests' must be a repository-relative file path/.test(issue.message)));
+
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      coverage: manifest.coverage.map((entry) => entry.id === "portal.billing"
+        ? { ...entry, evidence: [{ type: "source_reviewed", reference: "../outside.ts", checkedAt: "2026-11-04" }] }
+        : entry),
+    }));
+    const escape = await validatePack(repositoryPath);
+    assert.ok(escape.issues.some((issue) => /'\.\.\/outside.ts' must be a repository-relative file path/.test(issue.message)));
+  });
+});
+
+test("complete requires the structured required states, defaulting to populated", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login", "portal.profile", "portal.billing"]);
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupStatus: "complete",
+      coverage: manifest.coverage.map((entry) => entry.id === "portal.billing" ? { ...entry, statesObserved: ["error"] } : entry),
+    }));
+    const defaultTarget = await inspectPack(repositoryPath);
+    assert.equal(defaultTarget.validation.valid, false);
+    assert.equal(defaultTarget.coverageSummary.targetMet, false);
+    assert.ok(defaultTarget.validation.issues.some((issue) => /'portal\.billing' has not rendered the required state\(s\) populated/.test(issue.message)));
+
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupScope: { ...(manifest.setupScope as SetupScope), requiredStates: ["populated", "error"] },
+      coverage: manifest.coverage.map((entry) => ({ ...entry, statesObserved: ["populated", "error"] })),
+    }));
+    const met = await inspectPack(repositoryPath);
+    assert.equal(met.validation.valid, true, JSON.stringify(met.validation.issues));
+    assert.equal(met.coverageSummary.targetMet, true);
+
+    await setManifest(repositoryPath, (manifest) => ({ ...manifest, setupScope: { ...(manifest.setupScope as SetupScope), requiredStates: [] } }));
+    const emptyStates = await validatePack(repositoryPath);
+    assert.ok(emptyStates.issues.some((issue) => /setupScope.requiredStates must be a non-empty list/.test(issue.message)));
+  });
+});
+
+test("a legacy 'incomplete' Pack is read as in_progress with migration steps", async () => {
+  await withRepository(async (repositoryPath) => {
+    await initializePack(repositoryPath, "Example Product", ["Admin login"]);
+    await writeFile(path.join(repositoryPath, "taste/manifest.json"), JSON.stringify({ name: "Example Product", version: "0.1.0", setupStatus: "incomplete", surfaces: ["Admin login"] }, null, 2) + "\n");
+
+    const inspection = await inspectPack(repositoryPath);
+    assert.equal(inspection.setupStatus, "in_progress");
+    assert.ok(inspection.migrationNeeded.some((step) => /legacy setupStatus 'incomplete'/i.test(step)));
+    assert.ok(inspection.migrationNeeded.some((step) => /setupScope/.test(step)));
+    assert.ok(inspection.migrationNeeded.some((step) => /coverage/.test(step)));
+    assert.equal(inspection.validation.valid, false);
+    assert.ok(inspection.validation.issues.some((issue) => /Legacy setupStatus 'incomplete' is read as 'in_progress'. Migrate the Pack/.test(issue.message)));
+  });
+});
+
+test("fact files opt out of the Why/Rejected check, and a Pack with no fixtures is warned", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath);
+    const packRoot = path.join(repositoryPath, "taste");
+    await writeFile(path.join(packRoot, "skills/product-design/references/admin-login.md"), "---\ntaste-kind: facts\n---\n# Admin facts\n\nThe Admin app serves login at /login on the documented local port. Source: src/admin/routes.ts. Visual behavior is not verified by this source-only evidence.\n");
+    await setManifest(repositoryPath, (manifest) => ({ ...manifest, setupStatus: "usable_partial" }));
+
+    const validation = await validatePack(repositoryPath);
+    assert.equal(validation.valid, true, JSON.stringify(validation.issues));
+    assert.equal(validation.warnings.some((warning) => warning.path.endsWith("admin-login.md")), false);
+    assert.ok(validation.warnings.some((warning) => warning.path.endsWith("portal-profile.md")));
+    assert.ok(validation.warnings.some((warning) => warning.path === "evals" && /no evaluation fixtures/.test(warning.message)));
+  });
 });

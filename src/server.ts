@@ -52,7 +52,7 @@ async function toolResult<T extends object>(toolName: string, operation: () => P
 
 export function createTasteServer(): McpServer {
   const server = new McpServer(
-    { name: "taste", version: "0.1.0" },
+    { name: "taste", version: "0.2.0" },
     {
       instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes."
         + (process.env.TASTE_TRACE_DIR ? " Local session tracing is enabled. Follow the Session traces section of taste-design." : ""),
@@ -91,7 +91,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts and target progress, references, fixtures, and validation. Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Reads only taste/.",
+      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts (including how many rendered a populated state) and target progress, references, fixtures, validation, and migrationNeeded steps for older Packs (a legacy incomplete status reads as in_progress). Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Reads only taste/.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -133,7 +133,7 @@ export function createTasteServer(): McpServer {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. usable_partial and complete coverage whose only evidence is inference fails. Linked guidance is soft-checked for Why and Rejected sections; a miss is a warning and does not fail validation. Product references and metadata are optional. Structural validation only, not a quality judgment or a guidance grammar.",
+      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Fails when: usable_partial or complete coverage has only inference evidence; a source_reviewed reference is not an existing repository-relative file path; a rendered entry has no statesObserved; a blocked entry has no accessAttempts; or complete coverage has not rendered every setupScope.requiredStates state (default populated). Warns, without failing, when linked decision guidance lacks Why and Rejected sections (files declaring taste-kind: facts or evidence are exempt), when no rendered entry observed a populated state, and when the Pack has no evaluation fixtures. Treat warnings as work items. Structural validation only, not a quality judgment or a guidance grammar.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -191,5 +191,5 @@ export function createTasteServer(): McpServer {
 }
 
 const server = createTasteServer();
-logDiagnostic("debug", "server_starting", { version: "0.1.0", transport: "stdio" });
+logDiagnostic("debug", "server_starting", { version: "0.2.0", transport: "stdio" });
 await server.connect(new StdioServerTransport());

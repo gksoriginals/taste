@@ -36667,6 +36667,8 @@ var ENTRY_SKILL = "skills/product-design/SKILL.md";
 var MAX_PACK_FILE_BYTES = 256 * 1024;
 var MAX_EVAL_FILES = 100;
 var MAX_EVAL_BYTES = 1024 * 1024;
+var RENDERED_STATES = ["populated", "empty", "loading", "error", "denied", "validation", "offline"];
+var DEFAULT_REQUIRED_STATES = ["populated"];
 var TasteError = class extends Error {
   constructor(message, code) {
     super(message);
@@ -36887,7 +36889,8 @@ async function inspectPack(repositoryPath2) {
   const coverage = Array.isArray(manifest?.coverage) ? manifest.coverage.filter((item) => isObjectRecord(item) && typeof item.id === "string" && typeof item.status === "string") : [];
   const requiredCoverage = Array.isArray(manifest?.setupScope?.requiredCoverage) ? manifest.setupScope.requiredCoverage.filter((id) => typeof id === "string") : [];
   const coverageById = new Map(coverage.map((item) => [item.id, item]));
-  const setupStatus = manifest?.setupStatus ?? "in_progress";
+  const setupStatus = normalizeSetupStatus(manifest?.setupStatus);
+  const requiredStates = manifest?.setupScope?.requiredStates ?? DEFAULT_REQUIRED_STATES;
   const referenceRoot = path.join(packRoot, "skills/product-design/references");
   const referenceCount = await countMarkdown(referenceRoot);
   const fixtureCounts = {
@@ -36901,11 +36904,16 @@ async function inspectPack(repositoryPath2) {
     coverageSummary: {
       sourceReviewed: coverage.filter((item) => item.status === "source_reviewed").length,
       rendered: coverage.filter((item) => item.status === "rendered").length,
+      renderedPopulated: coverage.filter((item) => item.status === "rendered" && Array.isArray(item.statesObserved) && item.statesObserved.includes("populated")).length,
       blocked: coverage.filter((item) => item.status === "blocked").length,
       notInspected: coverage.filter((item) => item.status === "not_inspected").length,
       required: requiredCoverage.length,
-      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => coverageById.get(id)?.status === "rendered")
+      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => {
+        const entry = coverageById.get(id);
+        return entry?.status === "rendered" && requiredStates.every((state) => Array.isArray(entry.statesObserved) && entry.statesObserved.includes(state));
+      })
     },
+    migrationNeeded: migrationSteps(manifest),
     entrySkillAvailable: await resolvePackFile(packRoot, ENTRY_SKILL).then(() => true).catch(() => false),
     referenceCount,
     layout: await packLayout(packRoot),
@@ -36940,6 +36948,54 @@ async function exists(filePath) {
   }
 }
 var SETUP_STATUSES = ["in_progress", "usable_partial", "complete"];
+var LEGACY_SETUP_STATUSES = { incomplete: "in_progress" };
+function validStateList(value, requireNonEmpty) {
+  return Array.isArray(value) && (!requireNonEmpty || value.length > 0) && value.every((state) => RENDERED_STATES.includes(state)) && new Set(value).size === value.length;
+}
+function normalizeSetupStatus(value) {
+  if (typeof value === "string" && SETUP_STATUSES.includes(value)) return value;
+  if (typeof value === "string" && value in LEGACY_SETUP_STATUSES) return LEGACY_SETUP_STATUSES[value];
+  return "in_progress";
+}
+function migrationSteps(manifest) {
+  if (!manifest) return ["Recreate manifest.json as valid JSON, then resume /taste-setup."];
+  const steps = [];
+  if (typeof manifest.setupStatus === "string" && manifest.setupStatus in LEGACY_SETUP_STATUSES) {
+    steps.push(`Replace legacy setupStatus '${manifest.setupStatus}' with '${LEGACY_SETUP_STATUSES[manifest.setupStatus]}'.`);
+  }
+  if (manifest.setupPolicy === void 0) steps.push('Add setupPolicy (default { "minimumUsableEvidence": "source_reviewed" }).');
+  if (manifest.setupScope === void 0) steps.push("Add setupScope from a fresh repository inventory; treat existing surfaces as hints, not confirmed scope.");
+  if (manifest.coverage === void 0) steps.push("Add coverage entries for each surface the existing guidance covers, with dated evidence and statesObserved; keep useful existing guidance files.");
+  return steps;
+}
+function sourceReferencePath(reference) {
+  const trimmed = reference.trim().replace(/:\d+(?:-\d+)?$/, "").replace(/#L\d+(?:-L?\d+)?$/, "");
+  if (!trimmed || /\s/.test(trimmed) || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || path.isAbsolute(trimmed)) return null;
+  if (trimmed.split(/[\\/]/).some((piece) => piece === "..")) return null;
+  return trimmed;
+}
+async function checkSourceReferences(repositoryRoot, coverage, issues) {
+  for (const entry of coverage) {
+    for (const evidence of entry.evidence) {
+      if (!isObjectRecord(evidence) || evidence.type !== "source_reviewed" || typeof evidence.reference !== "string") continue;
+      const relative = sourceReferencePath(evidence.reference);
+      if (!relative) {
+        issues.push({ path: "manifest.json", message: `Coverage '${entry.id}' source_reviewed reference '${evidence.reference}' must be a repository-relative file path (optionally :line); put descriptions in evidence.note.` });
+        continue;
+      }
+      const candidate = path.join(repositoryRoot, relative);
+      let resolved = null;
+      try {
+        resolved = await realpath(candidate);
+      } catch {
+        resolved = null;
+      }
+      if (!resolved || !isWithin(repositoryRoot, resolved)) {
+        issues.push({ path: "manifest.json", message: `Coverage '${entry.id}' cites '${evidence.reference}', which does not exist in the repository. Cite a real file.` });
+      }
+    }
+  }
+}
 var COVERAGE_STATUSES = ["source_reviewed", "rendered", "blocked", "not_inspected"];
 var EVIDENCE_TYPES = ["source_reviewed", "rendered", "design_reference", "inference"];
 function isObjectRecord(value) {
@@ -36957,6 +37013,10 @@ function validateSetupScope(value, issues) {
   const valid = typeof value.description === "string" && value.description.trim().length > 0 && (selection === "user_confirmed" || selection === "host_selected") && stringArray(value.repositoryApps) && stringArray(value.products) && Array.isArray(value.exclusions) && value.exclusions.every((item) => typeof item === "string") && typeof value.coverageTarget === "string" && value.coverageTarget.trim().length > 0 && stringArray(value.requiredCoverage) && new Set(value.requiredCoverage).size === value.requiredCoverage.length;
   if (!valid) {
     issues.push({ path: "manifest.json", message: "setupScope is missing a valid description, selection, repositoryApps, products, exclusions, coverageTarget, or requiredCoverage list." });
+    return null;
+  }
+  if (value.requiredStates !== void 0 && !validStateList(value.requiredStates, true)) {
+    issues.push({ path: "manifest.json", message: `setupScope.requiredStates must be a non-empty list of ${RENDERED_STATES.join(", ")}.` });
     return null;
   }
   return value;
@@ -37001,6 +37061,15 @@ function parseCoverage(value, issues) {
     if ((item.status === "blocked" || item.status === "not_inspected") && (typeof item.gap !== "string" || !item.gap.trim())) {
       issues.push({ path: "manifest.json", message: `${prefix}.gap must explain blocked or uninspected coverage.` });
     }
+    if (item.statesObserved !== void 0 && !validStateList(item.statesObserved, false)) {
+      issues.push({ path: "manifest.json", message: `${prefix}.statesObserved must list only ${RENDERED_STATES.join(", ")}.` });
+    }
+    if (item.status === "rendered" && !validStateList(item.statesObserved, true)) {
+      issues.push({ path: "manifest.json", message: `${prefix} is rendered but statesObserved does not list which UI states were actually seen (${RENDERED_STATES.join(", ")}). A screen seen only failing is not a populated rendering.` });
+    }
+    if (item.status === "blocked" && !(stringArray(item.accessAttempts) && item.accessAttempts.length > 0)) {
+      issues.push({ path: "manifest.json", message: `${prefix} is blocked but accessAttempts is empty. Before recording a block, try the documented way to run the product (startup/seed recipes from repository docs, launch configs, compose files, host memory) and record each attempt and its result.` });
+    }
     if (typeof item.id === "string" && typeof item.app === "string" && typeof item.surface === "string" && COVERAGE_STATUSES.includes(item.status) && Array.isArray(item.evidence) && stringArray(item.guidanceFiles)) {
       coverage.push(item);
     }
@@ -37033,6 +37102,10 @@ async function satisfiesMinimumEvidence(packRoot, coverage, minimum) {
 }
 var WHY_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:why|rationale|reasons?)\b|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*(?:why|rationale)\b/i;
 var REJECTED_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:rejected\b|alternatives(?:[ \t]+considered)?[ \t]+rejected\b|considered(?:[ \t]+and)?[ \t]+rejected\b|settled rejections?\b|options rejected\b)|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*rejected\b/i;
+var NON_DECISION_KIND = /(?:^|\n)(?:<!--\s*)?taste-kind:\s*(?:facts|evidence)\b/i;
+function declaresNonDecisionKind(content) {
+  return NON_DECISION_KIND.test(content.slice(0, 600));
+}
 function inferenceOnlyCoverage(entry) {
   if (entry.status !== "source_reviewed" && entry.status !== "rendered") return false;
   return entry.evidence.length > 0 && entry.evidence.every((evidence) => evidence.type === "inference");
@@ -37051,6 +37124,7 @@ async function warnOnGuidanceShape(packRoot, coverage, warnings) {
       } catch {
         continue;
       }
+      if (declaresNonDecisionKind(content)) continue;
       const missing = [];
       if (!WHY_SECTION.test(content)) missing.push("Why");
       if (!REJECTED_SECTION.test(content)) missing.push("Rejected");
@@ -37107,6 +37181,8 @@ async function validatePackAt(packRoot) {
     }
     if (record2.setupStatus === void 0) {
       issues.push({ path: "manifest.json", message: "setupStatus is required and must be in_progress, usable_partial, or complete." });
+    } else if (typeof record2.setupStatus === "string" && record2.setupStatus in LEGACY_SETUP_STATUSES) {
+      issues.push({ path: "manifest.json", message: `Legacy setupStatus '${record2.setupStatus}' is read as '${LEGACY_SETUP_STATUSES[record2.setupStatus]}'. Migrate the Pack: ${migrationSteps(record2).join(" ")} Then resume /taste-setup.` });
     } else if (!SETUP_STATUSES.includes(record2.setupStatus)) {
       issues.push({ path: "manifest.json", message: "setupStatus must be in_progress, usable_partial, or complete." });
     }
@@ -37140,7 +37216,21 @@ async function validatePackAt(packRoot) {
           });
         }
       }
+      await checkSourceReferences(path.dirname(packRoot), coverage, issues);
       await warnOnGuidanceShape(packRoot, coverage, warnings);
+      if (!coverage.some((entry2) => entry2.status === "rendered" && entry2.statesObserved?.includes("populated"))) {
+        warnings.push({
+          path: "manifest.json",
+          message: "No coverage entry rendered a populated state; every rendered observation is of loading, empty, or failure states (or nothing rendered at all). Guidance about real content is unverified. Start the product with its documented local stack and seed or test accounts, or ask the user once for safe access, then resume /taste-setup."
+        });
+      }
+      const fixtureTotal = (await listFixturesAt(packRoot, "conformance")).length + (await listFixturesAt(packRoot, "expression")).length;
+      if (fixtureTotal === 0) {
+        warnings.push({
+          path: "evals",
+          message: "The Pack has no evaluation fixtures, so taste-evaluate cannot measure whether this guidance helps. Add at least one conformance fixture (task.md, before/, after/) for a covered surface, built from a real product file."
+        });
+      }
       const usableCoverage = await satisfiesMinimumEvidence(packRoot, coverage, minimumUsableEvidence);
       if (usableCoverage.length === 0) {
         issues.push({ path: "manifest.json", message: `No surface has specific, cited guidance meeting minimumUsableEvidence=${minimumUsableEvidence}. Keep setupStatus=in_progress.` });
@@ -37153,6 +37243,12 @@ async function validatePackAt(packRoot) {
             const entry2 = coverage.find((item) => item.id === requiredId);
             if (!entry2 || entry2.status !== "rendered" || !entry2.evidence.some((evidence) => evidence.type === "rendered") || !entry2.evidence.some((evidence) => evidence.type === "source_reviewed") || !await hasCitedActionableGuidance(packRoot, entry2)) {
               issues.push({ path: "manifest.json", message: `Required coverage '${requiredId}' is not rendered, source-correlated, and supported by cited guidance; setup cannot be complete.` });
+              continue;
+            }
+            const requiredStates = setupScope.requiredStates ?? DEFAULT_REQUIRED_STATES;
+            const missingStates = requiredStates.filter((state) => !entry2.statesObserved?.includes(state));
+            if (missingStates.length > 0) {
+              issues.push({ path: "manifest.json", message: `Required coverage '${requiredId}' has not rendered the required state(s) ${missingStates.join(", ")}; setup cannot be complete.` });
             }
           }
         }
@@ -37404,7 +37500,7 @@ async function toolResult(toolName, operation, runId) {
 }
 function createTasteServer() {
   const server2 = new McpServer(
-    { name: "taste", version: "0.1.0" },
+    { name: "taste", version: "0.2.0" },
     {
       instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes." + (process.env.TASTE_TRACE_DIR ? " Local session tracing is enabled. Follow the Session traces section of taste-design." : "")
     }
@@ -37439,7 +37535,7 @@ function createTasteServer() {
     "taste_pack_inspect",
     {
       title: "Inspect a Taste Pack",
-      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts and target progress, references, fixtures, and validation. Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Reads only taste/.",
+      description: "Summarize the target repository's Taste Pack, lifecycle status, per-surface coverage counts (including how many rendered a populated state) and target progress, references, fixtures, validation, and migrationNeeded steps for older Packs (a legacy incomplete status reads as in_progress). Status and coverage are distinct; usable_partial guidance applies only to listed evidence-backed coverage. Reads only taste/.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
@@ -37478,7 +37574,7 @@ function createTasteServer() {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. usable_partial and complete coverage whose only evidence is inference fails. Linked guidance is soft-checked for Why and Rejected sections; a miss is a warning and does not fail validation. Product references and metadata are optional. Structural validation only, not a quality judgment or a guidance grammar.",
+      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Fails when: usable_partial or complete coverage has only inference evidence; a source_reviewed reference is not an existing repository-relative file path; a rendered entry has no statesObserved; a blocked entry has no accessAttempts; or complete coverage has not rendered every setupScope.requiredStates state (default populated). Warns, without failing, when linked decision guidance lacks Why and Rejected sections (files declaring taste-kind: facts or evidence are exempt), when no rendered entry observed a populated state, and when the Pack has no evaluation fixtures. Treat warnings as work items. Structural validation only, not a quality judgment or a guidance grammar.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
@@ -37531,7 +37627,7 @@ function createTasteServer() {
   return server2;
 }
 var server = createTasteServer();
-logDiagnostic("debug", "server_starting", { version: "0.1.0", transport: "stdio" });
+logDiagnostic("debug", "server_starting", { version: "0.2.0", transport: "stdio" });
 await server.connect(new StdioServerTransport());
 export {
   createTasteServer

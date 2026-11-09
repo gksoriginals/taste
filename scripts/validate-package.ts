@@ -25,7 +25,7 @@ if (!validatePlugin(plugin)) issues.push(`plugin.json: ${JSON.stringify(validate
 if (!validateMcp(portableMcp)) issues.push(`mcp.json: ${JSON.stringify(validateMcp.errors)}`);
 if (claudeManifest.name !== plugin.name) issues.push("Claude Code and portable plugin names must match.");
 if (claudeManifest.mcpServers !== "./.claude.mcp.json") issues.push("Claude Code manifest must point to its native MCP config.");
-if (cursorManifest.name !== plugin.name || cursorManifest.skills !== "./skills/" || cursorManifest.commands !== "./commands/" || cursorManifest.mcpServers !== "./.cursor.mcp.json") {
+if (cursorManifest.name !== plugin.name || cursorManifest.skills !== "./skills/" || cursorManifest.commands !== "./cursor/commands/" || cursorManifest.mcpServers !== "./.cursor.mcp.json") {
   issues.push("Cursor manifest must point to shared Skills, explicit commands, and Cursor-specific MCP config.");
 }
 if (codexManifest.name !== plugin.name || codexManifest.version !== plugin.version) issues.push("Codex and portable plugin identity/version must match.");
@@ -66,9 +66,9 @@ if (!(await stat(path.join(root, "dist/server.js")).then((item) => item.isFile()
   issues.push("dist/server.js is missing; run npm run build before packaging the plugin.");
 }
 
-const setupCommand = await readFile(path.join(root, "commands/taste-setup.md"), "utf8").catch(() => null);
+const setupCommand = await readFile(path.join(root, "cursor/commands/taste-setup.md"), "utf8").catch(() => null);
 if (!setupCommand || !/^name:\s*taste-setup\s*$/m.test(setupCommand.match(/^---\s*\n([\s\S]*?)\n---/m)?.[1] ?? "")) {
-  issues.push("commands/taste-setup.md must define the explicit Taste setup command.");
+  issues.push("cursor/commands/taste-setup.md must define the explicit Taste setup command.");
 }
 
 const skillDirectories = await readdir(path.join(root, "skills"), { withFileTypes: true });

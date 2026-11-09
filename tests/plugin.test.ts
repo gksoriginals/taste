@@ -40,7 +40,7 @@ test("Cursor compatibility manifest uses Cursor-specific plugin root expansion",
   const mcp = JSON.parse(await readFile(path.join(root, ".cursor.mcp.json"), "utf8")) as { mcpServers?: Record<string, { command?: string; args?: string[]; cwd?: string }> };
   assert.equal(manifest.name, "taste");
   assert.equal(manifest.skills, "./skills/");
-  assert.equal(manifest.commands, "./commands/");
+  assert.equal(manifest.commands, "./cursor/commands/");
   assert.equal(manifest.mcpServers, "./.cursor.mcp.json");
   assert.deepEqual(mcp.mcpServers?.taste, {
     command: "node",
@@ -60,7 +60,7 @@ test("Codex compatibility manifest routes to its plugin-root MCP config and Skil
     mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }>;
   };
   assert.equal(manifest.name, "taste");
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.2.0");
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.mcpServers, "./.mcp.json");
   assert.deepEqual(mcp.mcpServers?.taste, {
@@ -88,7 +88,7 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   const setup = await readFile(path.join(root, "skills/taste-setup/SKILL.md"), "utf8");
   const sweep = await readFile(path.join(root, "skills/taste-sweep/SKILL.md"), "utf8");
   const design = await readFile(path.join(root, "skills/taste-design/SKILL.md"), "utf8");
-  const command = await readFile(path.join(root, "commands/taste-setup.md"), "utf8");
+  const command = await readFile(path.join(root, "cursor/commands/taste-setup.md"), "utf8");
 
   assert.match(setup, /If no product UI or UI source exists, do not create a generic Pack/i);
   assert.match(setup, /starter Pack.s listed surfaces are hints only/i);
@@ -149,4 +149,38 @@ test("guidance writes record settled rejections, and UI work briefs before check
   assert.match(expression, /Keep the change only if the checker shows improvement or no regression/);
   assert.match(expression, /checkSummaries\.before/);
   assert.match(design, /checkSummaries\.before` and `checkSummaries\.after`/);
+});
+
+test("Claude Code marketplace installs the root plugin, and the Cursor-only command stays out of the auto-loaded commands/ directory", async () => {
+  const marketplace = JSON.parse(await readFile(path.join(root, ".claude-plugin/marketplace.json"), "utf8")) as {
+    name?: string;
+    owner?: { name?: string };
+    plugins?: Array<{ name?: string; source?: string; version?: string }>;
+  };
+  const plugin = JSON.parse(await readFile(path.join(root, ".claude-plugin/plugin.json"), "utf8")) as { version?: string };
+  const taste = marketplace.plugins?.find((entry) => entry.name === "taste");
+  assert.equal(marketplace.name, "taste");
+  assert.ok(marketplace.owner?.name);
+  assert.equal(taste?.source, "./");
+  assert.equal(taste?.version, plugin.version);
+  await assert.rejects(() => readFile(path.join(root, "commands/taste-setup.md"), "utf8"), /ENOENT/);
+});
+
+test("setup starts the product before recording a block and records what it actually saw", async () => {
+  const setup = await readFile(path.join(root, "skills/taste-setup/SKILL.md"), "utf8");
+  const sweep = await readFile(path.join(root, "skills/taste-sweep/SKILL.md"), "utf8");
+  const command = await readFile(path.join(root, "cursor/commands/taste-setup.md"), "utf8");
+  for (const text of [setup, sweep, command]) {
+    assert.match(text, /memory or notes for this repository/);
+    assert.match(text, /statesObserved/);
+    assert.match(text, /accessAttempts/);
+    assert.match(text, /test accounts/);
+  }
+  assert.match(setup, /A stopped local dependency is a step to take, not a gap to record/);
+  assert.match(setup, /requiredStates/);
+  assert.match(setup, /migrationNeeded/);
+  assert.match(setup, /simulator, emulator/);
+  assert.match(setup, /which source wins on conflict/);
+  assert.match(setup, /conformance fixture/);
+  assert.match(setup, /Say plainly whether any populated state was rendered/);
 });
