@@ -36679,38 +36679,22 @@ var TasteError = class extends Error {
 };
 var starterEntrySkill = (productName) => `---
 name: product-design
-description: Apply ${productName}'s product-specific design judgment when creating, implementing, or reviewing software UI. Load this Pack before UI work.
+description: Route UI tasks to relevant ${productName} product judgment. Read linked guidance only when it applies.
 ---
 
-# Product design guidance for ${productName}
+# ${productName} product design
 
-This Pack preserves durable product judgment: decisions and reasons, tested lessons, and traps discovered through use that a future assistant is unlikely to recover by rereading code or reopening the screen. Link to existing code, lint, docs, instructions, and rendered behavior rather than copying what they already show. Preserve evidence and distinguish observations, inferences, and settled intent; add context when a fact may change.
+This starter is not product guidance. Replace it with a short routing index to lessons worth remembering across tasks: decisions, tested lessons, and traps that cannot be cheaply recovered from the product itself. Link to focused references; do not inventory screens or repeat code, docs, lint rules, instructions, or current UI behavior. Keep uncertain and changing information labeled and scoped.
 
-This starter is not product guidance. Use explicit \`/taste-setup\` to inspect and map a broader product scope. During normal UI work, do not launch that sweep; if resolved user feedback establishes a clear reusable lesson, the host may replace the starter with a minimal, evidence-backed Pack for the affected surface and mark that coverage \`usable_partial\`. No separate approval is needed.
+Run explicit \`/taste-setup\` for a broader review. During ordinary UI work, read only relevant references. A clear reusable correction may add one focused lesson for the affected surface without a repository-wide sweep.
 
-## Apply this Pack
+## Relevant guidance
 
-First identify the user's task and the affected product surface. Load only the product Skills and references relevant to that pair. Then make a small approach choice:
+Use the manifest to find coverage and references for the affected app, task, or surface. Read only matching guidance; verify details that can be read from current source or UI instead of trusting a copied snapshot. With \`usable_partial\`, do not generalize lessons beyond listed coverage.
 
-- **Conformance:** apply relevant, established, sourced product guidance.
-- **Expression:** explore when the request asks for a new direction, identifies a gap, or corrects existing guidance.
-- **Clarify:** ask one focused question when repository evidence and the conversation do not resolve a material intent or scope ambiguity.
+## When saving a lesson
 
-These labels describe how the host handles this task; they are not persisted states or Pack modes. Existing guidance can still inform an Expression task. Keep review tasks report-only unless editing is separately requested. Follow canonical repository sources for component APIs, design tokens, accessibility, and interaction contracts instead of copying them into this Pack.
-
-Respect setup readiness and coverage separately. \`in_progress\` is not usable. With \`usable_partial\`, apply only guidanceFiles listed for evidence-backed surfaces; do not generalize it to blocked or uninspected journeys. \`complete\` applies only to the recorded scope and coverage target.
-
-During setup, build the routing map from the actual product tasks, surfaces, and evidence. Do not assume every product needs the same reference categories or files. Add a shared reference only when it captures guidance useful across multiple surfaces; otherwise keep guidance scoped to the relevant surface. A URL, screenshot, or component identifies scope; it does not authorize an edit. Skip backend-only work with no user-visible effect, telemetry-only changes, generated files, and tests without shipped UI impact.
-
-## Product-specific routing
-
-Use the manifest and Pack routing map to identify the affected surface, then load only guidance relevant to both the task and surface. The host owns this routing judgment. Keep this Skill as one user-facing front door. Do not duplicate component or design-system documentation owned by the product repository.
-
-## Learn from user feedback
-
-Treat a user correction, rejection, or disagreement as direct evidence for the current task. Apply it, then keep the edit only if the product's existing checks and the relevant Pack checklist show improvement or no regression; otherwise revert and retry. Update the scoped guidance when the lesson is clear and reusable. Do not require a separate Pack review or approval. Unresolved alternatives stay in the active task and are not written into the Pack. When you write guidance, record the trigger, scope, why, exceptions, and evidence, and include settled rejected alternatives (what was considered and why it lost). Do not invent examples; cite product evidence. Use a form that teaches the decision clearly, such as a checklist, decision tree, or an annotated example grounded in that evidence. Distinguish observed behavior, inferred intent, and settled decisions. Route to new guidance by task and surface and list it in matching manifest coverage.
-
-For explicit setup or a discovery refresh, follow \`taste-setup\` to inspect the repository, choose a bounded scope, and capture evidence. When implementing or reviewing visible UI, use the harness's available browser, computer, or rendered-preview tools when needed and report what you actually inspected.
+Save only a reusable lesson whose future value justifies keeping it. Prefer confirmed decisions and rules tested through use. Keep observed behavior, inference, and settled intent distinct. Include a concise rationale, scope, exceptions, and a link to evidence. Do not save screen inventories, implementation instructions, one-off reactions, routine defects, or facts easy to reread. Keep unresolved alternatives in the task. These are selection principles, not a quota or a failure-only rule.
 `;
 function createStarterPackFiles(productName, surfaces = [], setupPolicy = { minimumUsableEvidence: "source_reviewed" }) {
   const normalizedName = productName.trim();
@@ -37102,41 +37086,9 @@ async function satisfiesMinimumEvidence(packRoot, coverage, minimum) {
   }
   return usable;
 }
-var WHY_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:why|rationale|reasons?)\b|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*(?:why|rationale)\b/i;
-var REJECTED_SECTION = /(?:^|\n)#{1,6}[ \t]+(?:rejected\b|alternatives(?:[ \t]+considered)?[ \t]+rejected\b|considered(?:[ \t]+and)?[ \t]+rejected\b|settled rejections?\b|options rejected\b)|(?:^|\n)[ \t]*(?:[-*][ \t]+)?\*\*rejected\b/i;
-var NON_DECISION_KIND = /(?:^|\n)(?:<!--\s*)?taste-kind:\s*(?:facts|evidence)\b/i;
-function declaresNonDecisionKind(content) {
-  return NON_DECISION_KIND.test(content.slice(0, 600));
-}
 function inferenceOnlyCoverage(entry) {
   if (entry.status !== "source_reviewed" && entry.status !== "rendered") return false;
   return entry.evidence.length > 0 && entry.evidence.every((evidence) => evidence.type === "inference");
-}
-async function warnOnGuidanceShape(packRoot, coverage, warnings) {
-  const seen = /* @__PURE__ */ new Set();
-  for (const entry of coverage) {
-    if (entry.status !== "source_reviewed" && entry.status !== "rendered") continue;
-    for (const relative of entry.guidanceFiles) {
-      const key = relative.replaceAll("\\", "/");
-      if (seen.has(key) || !/\.md$/i.test(key)) continue;
-      seen.add(key);
-      let content;
-      try {
-        content = await readFile(await resolvePackFile(packRoot, key), "utf8");
-      } catch {
-        continue;
-      }
-      if (declaresNonDecisionKind(content)) continue;
-      const missing = [];
-      if (!WHY_SECTION.test(content)) missing.push("Why");
-      if (!REJECTED_SECTION.test(content)) missing.push("Rejected");
-      if (missing.length === 0) continue;
-      warnings.push({
-        path: key,
-        message: `Linked guidance is missing a ${missing.join(" and ")} section (or an equivalent heading or **label:**). Record why the choice won and the settled rejected alternatives. This warning does not fail validation.`
-      });
-    }
-  }
 }
 async function readablePackFile(packRoot, relative, issues) {
   try {
@@ -37228,18 +37180,10 @@ async function validatePackAt(packRoot) {
         }
       }
       await checkSourceReferences(path.dirname(packRoot), coverage, issues);
-      await warnOnGuidanceShape(packRoot, coverage, warnings);
       if (!coverage.some((entry2) => entry2.status === "rendered" && entry2.statesObserved?.includes("populated"))) {
         warnings.push({
           path: "manifest.json",
           message: "No coverage entry rendered a populated state; every rendered observation is of loading, empty, or failure states (or nothing rendered at all). Guidance about real content is unverified. Start the product with its documented local stack and seed or test accounts, or ask the user once for safe access, then resume /taste-setup."
-        });
-      }
-      const fixtureTotal = (await listFixturesAt(packRoot, "conformance")).length + (await listFixturesAt(packRoot, "expression")).length;
-      if (fixtureTotal === 0) {
-        warnings.push({
-          path: "evals",
-          message: "The Pack has no evaluation fixtures, so taste-evaluate cannot measure whether this guidance helps. Add at least one conformance fixture (task.md, before/, after/) for a covered surface, built from a real product file."
         });
       }
       const usableCoverage = await satisfiesMinimumEvidence(packRoot, coverage, minimumUsableEvidence);
@@ -37570,7 +37514,7 @@ function createTasteServer() {
     "taste_pack_write",
     {
       title: "Write Taste Pack guidance",
-      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. Keep guidance for durable product judgment and tested lessons that are unlikely to be recovered from canonical sources; link to code, docs, lint, instructions, or rendered behavior instead of copying them. Preserve evidence and distinguish observation, inference, and settled intent. Do not add manifest fields for rationale. When creating a missing Pack from feedback, write only the affected surface's guidance and coverage metadata; do not start a sweep. The host applies the lesson and keeps it only when existing checks show improvement or no regression; no separate review or approval is required.",
+      description: "Create or replace one bounded text file inside the target repository's taste/ Pack. This cannot write harness instructions, files outside the Pack. Use for explicit Pack setup/maintenance and for a resolved reusable lesson during normal UI work. Keep guidance for durable product judgment and tested lessons that are unlikely to be recovered from canonical sources; link to code, docs, lint, instructions, or rendered behavior instead of copying them. Preserve evidence and distinguish observation, inference, and settled intent. Include rationale or rejected options only when they help retain knowledge. Do not add manifest fields for rationale. When creating a missing Pack from feedback, write only the affected surface's guidance and coverage metadata; do not start a sweep. The host applies the lesson and keeps it only when existing checks show improvement or no regression; no separate review or approval is required.",
       inputSchema: {
         runId: sessionRunId.optional(),
         repositoryPath,
@@ -37585,7 +37529,7 @@ function createTasteServer() {
     "taste_pack_validate",
     {
       title: "Validate Taste Pack structure",
-      description: "Check Pack structure, manifest, entry Skill, and evidence relationships. Fails when: usable_partial or complete coverage has only inference evidence; a source_reviewed reference is not an existing repository-relative file path; a rendered entry has no statesObserved; a blocked entry has no accessAttempts; a required not_inspected entry has neither accessAttempts nor an explicit out-of-scope/unsafe-to-attempt reason; or complete coverage has not rendered every setupScope.requiredStates state (default populated). Warns, without failing, when linked decision guidance lacks Why and Rejected sections (files declaring taste-kind: facts or evidence are exempt), when no rendered entry observed a populated state, and when the Pack has no evaluation fixtures. Treat warnings as work items. Structural validation only, not a quality judgment or a guidance grammar.",
+      description: "Check Pack structure, manifest, and evidence relationships. Fails when: usable_partial or complete coverage has only inference evidence; a source_reviewed reference is not an existing repository-relative file path; a rendered entry has no statesObserved; a blocked entry has no accessAttempts; a required not_inspected entry has neither accessAttempts nor an explicit out-of-scope/unsafe-to-attempt reason; or complete coverage has not rendered every setupScope.requiredStates state (default populated). Warns, without failing, when no rendered entry observed a populated state. Guidance wording and evaluation fixtures are optional; validation does not impose a prose template or judge product design.",
       inputSchema: { runId: sessionRunId.optional(), repositoryPath },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },

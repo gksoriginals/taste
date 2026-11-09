@@ -96,7 +96,7 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(setup, /usable_partial/);
   assert.match(setup, /continue with other in-scope apps and source review/i);
   assert.match(setup, /complete.*every ID in the confirmed `setupScope.requiredCoverage`/s);
-  assert.match(setup, /multiple plausible products\/apps remain and the choice materially changes scope/i);
+  assert.match(setup, /Select representative, consequential journeys/);
   assert.match(setup, /preserve the most accurate status if interrupted/i);
   assert.match(setup, /continue with other in-scope apps and source review/i);
   assert.match(setup, /They are optional evidence of intended design/i);
@@ -106,17 +106,18 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(setup, /Inventory user-facing apps, routes, entry points, navigation, journeys/i);
   assert.match(setup, /without manually touring every URL/i);
   assert.match(setup, /Label evidence `rendered`, `source_reviewed`, `design_reference`, or `inference`/i);
-  assert.match(setup, /provenance and last-verified dates/i);
+  assert.match(setup, /Leave readily visible state, inventories, routine defects, and startup recipes/i);
   assert.match(setup, /durable product judgment/);
   assert.match(setup, /link to code, lint, docs, existing instructions, or rendered behavior/i);
-  assert.match(setup, /Batch unresolved candidate decisions into a concise question/i);
-  assert.match(setup, /Keep audit findings .* separate from Pack guidance/i);
+  assert.match(setup, /If intent is unclear and consequential, ask the user/i);
+  assert.match(setup, /do not require a guidance file or manifest row for every route/i);
+  assert.match(setup, /guidance created\/updated, audit findings separately/i);
   assert.match(setup, /For a required journey left `not_inspected`, record attempts too/i);
-  assert.match(setup, /Never store secrets or personal data there/i);
+  assert.match(setup, /Never store credentials, tokens, or real personal data/i);
   assert.match(setup, /New-product design can proceed as Expression/i);
   assert.match(sweep, /Figma is optional/i);
   assert.match(sweep, /Ask once for safe access/i);
-  assert.match(sweep, /durable product judgment/);
+  assert.match(sweep, /likely future value justifies their context cost/);
   assert.match(sweep, /Do not require every route to be toured/i);
   assert.match(design, /A new direction, correction, or greenfield surface is Expression work and can proceed without a prior Pack/);
   assert.match(design, /If no Pack exists, do not start a product-wide sweep/i);
@@ -127,13 +128,13 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(expression, /include it in the matching manifest coverage/);
   assert.match(command, /Inventory repository apps, routes, journeys, design sources/i);
   assert.match(command, /If a journey is blocked, record its gap/i);
-  assert.match(command, /durable product judgment/);
+  assert.match(command, /Save a Pack item only when future work is likely to need it/i);
   assert.match(command, /required journeys marked `not_inspected`/i);
   assert.match(command, /source evidence can support useful partial guidance/i);
   assert.match(command, /Never request production credentials or store secrets or real user data/i);
 });
 
-test("guidance writes record settled rejections, and UI work briefs before check-and-repair", async () => {
+test("guidance preserves useful rationale, and UI work briefs before check-and-repair", async () => {
   const readSkill = (name: string) => readFile(path.join(root, "skills", name, "SKILL.md"), "utf8");
   const [expression, design, conformance, setup, sweep, pack] = await Promise.all([
     readSkill("taste-expression"),
@@ -144,12 +145,14 @@ test("guidance writes record settled rejections, and UI work briefs before check
     readSkill("taste-pack"),
   ]);
 
-  for (const skill of [expression, setup, pack]) {
-    assert.match(skill, /settled rejected alternatives/i);
-    assert.match(skill, /Unresolved alternatives stay in the active task/);
-    assert.match(skill, /Do not invent examples; cite product evidence/);
+  for (const skill of [setup, pack]) {
+    assert.match(skill, /unresolved alternatives/i);
   }
-  assert.match(sweep, /Do not invent examples/);
+  assert.match(setup, /include rationale or rejected options when they add durable knowledge/i);
+  assert.match(pack, /Include rationale or rejected options when they preserve knowledge/);
+  assert.match(expression, /cite evidence and distinguish observed behavior, inference, and settled intent/i);
+  assert.match(sweep, /Do not add route descriptions, coverage rows, word quotas/i);
+  assert.match(sweep, /Do not apply a “failures only” rule/i);
   for (const skill of [design, conformance]) {
     assert.match(skill, /task-local brief before editing product files/);
     assert.match(skill, /Keep the change only if the checker shows improvement or no regression/);
@@ -190,6 +193,6 @@ test("setup starts the product before recording a block and records what it actu
   assert.match(setup, /migrationNeeded/);
   assert.match(setup, /simulator, emulator/);
   assert.match(setup, /which source wins on conflict/);
-  assert.match(setup, /conformance fixture/);
+  assert.match(setup, /Evaluation fixtures and rubrics are optional/);
   assert.match(setup, /Say plainly whether any populated state was rendered/);
 });

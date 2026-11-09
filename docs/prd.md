@@ -28,14 +28,14 @@ They are not Pack modes or setup states. Packs do not need persistent per-task r
 
 **Normal UI work** uses the existing Pack where relevant. If the Pack is absent or does not cover the surface, the host can still do the requested work in Expression. For non-trivial UI work, the host writes a short task-local brief before editing product files: the intent, the Pack constraints that apply, and options being rejected. The brief stays in the task.
 
-When a user correction or resolved disagreement establishes a clear reusable lesson, the host applies it and keeps the edit only when the product's existing checks and the relevant Pack checklist show improvement or no regression; otherwise the host reverts and retries. Taste does not run those checks, own a CI gate, or compute the before/after delta. The host may then write the lesson to scoped guidance. Guidance records why the choice won and the settled rejected alternatives (what was considered and why it lost), with trigger, scope, exceptions, and evidence. Examples cite product evidence. Unresolved alternatives are not written into the Pack. If needed, the host can create a minimal Pack for that affected surface; this is not a product-wide sweep. One-off reactions stay in the active conversation.
+When a user correction or resolved disagreement establishes a clear reusable lesson, the host applies it and keeps the edit only when the product's existing checks and the relevant Pack checklist show improvement or no regression; otherwise the host reverts and retries. Taste does not run those checks, own a CI gate, or compute the before/after delta. The host may then write the lesson to scoped guidance, preserving evidence and adding rationale or rejected options when they help a future assistant recover the judgment. Unresolved alternatives are not written into the Pack. If needed, the host can create a minimal Pack for that affected surface; this is not a product-wide sweep. One-off reactions stay in the active conversation.
 
 Taste does not observe conversations or decide whether a lesson is reusable. The host makes that judgment and supplies the content to Taste's Pack tools. There is no separate human approval or promotion step for updating scoped guidance.
 
 ## Product boundaries
 
 - Keep product guidance in the product repository, not in the Taste plugin checkout.
-- Prefer small, actionable rules with scope, rationale, settled rejected alternatives, and traceable evidence. Put why and rejections in guidance Markdown, not new manifest fields.
+- Prefer concise, useful lessons with traceable evidence. Do not add rationale or rejected-option sections just to fill a template; retain the context that makes a lesson reusable.
 - Treat shipped UI as evidence of current behavior, not proof that every choice is intentional or desirable.
 - Do not turn an observed pattern into an intentional rule without evidence for its rationale. When intent is unresolved, ask concisely if the user is available; otherwise omit it or label it as inference.
 - Distinguish rendered observations, source facts, design references, and inference.

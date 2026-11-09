@@ -111,9 +111,9 @@ test("initializes an in-progress product-specific Pack shell without touching re
     assert.equal(inspection.entrySkillAvailable, true);
     assert.equal(await readFile(path.join(repositoryPath, "AGENTS.md"), "utf8"), originalInstructions);
     const starter = await readFile(path.join(repositoryPath, "taste/skills/product-design/SKILL.md"), "utf8");
-    assert.match(starter, /Unresolved alternatives stay in the active task/);
-    assert.match(starter, /settled rejected alternatives/);
-    assert.match(starter, /Do not invent examples; cite product evidence/);
+    assert.match(starter, /short routing index/);
+    assert.match(starter, /do not inventory screens/);
+    assert.doesNotMatch(starter, /## Apply this Pack/);
     assert.deepEqual(inspection.validation.warnings, []);
   });
 });
@@ -231,7 +231,7 @@ test("usable coverage whose only evidence is inference fails validation", async 
   });
 });
 
-test("linked guidance missing Why or Rejected sections warns without failing validation", async () => {
+test("guidance prose does not need template sections", async () => {
   await withRepository(async (repositoryPath) => {
     await prepareEvidencePack(repositoryPath);
     const manifestPath = path.join(repositoryPath, "taste/manifest.json");
@@ -240,8 +240,7 @@ test("linked guidance missing Why or Rejected sections warns without failing val
 
     const warned = await validatePack(repositoryPath);
     assert.equal(warned.valid, true, JSON.stringify(warned.issues));
-    assert.ok(warned.warnings.some((warning) => warning.path.endsWith("admin-login.md") && /Why and Rejected/.test(warning.message)));
-    assert.equal(warned.warnings.some((warning) => warning.path.endsWith("portal-billing.md")), false);
+    assert.equal(warned.warnings.some((warning) => warning.path.endsWith("admin-login.md") || warning.path.endsWith("portal-profile.md")), false);
 
     const packRoot = path.join(repositoryPath, "taste");
     await writeFile(path.join(packRoot, "skills/product-design/references/admin-login.md"), "# Admin Authentication\n\n## Why\n\nKeep the user on the form so valid entries survive a validation error.\n\n## Rejected alternatives\n\nA full-page error was rejected because the source keeps the submitted form mounted. Evidence: src/admin/routes.ts. Visual behavior is not verified by this source-only evidence.\n");
@@ -500,17 +499,14 @@ test("a legacy 'incomplete' Pack is read as in_progress with migration steps", a
   });
 });
 
-test("fact files opt out of the Why/Rejected check, and a Pack with no fixtures is warned", async () => {
+test("evaluation fixtures remain optional", async () => {
   await withRepository(async (repositoryPath) => {
     await prepareEvidencePack(repositoryPath);
     const packRoot = path.join(repositoryPath, "taste");
-    await writeFile(path.join(packRoot, "skills/product-design/references/admin-login.md"), "---\ntaste-kind: facts\n---\n# Admin facts\n\nThe Admin app serves login at /login on the documented local port. Source: src/admin/routes.ts. Visual behavior is not verified by this source-only evidence.\n");
     await setManifest(repositoryPath, (manifest) => ({ ...manifest, setupStatus: "usable_partial" }));
 
     const validation = await validatePack(repositoryPath);
     assert.equal(validation.valid, true, JSON.stringify(validation.issues));
-    assert.equal(validation.warnings.some((warning) => warning.path.endsWith("admin-login.md")), false);
-    assert.ok(validation.warnings.some((warning) => warning.path.endsWith("portal-profile.md")));
-    assert.ok(validation.warnings.some((warning) => warning.path === "evals" && /no evaluation fixtures/.test(warning.message)));
+    assert.equal(validation.warnings.some((warning) => warning.path === "evals"), false);
   });
 });
