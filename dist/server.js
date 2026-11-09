@@ -36894,7 +36894,7 @@ async function inspectPack(repositoryPath2) {
       blocked: coverage.filter((item) => item.status === "blocked").length,
       notInspected: coverage.filter((item) => item.status === "not_inspected").length,
       required: requiredCoverage.length,
-      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => {
+      targetMet: manifest?.setupScope?.selection === "user_confirmed" && requiredCoverage.length > 0 && requiredCoverage.every((id) => {
         const entry = coverageById.get(id);
         return entry?.status === "rendered" && requiredStates.every((state) => Array.isArray(entry.statesObserved) && entry.statesObserved.includes(state));
       })
@@ -37193,6 +37193,8 @@ async function validatePackAt(packRoot) {
       if (setupStatus === "complete") {
         if (!setupScope || setupScope.requiredCoverage.length === 0) {
           issues.push({ path: "manifest.json", message: "A complete Pack must list its confirmed requiredCoverage and coverage target in setupScope." });
+        } else if (setupScope.selection !== "user_confirmed") {
+          issues.push({ path: "manifest.json", message: "A complete Pack requires user-confirmed setupScope.selection; a host-selected sample cannot establish completion." });
         } else {
           for (const requiredId of setupScope.requiredCoverage) {
             const entry2 = coverage.find((item) => item.id === requiredId);
@@ -37455,7 +37457,7 @@ async function toolResult(toolName, operation, runId) {
 }
 function createTasteServer() {
   const server2 = new McpServer(
-    { name: "taste", version: "0.2.0" },
+    { name: "taste", version: "0.3.0" },
     {
       instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes." + (process.env.TASTE_TRACE_DIR ? " Local session tracing is enabled. Follow the Session traces section of taste-design." : "")
     }
@@ -37582,7 +37584,7 @@ function createTasteServer() {
   return server2;
 }
 var server = createTasteServer();
-logDiagnostic("debug", "server_starting", { version: "0.2.0", transport: "stdio" });
+logDiagnostic("debug", "server_starting", { version: "0.3.0", transport: "stdio" });
 await server.connect(new StdioServerTransport());
 export {
   createTasteServer

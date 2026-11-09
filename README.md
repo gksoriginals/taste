@@ -18,7 +18,7 @@ This repository ships seven Taste Skills: setup, sweep, design, conformance, exp
 
 For ordinary UI work, the assistant reads guidance for the affected surface, makes the requested change, and checks its work. When you correct a design choice, the assistant applies the correction. If the feedback establishes a clear lesson worth reusing, it updates the relevant guidance. If no Pack covers that surface, it creates a small Pack for that surface. One-off reactions stay in the conversation. This learning does not start a product-wide sweep.
 
-Use `/taste-setup` in Cursor, or invoke Taste's `taste-setup` Skill in another supported assistant, when you want a broader product inspection. Setup inventories the repository, identifies apps and journeys, chooses a scope, inspects accessible UI and source, then writes product-specific guidance. If part of the product is inaccessible, it records the gap and continues with other accessible parts. The assistant checks its own guidance; no separate human approval step is required.
+Use `/taste-setup` in Cursor, or invoke Taste's `taste-setup` Skill in another supported assistant, when you want a broader product inspection. Setup inventories the repository and accessible decision sources, proposes consequential scope and candidate decisions, inspects accessible UI and source, then writes product-specific guidance. The owner confirms material scope and candidate decisions before setup claims completion or labels them settled owner intent. If part of the product is inaccessible, setup records the gap and continues with other accessible parts.
 
 ```mermaid
 flowchart TD
@@ -80,12 +80,12 @@ Coding models can produce working interfaces, but without product context they t
 
 The approach draws on several published systems and methods:
 
-- [Vercel's product-design system](https://vercel.com/blog/teaching-agents-product-design-at-vercel) shows how repository-owned Skills can route by task and surface, while product rules, examples, evidence, and mechanical checks stay close to the code they govern. Taste uses that as a starting point and lets each product choose the guidance it needs.
+- [Vercel's product-design system](https://vercel.com/blog/teaching-agents-product-design-at-vercel) shows how repository-owned Skills route work and make accepted decisions available to every agent, including rationale otherwise left in reviews or conversations. Taste uses that as a starting point and lets each product choose the guidance it needs.
 - [LangChain's design agent](https://www.langchain.com/blog/design-agent) describes combining expert judgment in Skills and checks with feedback and evaluation. Taste borrows the knowledge-layer and evaluation ideas; it does not include LangChain's agent runtime or hosted environment.
 - [Anthropic's frontend Skills article](https://claude.com/resources/articles/improving-frontend-design-through-skills) explains how focused Skills can give models design context only when a UI task needs it, helping avoid generic output without loading frontend rules into every task.
 - [Emil Kowalski's “Agents with Taste”](https://emilkowal.ski/ui/agents-with-taste) demonstrates how to turn visual judgment into concrete, scenario-based guidance with reasons—for example, how an animation should enter, move, or respond to hover. Taste applies the same idea across product-specific surfaces and tasks, while keeping rules tied to evidence and scope.
 
-Taste applies these ideas with evidence labels and source references: the assistant should distinguish what it saw in the running product from what it learned from source code, design files, or inference. It should record coverage gaps rather than turn a small sample into a product-wide rule.
+Taste applies these ideas with evidence labels and source references: the assistant should distinguish owner decisions, rendered observations, source facts, design references, and inference. It should link to material the same future agent can readily retrieve, while preserving a concise generalized decision from local-only sources that other agents cannot access. It should record coverage gaps rather than turn a small sample into a product-wide rule. `complete` requires user-confirmed setup scope; a host-selected sample cannot establish completion.
 
 These sources inform Taste's design; they do not prove that Taste improves results. The project's evaluation approach is to compare the same task with and without relevant guidance, keep the conditions as similar as practical, and score following product rules separately from similarity to existing UI. Examples held back from authoring can help check whether guidance generalizes. See [Engineering design](docs/engineering.md) for the full rationale and evaluation details.
 

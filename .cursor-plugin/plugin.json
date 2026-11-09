@@ -1,6 +1,6 @@
 {
   "name": "taste",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Taste provides an explicit setup command for creating or resuming a product-specific Pack, plus UI guidance and checklist learning for existing Packs.",
   "skills": "./skills/",
   "mcpServers": "./.cursor.mcp.json",

@@ -364,7 +364,7 @@ export async function inspectPack(repositoryPath: string): Promise<{
       blocked: coverage.filter((item) => item.status === "blocked").length,
       notInspected: coverage.filter((item) => item.status === "not_inspected").length,
       required: requiredCoverage.length,
-      targetMet: requiredCoverage.length > 0 && requiredCoverage.every((id) => {
+      targetMet: manifest?.setupScope?.selection === "user_confirmed" && requiredCoverage.length > 0 && requiredCoverage.every((id) => {
         const entry = coverageById.get(id);
         return entry?.status === "rendered" && requiredStates.every((state) => Array.isArray(entry.statesObserved) && entry.statesObserved.includes(state));
       }),
@@ -705,6 +705,8 @@ async function validatePackAt(packRoot: string): Promise<PackValidation> {
       if (setupStatus === "complete") {
         if (!setupScope || setupScope.requiredCoverage.length === 0) {
           issues.push({ path: "manifest.json", message: "A complete Pack must list its confirmed requiredCoverage and coverage target in setupScope." });
+        } else if (setupScope.selection !== "user_confirmed") {
+          issues.push({ path: "manifest.json", message: "A complete Pack requires user-confirmed setupScope.selection; a host-selected sample cannot establish completion." });
         } else {
           for (const requiredId of setupScope.requiredCoverage) {
             const entry = coverage.find((item) => item.id === requiredId);

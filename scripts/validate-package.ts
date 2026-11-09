@@ -1,4 +1,5 @@
 import { readFile, readdir, stat } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import pluginSchema from "../schemas/agent-plugins/1.0.0/plugin.schema.json" with { type: "json" };
@@ -9,12 +10,13 @@ const readJson = async <T>(relativePath: string): Promise<T> => JSON.parse(await
 const issues: string[] = [];
 
 const plugin = await readJson<Record<string, unknown>>("plugin.json");
+const serverSource = await readFile(path.join(root, "src/server.ts"), "utf8");
 const portableMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }> }>("mcp.json");
 const codexManifest = await readJson<{ name?: string; version?: string; skills?: string; mcpServers?: string }>(".codex-plugin/plugin.json");
 const codexMcp = await readJson<{ mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }> }>(".mcp.json");
-const claudeManifest = await readJson<{ name?: string; mcpServers?: string }>(".claude-plugin/plugin.json");
+const claudeManifest = await readJson<{ name?: string; version?: string; mcpServers?: string }>(".claude-plugin/plugin.json");
 const claudeMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[] }> }>(".claude.mcp.json");
-const cursorManifest = await readJson<{ name?: string; skills?: string; commands?: string; mcpServers?: string }>(".cursor-plugin/plugin.json");
+const cursorManifest = await readJson<{ name?: string; version?: string; skills?: string; commands?: string; mcpServers?: string }>(".cursor-plugin/plugin.json");
 const cursorMcp = await readJson<{ mcpServers?: Record<string, { command?: string; args?: string[]; cwd?: string }> }>(".cursor.mcp.json");
 const codexMarketplace = await readJson<{ name?: string; plugins?: Array<{ name?: string; source?: { source?: string; path?: string }; policy?: { installation?: string; authentication?: string }; category?: string }> }>(".agents/plugins/marketplace.json");
 
@@ -24,6 +26,24 @@ const validateMcp = ajv.compile(mcpSchema);
 if (!validatePlugin(plugin)) issues.push(`plugin.json: ${JSON.stringify(validatePlugin.errors)}`);
 if (!validateMcp(portableMcp)) issues.push(`mcp.json: ${JSON.stringify(validateMcp.errors)}`);
 if (claudeManifest.name !== plugin.name) issues.push("Claude Code and portable plugin names must match.");
+if (claudeManifest.version !== plugin.version || cursorManifest.version !== plugin.version) issues.push("All host plugin manifests must use the portable plugin version.");
+if (typeof plugin.version !== "string" || codexManifest.version !== plugin.version) issues.push("Codex and portable plugin versions must match.");
+if (typeof plugin.version === "string" && !serverSource.includes(`version: "${plugin.version}"`)) issues.push("MCP server version must match the plugin manifests.");
+
+if (typeof plugin.version === "string") {
+  try {
+    const releaseCommit = execFileSync("git", ["log", "-1", "--format=%H", "-S", `\"version\": \"${plugin.version}\"`, "--", "package.json"], { cwd: root, encoding: "utf8" }).trim();
+    if (releaseCommit) {
+      const releasedPackage = JSON.parse(execFileSync("git", ["show", `${releaseCommit}:package.json`], { cwd: root, encoding: "utf8" })) as { version?: string };
+      const changedUserFacingFiles = execFileSync("git", ["diff", "--name-only", releaseCommit, "--", "skills", "cursor/commands", "src", "dist", "plugin.json", ".claude-plugin", ".codex-plugin", ".cursor-plugin"], { cwd: root, encoding: "utf8" }).trim();
+      if (releasedPackage.version === plugin.version && changedUserFacingFiles) {
+        issues.push(`User-facing plugin files changed after version ${plugin.version} was released; bump the plugin version before shipping these changes.`);
+      }
+    }
+  } catch {
+    // Package validation still works in source archives without Git history.
+  }
+}
 if (claudeManifest.mcpServers !== "./.claude.mcp.json") issues.push("Claude Code manifest must point to its native MCP config.");
 if (cursorManifest.name !== plugin.name || cursorManifest.skills !== "./skills/" || cursorManifest.commands !== "./cursor/commands/" || cursorManifest.mcpServers !== "./.cursor.mcp.json") {
   issues.push("Cursor manifest must point to shared Skills, explicit commands, and Cursor-specific MCP config.");

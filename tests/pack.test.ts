@@ -60,7 +60,7 @@ async function prepareEvidencePack(repositoryPath: string, minimumUsableEvidence
   }
   const scope: SetupScope = {
     description: "Representative Admin authentication and Portal profile/billing journeys.",
-    selection: "host_selected",
+    selection: "user_confirmed",
     repositoryApps: ["Admin", "Portal"],
     products: ["Admin", "Portal"],
     exclusions: ["Other Portal routes share the inspected layout and remain a later sweep target."],
@@ -211,6 +211,21 @@ test("complete status requires every confirmed coverage target to be rendered an
     assert.equal(complete.setupStatus, "complete");
     assert.equal(complete.coverageSummary.targetMet, true);
     assert.equal(complete.validation.valid, true, JSON.stringify(complete.validation.issues));
+  });
+});
+
+test("host-selected scope cannot be marked complete", async () => {
+  await withRepository(async (repositoryPath) => {
+    await prepareEvidencePack(repositoryPath, "source_reviewed", ["admin.login", "portal.profile", "portal.billing"]);
+    await setManifest(repositoryPath, (manifest) => ({
+      ...manifest,
+      setupStatus: "complete",
+      setupScope: { ...(manifest.setupScope as SetupScope), selection: "host_selected" },
+    }));
+    const inspection = await inspectPack(repositoryPath);
+    assert.equal(inspection.coverageSummary.targetMet, false);
+    assert.equal(inspection.validation.valid, false);
+    assert.ok(inspection.validation.issues.some((issue) => /requires user-confirmed setupScope.selection/i.test(issue.message)));
   });
 });
 

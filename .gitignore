@@ -3,3 +3,4 @@ node_modules/
 *.log
 
 /.taste-eval-runs/
+/.taste-setup-runs/

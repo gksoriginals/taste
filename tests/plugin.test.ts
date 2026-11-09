@@ -60,7 +60,7 @@ test("Codex compatibility manifest routes to its plugin-root MCP config and Skil
     mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; cwd?: string }>;
   };
   assert.equal(manifest.name, "taste");
-  assert.equal(manifest.version, "0.2.0");
+  assert.equal(manifest.version, "0.3.0");
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.mcpServers, "./.mcp.json");
   assert.deepEqual(mcp.mcpServers?.taste, {
@@ -95,11 +95,15 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(setup, /source_reviewed.*rendered_flow/s);
   assert.match(setup, /usable_partial/);
   assert.match(setup, /continue with other in-scope apps and source review/i);
-  assert.match(setup, /complete.*every ID in the confirmed `setupScope.requiredCoverage`/s);
+  assert.match(setup, /complete.*every ID in the user-confirmed `setupScope.requiredCoverage`/s);
   assert.match(setup, /Select representative, consequential journeys/);
   assert.match(setup, /preserve the most accurate status if interrupted/i);
   assert.match(setup, /continue with other in-scope apps and source review/i);
   assert.match(setup, /They are optional evidence of intended design/i);
+  assert.match(setup, /feedback memories and rejected UI directions/i);
+  assert.match(setup, /durable decision is buried in a local-only memory/i);
+  assert.match(setup, /confirm, edit, or reject candidates/i);
+  assert.match(setup, /candidate decisions, and which candidates were confirmed/i);
   assert.match(setup, /Ask for design-source access only when it materially improves the agreed scope/i);
   assert.match(setup, /ask once for safe access when it materially improves coverage/i);
   assert.match(setup, /Never request production credentials or store credentials, tokens, or real personal data/i);
@@ -109,11 +113,11 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(setup, /Leave readily visible state, inventories, routine defects, and startup recipes/i);
   assert.match(setup, /durable product judgment/);
   assert.match(setup, /link to code, lint, docs, existing instructions, or rendered behavior/i);
-  assert.match(setup, /If intent is unclear and consequential, ask the user/i);
+  assert.match(setup, /Present decision candidates and material uncertainties in one concise batch/i);
   assert.match(setup, /do not require a guidance file or manifest row for every route/i);
   assert.match(setup, /guidance created\/updated, audit findings separately/i);
   assert.match(setup, /For a required journey left `not_inspected`, record attempts too/i);
-  assert.match(setup, /Never store credentials, tokens, or real personal data/i);
+  assert.match(setup, /Never store credentials, tokens, private quotes, or real personal data/i);
   assert.match(setup, /New-product design can proceed as Expression/i);
   assert.match(sweep, /Figma is optional/i);
   assert.match(sweep, /Ask once for safe access/i);
@@ -131,6 +135,8 @@ test("setup remains explicit while Expression saves clear feedback as scoped gui
   assert.match(command, /Save a Pack item only when future work is likely to need it/i);
   assert.match(command, /required journeys marked `not_inspected`/i);
   assert.match(command, /source evidence can support useful partial guidance/i);
+  assert.match(command, /product decisions as well as operational recipes/i);
+  assert.match(command, /host-selected sample cannot be complete/i);
   assert.match(command, /Never request production credentials or store secrets or real user data/i);
 });
 
@@ -153,6 +159,8 @@ test("guidance preserves useful rationale, and UI work briefs before check-and-r
   assert.match(expression, /cite evidence and distinguish observed behavior, inference, and settled intent/i);
   assert.match(sweep, /Do not add route descriptions, coverage rows, word quotas/i);
   assert.match(sweep, /Do not apply a “failures only” rule/i);
+  assert.match(sweep, /feedback memories/i);
+  assert.match(sweep, /local-only decision/i);
   for (const skill of [design, conformance]) {
     assert.match(skill, /task-local brief before editing product files/);
     assert.match(skill, /Keep the change only if the checker shows improvement or no regression/);

@@ -11,11 +11,15 @@ Use the [evaluation skill](../skills/taste-evaluate/SKILL.md) to run the tasks i
 
 Start with one development fixture, then use independently selected holdouts before drawing product-level conclusions. Pin the starting state and keep the task, model, effort, and other capabilities comparable. Record actual skill loads and tool calls. Keep judge-only references out of generator workspaces. Give the independent reviewer unlabeled outputs and the same rubric before revealing the arms. Existing rendered UI and accepted work are evidence. Use observable acceptance criteria when several designs can succeed.
 
+For a first independent product study, prefer an open-source repository outside the Taste author's projects, with a small runnable UI, clear license, demo/seed data, and no required account or external service. Avoid projects whose existing agent memories, private knowledge servers, or extensive product instructions would supply the same context as Taste; record any instruction files or other guidance the baseline already loads. Before editing the target, capture its revision, screenshots at chosen viewports, accessible states, existing checks, and the exact UI task. Make a visible, bounded change with an observable acceptance rubric. Keep separate clean copies of the same starting revision for the with/without arms.
+
 For product tasks, score task completion, product judgment, and rendered quality separately. For skill and tool comparisons, also collect task-specific evidence such as successful tool calls, recovery from errors, or duration. Use the same criteria for both arms. Score each dimension from 0 to 3, where 0 is a failed criterion, 1 is a material gap, 2 meets the criterion with a minor gap, and 3 fully meets it. If a criterion cannot be verified, record the deviation and omit it from both arms. Review paired differences alongside evidence. Keep exploratory runs distinct from holdouts.
 
 ## Record and report
 
 Save one JSON file per completed pair. This fabricated example illustrates the format.
+
+Keep setup discovery notes separately under `.taste-setup-runs/` (gitignored), one redacted JSON record per setup run. Record repository/revision, host and date, scope proposed and user-confirmed, decision-source categories checked, sources inaccessible, candidate count, candidate dispositions (confirmed/edited/rejected/omitted/inference), Pack files changed, validation result, and material deviations. Record source paths or stable identifiers where safe, but not private quotes, raw transcript text, credentials, or personal data. This makes the source-discovery step auditable without loading an operational log into every Pack session.
 
 ```json
 {
