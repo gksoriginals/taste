@@ -165,8 +165,10 @@ test("guidance preserves useful rationale, and UI work briefs before check-and-r
   assert.match(sweep, /local-only decision/i);
   for (const skill of [design, conformance]) {
     assert.match(skill, /task-local brief before editing product files/);
-    assert.match(skill, /Keep the change only if the checker shows improvement or no regression/);
+    assert.match(skill, /Keep the change only if checks show improvement or no regression/);
     assert.match(skill, /checkSummaries\.before/);
+    assert.match(skill, /record \*\*Pass\*\*, \*\*Fail\*\*, or \*\*Unverified\*\*/);
+    assert.match(skill, /do not imply the condition passed/i);
   }
   assert.match(expression, /Keep the change only if the checker shows improvement or no regression/);
   assert.match(expression, /checkSummaries\.before/);

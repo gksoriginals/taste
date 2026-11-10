@@ -37464,7 +37464,7 @@ async function toolResult(toolName, operation, runId) {
 }
 function createTasteServer() {
   const server2 = new McpServer(
-    { name: "taste", version: "0.4.0" },
+    { name: "taste", version: "0.4.1" },
     {
       instructions: "For UI tasks, route from the current user request and affected product surface, then load the relevant Skill and scoped guidance. Choose whether to apply established guidance, explore a new direction/gap/correction, or ask a focused clarification when intent or scope is materially unclear. Conformance and Expression are behavior labels, not Pack modes." + (process.env.TASTE_TRACE_DIR ? " Local session tracing is enabled. Follow the Session traces section of taste-design." : "")
     }
@@ -37591,7 +37591,7 @@ function createTasteServer() {
   return server2;
 }
 var server = createTasteServer();
-logDiagnostic("debug", "server_starting", { version: "0.4.0", transport: "stdio" });
+logDiagnostic("debug", "server_starting", { version: "0.4.1", transport: "stdio" });
 await server.connect(new StdioServerTransport());
 export {
   createTasteServer
